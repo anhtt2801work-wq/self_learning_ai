@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Deep Learning · Tự học AI</title>
-<meta name="description" content="Deep Learning từ nơ-ron đến mạng sâu: hàm kích hoạt, lan truyền ngược, bộ tối ưu Adam, điều chuẩn, CNN, RNN và vòng lặp huấn luyện PyTorch.">
+<meta name="description" content="Deep Learning chuyên sâu: backprop dạng ma trận, momentum và Adam, khởi tạo, chuẩn hóa, BPTT và LSTM, đọc đường cong huấn luyện, PyTorch, kèm nhiều minh họa tương tác.">
 <script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
@@ -14,6 +14,7 @@
 <script defer src="assets/js/search-index.js"></script>
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-dl.js"></script>
+<script defer src="assets/js/viz-dl2.js"></script>
 </head>
 <body data-page="dl">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -95,6 +96,52 @@ for step in range(3000):
 print("loss:", loss, "acc:", ((p > 0.5) == y).mean())</code></pre>
 <p>Hãy tự kiểm tra gradient bằng sai phân hữu hạn: \(\frac{J(\theta+\epsilon)-J(\theta-\epsilon)}{2\epsilon}\) với \(\epsilon\sim10^{-5}\) rồi so với kết quả backprop. Đây là cách phát hiện lỗi đạo hàm kinh điển (PyTorch có <code>torch.autograd.gradcheck</code> cho việc này).</p>
 
+<h3 id="backprop-ma-tran">Suy dẫn lan truyền ngược dạng ma trận cho cả lô</h3>
+<p>Trong thực tế ta xử lý \(B\) mẫu cùng lúc. Xếp các mẫu thành hàng: \(H^{(l-1)}\in\mathbb{R}^{B\times n_{l-1}}\), \(W^{(l)}\in\mathbb{R}^{n_l\times n_{l-1}}\), và</p>
+$$Z^{(l)}=H^{(l-1)}W^{(l)\top}+\mathbf{1}\,\mathbf{b}^{(l)\top},\qquad H^{(l)}=\phi\big(Z^{(l)}\big),\qquad \Delta^{(l)}:=\frac{\partial L}{\partial Z^{(l)}}\in\mathbb{R}^{B\times n_l}$$
+<p>Từng phần tử: \(Z_{bj}=\sum_iH_{bi}W_{ji}+b_j\). Áp dụng quy tắc chuỗi:</p>
+$$\frac{\partial L}{\partial W_{ji}}=\sum_{b}\Delta_{bj}H_{bi}\ \Rightarrow\ \frac{\partial L}{\partial W^{(l)}}=\Delta^{(l)\top}H^{(l-1)},\qquad \frac{\partial L}{\partial b_j}=\sum_b\Delta_{bj},\qquad \frac{\partial L}{\partial H_{bi}}=\sum_j\Delta_{bj}W_{ji}\ \Rightarrow\ \frac{\partial L}{\partial H^{(l-1)}}=\Delta^{(l)}W^{(l)}$$
+<p>và đi qua hàm kích hoạt theo từng phần tử: \(\Delta^{(l-1)}=\big(\Delta^{(l)}W^{(l)}\big)\odot\phi'\big(Z^{(l-1)}\big)\). Ở lớp cuối với softmax và cross-entropy trung bình trên lô, \(L=-\frac1B\sum_b\big[z_{b,y_b}-\ln\sum_je^{z_{bj}}\big]\), nên</p>
+$$\Delta^{(L)}=\frac1B\big(P-Y\big)$$
+<p>với \(P\) là ma trận xác suất softmax và \(Y\) là ma trận one-hot. Bốn điều thực dụng rút ra từ các công thức này:</p>
+<ul>
+  <li><strong>Kiểm tra kích thước</strong>: \(\Delta^\top H\) có dạng \((n_l\times B)(B\times n_{l-1})=n_l\times n_{l-1}\), đúng bằng kích thước \(W\). Lỗi hình dạng tensor là loại lỗi hay gặp nhất khi tự cài.</li>
+  <li><strong>Phải nhớ \(H\) và \(Z\) của lượt xuôi</strong> để dùng ở lượt ngược. Đó là lý do bộ nhớ huấn luyện lớn hơn nhiều bộ nhớ suy luận, và vì sao có kỹ thuật <em>gradient checkpointing</em> (không lưu hết, tính lại khi cần, đổi thời gian lấy bộ nhớ).</li>
+  <li><strong>Chi phí</strong>: lượt xuôi có một phép nhân ma trận mỗi lớp, lượt ngược có hai (\(\Delta^\top H\) và \(\Delta W\)), nên một bước huấn luyện tốn khoảng 3 lần lượt xuôi. Đó là gốc của ước lượng \(6ND\) FLOP ở trang LLM (mỗi tham số mỗi token: 2 FLOP xuôi + 4 FLOP ngược).</li>
+  <li><strong>Gradient trung bình trên lô</strong>: hệ số \(1/B\) nằm trong \(\Delta^{(L)}\); quên nó tương đương nhân tốc độ học với \(B\).</li>
+</ul>
+<h3 id="backprop-tung-buoc">Thực hành: đi qua từng đạo hàm riêng</h3>
+<p>Minh họa dưới đây lập một mạng 2–2–1 (tanh ở lớp ẩn, sigmoid và cross-entropy ở đầu ra) và hiển thị <em>từng</em> đạo hàm riêng theo thứ tự backprop thực hiện. Bạn có thể đổi trọng số, đầu vào và nhãn. Ở cuối, chương trình so toàn bộ 9 gradient với đạo hàm số (sai phân hữu hạn) để bạn thấy công thức đúng.</p>
+<div class="viz" data-viz="bp1" data-title="Backprop từng bước trên mạng 2–2–1">
+  <p class="viz-help">Bấm “Bước tiếp theo” 21 lần. Nhìn mỗi dòng ngược: nó chỉ dùng giá trị của dòng ngược trước đó và giá trị đã lưu từ lượt xuôi.</p>
+</div>
+<p>Tự cài kiểm tra gradient (cách phát hiện lỗi backprop hiệu quả nhất, nên làm mỗi khi viết một lớp mới):</p>
+<pre><code class="language-python">import numpy as np
+
+x = np.array([1.0, 2.0]); y = 1.0
+W1 = np.array([[0.4, -0.3], [0.2, 0.8]]); b1 = np.array([0.1, -0.1]); v = np.array([0.7, -0.4]); c = 0.05
+
+def forward(W1, b1, v, c):
+    z = W1 @ x + b1; h = np.tanh(z); zo = v @ h + c; p = 1 / (1 + np.exp(-zo))
+    return z, h, p, -(y * np.log(p) + (1 - y) * np.log(1 - p))
+
+z, h, p, L = forward(W1, b1, v, c)
+dzo = p - y                         # ∂L/∂zo
+dv, dc = dzo * h, dzo
+dh = dzo * v
+dz = dh * (1 - h ** 2)              # qua tanh
+dW1, db1 = np.outer(dz, x), dz
+
+def numeric(f, arr, eps=1e-6):      # đạo hàm số theo từng phần tử của arr
+    g = np.zeros_like(arr)
+    for idx in np.ndindex(arr.shape):
+        a, b = arr.copy(), arr.copy(); a[idx] += eps; b[idx] -= eps
+        g[idx] = (f(a) - f(b)) / (2 * eps)
+    return g
+
+num_W1 = numeric(lambda W: forward(W, b1, v, c)[3], W1)
+print(np.abs(dW1 - num_W1).max())   # cỡ 1e-9: backprop khớp đạo hàm số</code></pre>
+
 <h2 id="toi-uu">Bộ tối ưu: SGD, momentum, Adam</h2>
 <p>Với gradient \(\mathbf{g}_t\) tính trên một lô nhỏ:</p>
 <ul>
@@ -104,6 +151,37 @@ print("loss:", loss, "acc:", ((p > 0.5) == y).mean())</code></pre>
 </ul>
 $$\begin{aligned}\mathbf{m}_t&=\beta_1\mathbf{m}_{t-1}+(1-\beta_1)\mathbf{g}_t, & \mathbf{v}_t&=\beta_2\mathbf{v}_{t-1}+(1-\beta_2)\mathbf{g}_t^{2}\\ \hat{\mathbf{m}}_t&=\frac{\mathbf{m}_t}{1-\beta_1^t}, & \hat{\mathbf{v}}_t&=\frac{\mathbf{v}_t}{1-\beta_2^t}\\ \theta&\leftarrow\theta-\eta\,\frac{\hat{\mathbf{m}}_t}{\sqrt{\hat{\mathbf{v}}_t}+\epsilon}\end{aligned}$$
 <p>Tác giả Adam đề xuất mặc định \(\beta_1=0.9,\;\beta_2=0.999,\;\epsilon=10^{-8}\). <strong>AdamW</strong> tách riêng weight decay khỏi cập nhật thích nghi và thường được ưu tiên khi huấn luyện Transformer. Tốc độ học thường được thay đổi theo lịch (warm-up tăng dần lúc đầu rồi giảm theo cosine hoặc tuyến tính); các giá trị cụ thể phụ thuộc bài toán, đừng sao chép máy móc.</p>
+
+<h3 id="toi-uu-suy-dan">Vì sao momentum và Adam hoạt động: suy dẫn</h3>
+<p><strong>Gradient descent trên hàm bậc hai.</strong> Với \(f(x)=\frac12\lambda x^2\), bước \(x\leftarrow x-\eta\lambda x=(1-\eta\lambda)x\) hội tụ khi \(0<\eta<2/\lambda\). Với nhiều chiều có độ cong \(\lambda_{\min}\le\dots\le\lambda_{\max}\), bước phải thỏa \(\eta<2/\lambda_{\max}\) để chiều cong nhất không phân kỳ; khi đó chiều phẳng nhất co về với hệ số \(1-\eta\lambda_{\min}\approx1-2/\kappa\), với số điều kiện \(\kappa=\lambda_{\max}/\lambda_{\min}\). Cần cỡ \(\kappa\) bước để giảm sai số theo một hệ số cố định: thung lũng càng hẹp, càng chậm.</p>
+<p><strong>Momentum</strong> với \(\mathbf{v}_t=\beta\mathbf{v}_{t-1}+\mathbf{g}_t\) khai triển thành \(\mathbf{v}_t=\sum_{i\le t}\beta^{t-i}\mathbf{g}_i\): trung bình trượt cộng dồn các gradient gần đây. Thành phần gradient nhất quán qua nhiều bước (dọc đáy thung lũng) được khuếch đại tới \(1/(1-\beta)=10\) lần khi \(\beta=0.9\); thành phần đổi dấu liên tục (dao động ngang thung lũng) triệt tiêu lẫn nhau. Với hàm bậc hai và tham số chọn tối ưu, tốc độ hội tụ cải thiện từ cỡ \(\kappa\) xuống cỡ \(\sqrt\kappa\) bước (kết quả kinh điển của Polyak).</p>
+<p><strong>RMSProp</strong> chuẩn hóa từng tọa độ theo độ lớn gradient gần đây: \(s_t=\rho s_{t-1}+(1-\rho)g_t^2\), \(\theta\leftarrow\theta-\eta\,g_t/(\sqrt{s_t}+\epsilon)\). Mỗi tọa độ được di chuyển cỡ \(\eta\) bất kể thang đo gradient, nên hợp với các tham số có độ cong rất khác nhau.</p>
+<p><strong>Adam</strong> kết hợp cả hai. Vì \(m_0=v_0=0\), các trung bình trượt bị lệch về 0 ở đầu. Nếu gradient có kỳ vọng \(\mu\) không đổi, \(m_t=(1-\beta_1)\sum_{i\le t}\beta_1^{t-i}g_i\) có kỳ vọng \((1-\beta_1)\mu\sum_{k=0}^{t-1}\beta_1^k=(1-\beta_1^t)\mu\). Chia cho \(1-\beta_1^t\) cho ước lượng không lệch \(\hat m_t\); tương tự \(\hat v_t=v_t/(1-\beta_2^t)\). Hệ quả đáng nhớ: ở bước đầu \(\hat m_1=g\), \(\hat v_1=g^2\) nên cập nhật \(=-\eta\,g/(|g|+\epsilon)\approx-\eta\,\mathrm{sign}(g)\). Nói cách khác, mỗi tham số di chuyển xấp xỉ \(\eta\) mỗi bước, bất kể độ lớn gradient; đây là cách hiểu hữu ích về \(\eta\) khi chọn tốc độ học cho Adam.</p>
+<p><strong>L2 và weight decay.</strong> Với SGD, thêm \(\frac\lambda2\lVert\theta\rVert^2\) vào mất mát cho cập nhật \(\theta\leftarrow(1-\eta\lambda)\theta-\eta g\), chính là “suy giảm trọng số” (weight decay). Với Adam điều này không còn đúng: số hạng \(\lambda\theta\) bị chia cho \(\sqrt{\hat v}\) như gradient, nên mức suy giảm thực tế thay đổi theo từng tham số. <strong>AdamW</strong> tách riêng: \(\theta\leftarrow\theta-\eta\big(\hat m/(\sqrt{\hat v}+\epsilon)+\lambda\theta\big)\), nên mức điều chuẩn độc lập với gradient.</p>
+<p><strong>Lịch tốc độ học.</strong> Phổ biến là <em>warm-up</em> tuyến tính trong vài trăm đến vài nghìn bước đầu (lúc đó ước lượng \(\hat v\) còn nhiễu), rồi giảm theo cosine: \(\eta_t=\eta_{\min}+\tfrac12(\eta_{\max}-\eta_{\min})\big(1+\cos(\pi t/T)\big)\).</p>
+<h3 id="opt-viz">Cuộc đua giữa các bộ tối ưu</h3>
+<p>Bốn bộ tối ưu xuất phát từ cùng một điểm trên cùng một bề mặt. Mỗi bộ có thanh trượt tốc độ học riêng, đã được mình dò sơ bộ (lưới thô trong NumPy) để so sánh công bằng: dùng chung một tốc độ học gần như luôn thiên vị một bộ nào đó, vì giá trị tốt nhất của SGD, momentum và Adam khác nhau hàng chục lần.</p>
+<div class="viz" data-viz="opt1" data-title="SGD, Momentum, RMSProp, Adam trên bề mặt hai chiều">
+  <p class="viz-help">Hãy dự đoán trước ai đến đáy nhanh nhất rồi bấm “Chạy”. Sau đó thử kéo tốc độ học của một bộ lên gấp 3: bạn sẽ thấy phân kỳ hoặc dao động quanh đáy.</p>
+</div>
+<p>Trong lưới dò thô của mình (số bước để đạt \(f-f^\star<10^{-3}\) với tốc độ học tốt nhất của từng bộ; con số phụ thuộc lưới và điểm xuất phát nên chỉ để tham khảo): trên thung lũng hẹp \(\kappa=100\), SGD cần khoảng 250 bước, momentum khoảng 95, RMSProp khoảng 35 và Adam khoảng 50. Trên Rosenbrock, momentum nhanh nhất (khoảng 165 bước), Adam khoảng 575, còn SGD và RMSProp cần gần 4000 bước. Trên Himmelblau, cả bốn đều hội tụ nhanh, nhưng <em>có thể về những đáy khác nhau</em> tùy bộ tối ưu và tốc độ học. Nghĩa là không có người thắng tuyệt đối: thứ hạng phụ thuộc bề mặt, tốc độ học và có nhiễu mini-batch hay không. Còn khi dùng <em>chung</em> một tốc độ học cố định, Adam và RMSProp có thể quẩn quanh đáy vì mỗi bước vẫn có độ lớn cỡ \(\eta\) bất kể gần đích; đó là lý do thực tế người ta giảm dần tốc độ học theo lịch. Nghiên cứu cho thấy phương pháp thích nghi như Adam có thể tổng quát hóa kém hơn SGD có momentum trong một số bài toán (Wilson và cộng sự, 2017), và Adam có thể không hội tụ trong những cấu hình đặc biệt (Reddi và cộng sự, 2018).</p>
+<pre><code class="language-python">import numpy as np
+
+def adam(grad, w0, lr=0.1, b1=0.9, b2=0.999, eps=1e-8, steps=300):
+    w, m, v = np.array(w0, float), np.zeros(len(w0)), np.zeros(len(w0))
+    for t in range(1, steps + 1):
+        g = grad(w)
+        m = b1 * m + (1 - b1) * g
+        v = b2 * v + (1 - b2) * g * g
+        m_hat, v_hat = m / (1 - b1 ** t), v / (1 - b2 ** t)      # hiệu chỉnh lệch
+        step = lr * m_hat / (np.sqrt(v_hat) + eps)
+        if t == 1:
+            print("bước đầu |Δw| / lr =", np.abs(step) / lr)       # xấp xỉ [1, 1]: giống sign(g)
+        w = w - step
+    return w
+
+H = np.array([1.0, 25.0])                                         # f = ½(x² + 25 y²)
+print(adam(lambda w: H * w, [4.0, 1.5]))                           # tiến gần [0, 0]</code></pre>
 
 <h2 id="playground">Sân chơi: tự huấn luyện một mạng nơ-ron</h2>
 <p>Mạng dưới đây chạy hoàn toàn trong trình duyệt của bạn, dùng đúng các công thức ở trên (backprop + Adam, đầu ra sigmoid, cross-entropy). Thí nghiệm gợi ý:</p>
@@ -127,11 +205,75 @@ $$\begin{aligned}\mathbf{m}_t&=\beta_1\mathbf{m}_{t-1}+(1-\beta_1)\mathbf{g}_t, 
   <li><strong>BatchNorm</strong> chuẩn hóa theo lô (phổ biến ở CNN); <strong>LayerNorm</strong> chuẩn hóa theo các đặc trưng của từng mẫu (chuẩn trong Transformer vì không phụ thuộc kích thước lô).</li>
 </ul>
 
+<h2 id="khoi-tao">Khởi tạo trọng số và sự lan truyền tín hiệu</h2>
+<p>Khởi tạo sai làm tín hiệu (và gradient) co lại hoặc phình ra theo cấp số nhân qua các lớp. Xét một lớp \(z=\sum_{i=1}^{n}w_ix_i\) với \(w_i\) độc lập, kỳ vọng 0, và độc lập với \(x_i\) (cũng kỳ vọng 0):</p>
+$$\mathrm{Var}(z)=\sum_{i=1}^n\mathrm{Var}(w_ix_i)=n\,\mathrm{Var}(w)\,\mathrm{Var}(x)$$
+<p>Để giữ \(\mathrm{Var}(z)=\mathrm{Var}(x)\) khi lan truyền xuôi cần \(\mathrm{Var}(w)=1/n_{in}\). Phân tích tương tự cho lan truyền ngược cần \(1/n_{out}\). <strong>Xavier/Glorot</strong> lấy trung bình điều hòa của hai điều kiện: \(\mathrm{Var}(w)=2/(n_{in}+n_{out})\), phù hợp tanh và sigmoid xung quanh 0. ReLU triệt tiêu một nửa đầu vào nên \(\mathbb{E}[\mathrm{ReLU}(z)^2]=\tfrac12\mathbb{E}[z^2]\) (với \(z\) đối xứng quanh 0), vì vậy cần gấp đôi: <strong>He</strong>: \(\mathrm{Var}(w)=2/n_{in}\).</p>
+<p>Minh họa dưới đây truyền một lô dữ liệu ngẫu nhiên qua mạng nhiều lớp với bốn cách khởi tạo, vẽ độ lệch chuẩn của kích hoạt và hệ số đạo hàm trung bình \(\phi'(z)\) theo lớp. Chú ý trường hợp tanh với \(\mathcal{N}(0,1)\): độ lệch chuẩn kích hoạt <em>không</em> sụp đổ (khoảng 1) nhưng \(\phi'\) gần 0 vì mọi nơ-ron bão hòa, nên gradient vẫn chết.</p>
+<div class="viz" data-viz="init1" data-title="Tín hiệu và hệ số đạo hàm qua nhiều lớp theo cách khởi tạo">
+  <p class="viz-help">Thử tanh rồi ReLU. Với ReLU, thử Xavier (suy giảm dần) so với He (ổn định). Tăng số lớp để thấy khác biệt tích lũy.</p>
+</div>
+<pre><code class="language-python">import numpy as np
+
+def propagate(act, init, width=128, depth=30, batch=64, seed=1):
+    r = np.random.default_rng(seed)
+    x = r.normal(size=(batch, width)); stds = []
+    scale = {"small": 0.01, "one": 1.0, "xavier": np.sqrt(1 / width), "he": np.sqrt(2 / width)}[init]
+    for _ in range(depth):
+        z = x @ r.normal(0, scale, (width, width))
+        x = np.tanh(z) if act == "tanh" else np.maximum(0, z)
+        stds.append(x.std())
+    return stds
+
+for act in ("tanh", "relu"):
+    for init in ("small", "one", "xavier", "he"):
+        s = propagate(act, init)
+        print(f"{act:5s} {init:6s} lớp 1: {s[0]:.3g}  lớp 10: {s[9]:.3g}  lớp 30: {s[-1]:.3g}")</code></pre>
+<p>Kết quả khi mình chạy mã này (hạt giống 1): ReLU với \(\mathcal{N}(0,0.01^2)\) co về cỡ \(10^{-34}\), với \(\mathcal{N}(0,1)\) phình lên cỡ \(10^{26}\); ReLU với Xavier giảm còn khoảng \(10^{-5}\) sau 30 lớp trong khi He còn khoảng 0.4. Với tanh và \(\mathcal{N}(0,0.01^2)\), tín hiệu tiêu biến về cỡ \(10^{-29}\); \(\mathcal{N}(0,1)\) giữ độ lệch chuẩn khoảng 0.96 (bão hòa). Con số cụ thể phụ thuộc hạt giống và độ rộng, xu hướng thì ổn định.</p>
+
+<h2 id="chuan-hoa">Chuẩn hóa, dropout và weight decay</h2>
+<h3 id="batchnorm">BatchNorm và LayerNorm</h3>
+<p>BatchNorm chuẩn hóa mỗi đặc trưng theo thống kê của lô, rồi cho mô hình học lại thang đo và độ lệch:</p>
+$$\mu=\frac1B\sum_bx_b,\quad\sigma^2=\frac1B\sum_b(x_b-\mu)^2,\quad\hat x_b=\frac{x_b-\mu}{\sqrt{\sigma^2+\epsilon}},\quad y_b=\gamma\,\hat x_b+\beta$$
+<p>Ví dụ \(x=(1,2,3,6)\): \(\mu=3\), \(\sigma^2=(4+1+0+9)/4=3.5\), \(\sigma\approx1.871\), \(\hat x\approx(-1.069,\,-0.535,\,0,\,1.604)\). Khi suy luận, thay thống kê của lô bằng trung bình trượt tích lũy lúc huấn luyện (nhớ <code>model.eval()</code>). <strong>LayerNorm</strong> tính thống kê theo các đặc trưng của <em>từng mẫu</em> nên không phụ thuộc kích thước lô và hoạt động giống nhau lúc huấn luyện và suy luận; đó là lý do Transformer dùng nó. Lời giải thích “giảm dịch chuyển hiệp biến nội bộ” ban đầu của BatchNorm đã bị đặt nghi vấn; nghiên cứu sau đó (Santurkar và cộng sự, 2018) cho rằng lợi ích chính là làm bề mặt mất mát trơn hơn.</p>
+<h3 id="dropout-suy-dan">Dropout</h3>
+<p>Khi huấn luyện, giữ mỗi nơ-ron với xác suất \(1-p\) và chia cho \(1-p\) (inverted dropout): \(\tilde h=\dfrac{m\,h}{1-p}\) với \(m\sim\mathrm{Bernoulli}(1-p)\). Kỳ vọng \(\mathbb{E}[\tilde h]=h\), nên lúc suy luận chỉ cần dùng nguyên mạng mà không cần co lại. Có thể hiểu dropout như huấn luyện chung một tập khổng lồ các mạng con và lấy trung bình khi suy luận; đồng thời nó ngăn các nơ-ron “đồng thích nghi” (co-adapt) và dựa vào nhau.</p>
+
 <h2 id="kien-truc">Các họ kiến trúc chính</h2>
 <h3 id="cnn">Mạng tích chập (CNN)</h3>
 <p>Dùng bộ lọc nhỏ trượt trên ảnh, chia sẻ trọng số theo vị trí. Hai ưu điểm: ít tham số hơn kết nối đầy đủ rất nhiều và tận dụng tính cục bộ của ảnh. Số tham số của một lớp tích chập kích thước \(k\times k\) với \(C_{in}\) kênh vào, \(C_{out}\) kênh ra là \((k^2C_{in}+1)C_{out}\); ví dụ \(3\times3\), 64→128 kênh có \((9\cdot64+1)\cdot128=73{,}856\) tham số. Kích thước đầu ra theo một chiều: \(\lfloor (n+2p-k)/s\rfloor+1\) với đệm \(p\), bước \(s\).</p>
 <h3 id="rnn">Mạng hồi quy (RNN, LSTM)</h3>
 <p>Xử lý chuỗi bằng trạng thái ẩn lan truyền theo thời gian \(\mathbf{h}_t=\phi(W_h\mathbf{h}_{t-1}+W_x\mathbf{x}_t+\mathbf{b})\). Hạn chế: phải xử lý tuần tự (khó song song hóa) và khó nhớ phụ thuộc xa do gradient triệt tiêu theo thời gian; LSTM/GRU giảm bớt bằng cơ chế cổng. Đây chính là động lực dẫn tới attention và Transformer, nội dung của trang NLP và LLM.</p>
+
+<h3 id="bptt">Lan truyền ngược qua thời gian: vì sao gradient triệt tiêu hoặc bùng nổ</h3>
+<p>RNN dùng cùng một ma trận \(W_h\) ở mọi bước: \(\mathbf{h}_t=\phi(W_h\mathbf{h}_{t-1}+W_x\mathbf{x}_t+\mathbf{b})\). Mất mát ở bước \(T\) phụ thuộc vào trạng thái ẩn ở bước \(t\ll T\) qua một chuỗi Jacobian:</p>
+$$\frac{\partial\mathbf{h}_T}{\partial\mathbf{h}_t}=\prod_{k=t+1}^{T}\frac{\partial\mathbf{h}_k}{\partial\mathbf{h}_{k-1}}=\prod_{k=t+1}^{T}\mathrm{diag}\big(\phi'(\mathbf{z}_k)\big)\,W_h,\qquad\Big\lVert\frac{\partial\mathbf{h}_T}{\partial\mathbf{h}_t}\Big\rVert\le\big(\gamma\,\lVert W_h\rVert\big)^{T-t}$$
+<p>với \(\gamma=\sup|\phi'|\) (bằng 1 với tanh, 1/4 với sigmoid). Nếu \(\gamma\lVert W_h\rVert<1\), ảnh hưởng của quá khứ xa <em>giảm theo hàm mũ</em>: mạng không thể học phụ thuộc xa (triệt tiêu gradient). Nếu lớn hơn 1, gradient <em>có thể</em> bùng nổ (cận trên không đảm bảo bùng nổ, nhưng đó là trường hợp thường gặp). Ví dụ với \(W_h=\rho Q\) (\(Q\) trực giao), chuẩn Jacobian bằng đúng \(\rho^{k}\) sau \(k\) bước: \(\rho=0.8\) cho \(0.107\), \(0.0012\), \(1.4\times10^{-5}\) sau 10, 30, 50 bước; \(\rho=1.2\) cho \(6.2\), \(237\), \(9\times10^3\). Bùng nổ được xử lý bằng <strong>cắt gradient</strong> \(\mathbf{g}\leftarrow\mathbf{g}\cdot\min\big(1,\tau/\lVert\mathbf{g}\rVert\big)\); triệt tiêu cần thay đổi kiến trúc.</p>
+<h3 id="lstm">LSTM: đường đi cộng cho gradient</h3>
+<p>LSTM thêm một <em>trạng thái ô</em> \(\mathbf{c}_t\) được cập nhật bằng phép <strong>cộng</strong> có kiểm soát bởi các cổng:</p>
+$$\begin{aligned}\mathbf{f}_t&=\sigma(W_f[\mathbf{h}_{t-1},\mathbf{x}_t]+\mathbf{b}_f), & \mathbf{i}_t&=\sigma(W_i[\mathbf{h}_{t-1},\mathbf{x}_t]+\mathbf{b}_i), & \mathbf{o}_t&=\sigma(W_o[\mathbf{h}_{t-1},\mathbf{x}_t]+\mathbf{b}_o)\\ \tilde{\mathbf{c}}_t&=\tanh(W_c[\mathbf{h}_{t-1},\mathbf{x}_t]+\mathbf{b}_c), & \mathbf{c}_t&=\mathbf{f}_t\odot\mathbf{c}_{t-1}+\mathbf{i}_t\odot\tilde{\mathbf{c}}_t, & \mathbf{h}_t&=\mathbf{o}_t\odot\tanh(\mathbf{c}_t)\end{aligned}$$
+<figure class="diagram">
+<svg viewBox="0 0 640 280" role="img" aria-label="Sơ đồ một ô LSTM với ba cổng và trạng thái ô">
+  <path class="arrow c3" d="M30 50 H138"/><path class="arrow c3" d="M162 50 H278"/><path class="arrow c3" d="M302 50 H610"/>
+  <text x="14" y="36" class="small bold">c<tspan dy="3" font-size="9">t−1</tspan></text><text x="590" y="36" class="small bold">c<tspan dy="3" font-size="9">t</tspan></text>
+  <circle class="box c3" cx="150" cy="50" r="12"/><text x="150" y="55" text-anchor="middle" class="bold">×</text>
+  <circle class="box c3" cx="290" cy="50" r="12"/><text x="290" y="55" text-anchor="middle" class="bold">+</text>
+  <circle class="box c3" cx="290" cy="105" r="12"/><text x="290" y="110" text-anchor="middle" class="bold">×</text>
+  <circle class="box c3" cx="460" cy="140" r="12"/><text x="460" y="145" text-anchor="middle" class="bold">×</text>
+  <rect class="box c1" x="120" y="150" width="60" height="42" rx="6"/><text x="150" y="168" text-anchor="middle" class="small">σ</text><text x="150" y="184" text-anchor="middle" class="muted small">cổng quên f</text>
+  <rect class="box c1" x="217" y="150" width="60" height="42" rx="6"/><text x="247" y="168" text-anchor="middle" class="small">σ</text><text x="247" y="184" text-anchor="middle" class="muted small">cổng vào i</text>
+  <rect class="box c2" x="302" y="150" width="60" height="42" rx="6"/><text x="332" y="168" text-anchor="middle" class="small">tanh</text><text x="332" y="184" text-anchor="middle" class="muted small">ứng viên c̃</text>
+  <rect class="box c1" x="430" y="178" width="60" height="42" rx="6"/><text x="460" y="196" text-anchor="middle" class="small">σ</text><text x="460" y="212" text-anchor="middle" class="muted small">cổng ra o</text>
+  <rect class="box c2" x="430" y="85" width="62" height="28" rx="6"/><text x="461" y="104" text-anchor="middle" class="small">tanh</text>
+  <path class="line c3" d="M460 50 V85"/><path class="arrow" d="M460 113 V128"/>
+  <path class="arrow" d="M150 150 V62"/><path class="arrow" d="M247 150 V105 H278"/><path class="arrow" d="M332 150 V105 H302"/><path class="arrow" d="M290 93 V62"/>
+  <path class="arrow" d="M460 178 V152"/><path class="arrow c2" d="M472 140 H610"/><text x="590" y="130" class="small bold">h<tspan dy="3" font-size="9">t</tspan></text>
+  <path class="line dash" d="M30 245 H500"/><text x="30" y="262" class="muted small">đầu vào [h<tspan dy="3" font-size="9">t−1</tspan><tspan dy="-3">, x</tspan><tspan dy="3" font-size="9">t</tspan><tspan dy="-3">] đi vào cả bốn khối</tspan></text>
+  <path class="line dash" d="M150 245 V192"/><path class="line dash" d="M247 245 V192"/><path class="line dash" d="M332 245 V192"/><path class="line dash" d="M460 245 V220"/>
+</svg>
+<figcaption>Trạng thái ô (đường xanh lá phía trên) chỉ đi qua phép nhân theo từng phần tử với cổng quên và phép cộng: đây là đường để gradient chảy xa.</figcaption>
+</figure>
+<p>Đạo hàm của trạng thái ô theo bước trước là \(\partial\mathbf{c}_t/\partial\mathbf{c}_{t-1}=\mathrm{diag}(\mathbf{f}_t)\) (cộng thêm các số hạng đi qua cổng). Nếu cổng quên \(\mathbf{f}_t\approx1\), gradient đi qua nguyên vẹn qua nhiều bước, trong khi RNN thuần luôn nhân với \(W_h\) và \(\phi'\). Đó là ý tưởng “băng chuyền sai số hằng định” của Hochreiter và Schmidhuber (1997). Thực hành thường khởi tạo bias của cổng quên dương để mặc định “nhớ”. GRU gộp bớt cổng (cổng cập nhật và cổng đặt lại) với ít tham số hơn. Cả hai vẫn xử lý tuần tự nên khó song song hóa; Transformer thay thế bằng attention nối trực tiếp mọi cặp vị trí (xem trang LLM).</p>
 
 <h2 id="pytorch">Vòng lặp huấn luyện trong PyTorch</h2>
 <pre><code class="language-python">import torch
@@ -175,6 +317,40 @@ for epoch in range(30):
   <li>Đừng quên <code>model.train()</code> / <code>model.eval()</code> khi dùng dropout và BatchNorm.</li>
 </ol>
 
+<h2 id="doc-duong-cong">Đọc đường cong huấn luyện để chẩn đoán</h2>
+<p>Ghi lại mất mát train và validation mỗi epoch (hoặc mỗi vài trăm bước) là thói quen rẻ nhất và có giá trị nhất. Hình dạng của hai đường cho biết bạn đang ở trường hợp nào, và nên sửa gì trước.</p>
+<div class="viz" data-viz="curves1" data-title="Chẩn đoán từ đường cong mất mát">
+  <p class="viz-help">Chọn từng tình huống và đọc dấu hiệu cùng cách xử lý. Hãy so với đường cong thật của bạn khi huấn luyện.</p>
+</div>
+<table>
+  <thead><tr><th>Triệu chứng</th><th>Kiểm tra trước tiên</th></tr></thead>
+  <tbody>
+    <tr><td>Mất mát NaN hoặc tăng đột ngột</td><td>Tốc độ học, dữ liệu có NaN/inf, <code>log(0)</code>, cắt gradient, độ chính xác số (mixed precision).</td></tr>
+    <tr><td>Train không giảm dù đã thử nhiều tốc độ học</td><td>Overfit thử một lô nhỏ; nhãn và dữ liệu khớp nhau; <code>zero_grad</code>/<code>step</code>; có đóng băng nhầm tham số.</td></tr>
+    <tr><td>Train giảm, validation đứng yên ngay từ đầu</td><td>Rò rỉ dữ liệu giữa train/validation; hoặc phân phối validation khác train; tiền xử lý khác nhau giữa hai tập.</td></tr>
+    <tr><td>Validation tăng sau một thời điểm</td><td>Overfitting: dừng sớm, điều chuẩn, thêm dữ liệu.</td></tr>
+    <tr><td>Kết quả khác nhau lớn giữa các lần chạy</td><td>Đặt seed, tăng kích thước lô/giảm tốc độ học, chạy nhiều lần và báo cáo trung bình ± độ lệch.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="doc-paper">Đọc nhanh các bài báo nền tảng</h2>
+<p>Ý chính theo hiểu biết của mình; hãy đối chiếu bản gốc và tra tên bài để lấy thông tin xuất bản chính xác.</p>
+<table>
+  <thead><tr><th>Công trình</th><th>Ý chính đáng nhớ</th></tr></thead>
+  <tbody>
+    <tr><td>Rumelhart, Hinton, Williams (1986), <em>Learning representations by back-propagating errors</em>, Nature</td><td>Backprop huấn luyện mạng nhiều lớp và học được biểu diễn ẩn hữu ích.</td></tr>
+    <tr><td>Hornik, Stinchcombe, White (1989), <em>Multilayer feedforward networks are universal approximators</em>, Neural Networks</td><td>Mạng một lớp ẩn đủ rộng xấp xỉ được hàm liên tục trên tập compact; không nói gì về khả năng học hay số nơ-ron cần thiết.</td></tr>
+    <tr><td>Bengio, Simard, Frasconi (1994), <em>Learning long-term dependencies with gradient descent is difficult</em>; Pascanu, Mikolov, Bengio (2013), <em>On the difficulty of training recurrent neural networks</em> (arXiv:1211.5063)</td><td>Phân tích triệt tiêu/bùng nổ gradient trong RNN và đề xuất cắt gradient.</td></tr>
+    <tr><td>Hochreiter và Schmidhuber (1997), <em>Long Short-Term Memory</em>, Neural Computation</td><td>Cổng và trạng thái ô cho đường đi cộng của gradient.</td></tr>
+    <tr><td>Glorot và Bengio (2010), <em>Understanding the difficulty of training deep feedforward neural networks</em>, AISTATS; He và cộng sự (2015), arXiv:1502.01852</td><td>Phân tích phương sai tín hiệu dẫn tới khởi tạo Xavier và He.</td></tr>
+    <tr><td>Sutskever và cộng sự (2013), <em>On the importance of initialization and momentum in deep learning</em>, ICML</td><td>Khởi tạo tốt cùng momentum cho phép huấn luyện mạng sâu bằng SGD.</td></tr>
+    <tr><td>Kingma và Ba (2014), arXiv:1412.6980; Loshchilov và Hutter (2017), arXiv:1711.05101</td><td>Adam và AdamW như đã suy dẫn ở trên.</td></tr>
+    <tr><td>Reddi, Kale, Kumar (2018), <em>On the Convergence of Adam and Beyond</em>, ICLR; Wilson và cộng sự (2017), <em>The Marginal Value of Adaptive Gradient Methods in Machine Learning</em>, NeurIPS</td><td>Hai cảnh báo: Adam có thể không hội tụ trong một số cấu hình, và phương pháp thích nghi không phải lúc nào cũng tổng quát hóa tốt hơn SGD.</td></tr>
+    <tr><td>Ioffe và Szegedy (2015), arXiv:1502.03167; Ba, Kiros, Hinton (2016), <em>Layer Normalization</em>, arXiv:1607.06450; Santurkar và cộng sự (2018), <em>How Does Batch Normalization Help Optimization?</em>, NeurIPS</td><td>BatchNorm, LayerNorm và cách hiểu hiện đại về lợi ích của chuẩn hóa.</td></tr>
+    <tr><td>Srivastava và cộng sự (2014), <em>Dropout: A Simple Way to Prevent Neural Networks from Overfitting</em>, JMLR</td><td>Dropout như điều chuẩn và như trung bình mô hình ngầm định.</td></tr>
+  </tbody>
+</table>
+
 <h2 id="bai-tap">Bài tập</h2>
 <details class="exercise">
   <summary>Bài 1. Triệt tiêu gradient</summary>
@@ -196,6 +372,37 @@ for epoch in range(30):
   <div class="ex-body"><p>Trên dữ liệu Xoắn ốc, tìm cấu hình nhỏ nhất (số lớp × nơ-ron) mà tập test đạt trên 90%. Có phụ thuộc vào hàm kích hoạt và dữ liệu mới (“Lấy dữ liệu mới”) không? Ghi lại kết luận của bạn.</p></div>
 </details>
 
+<details class="exercise">
+  <summary>Bài 5. Chọn độ lệch chuẩn khởi tạo</summary>
+  <div class="ex-body"><p>Một lớp có \(n_{in}=256\) đầu vào. Độ lệch chuẩn khởi tạo cho (a) giữ phương sai khi lan truyền xuôi (tanh) và (b) He với ReLU là bao nhiêu?</p>
+  <p><em>Lời giải:</em> (a) \(\mathrm{Var}(w)=1/256\Rightarrow\) std \(=1/16=0.0625\). (b) \(\mathrm{Var}(w)=2/256\Rightarrow\) std \(=\sqrt{2}/16\approx0.0884\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 6. BatchNorm bằng tay</summary>
+  <div class="ex-body"><p>Chuẩn hóa \(x=(1,2,3,6)\) (bỏ qua \(\epsilon\)). Sau đó với \(\gamma=2,\beta=1\), đầu ra là gì?</p>
+  <p><em>Lời giải:</em> \(\mu=3\), \(\sigma\approx1.871\), \(\hat x\approx(-1.069,-0.535,0,1.604)\), \(y=2\hat x+1\approx(-1.139,-0.069,1,4.207)\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 7. Bước Adam đầu tiên</summary>
+  <div class="ex-body"><p>Gradient \(g=(0.3,-2.0)\), \(\eta=0.01\), mặc định \(\beta_1=0.9,\beta_2=0.999\). Tính bước cập nhật đầu tiên (bỏ qua \(\epsilon\)).</p>
+  <p><em>Lời giải:</em> \(\hat m_1=g\), \(\hat v_1=g^2\), nên cập nhật \(=-\eta g/|g|=-\eta\,\mathrm{sign}(g)=(-0.01,+0.01)\), không phụ thuộc độ lớn của \(g\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 8. Hình dạng và chi phí backprop</summary>
+  <div class="ex-body"><p>Lô \(B=32\), lớp \(784\to256\). Nêu kích thước của \(W\), \(\Delta\) và \(\partial L/\partial W\), và so chi phí lượt ngược với lượt xuôi (chỉ tính phép nhân ma trận).</p>
+  <p><em>Lời giải:</em> \(W:256\times784\), \(\Delta:32\times256\), \(\partial L/\partial W=\Delta^\top H:(256\times32)(32\times784)=256\times784\). Lượt xuôi: \(2\cdot32\cdot256\cdot784\approx12.8\) triệu FLOP. Lượt ngược có hai phép nhân cùng cỡ (cho \(\partial L/\partial W\) và \(\Delta W\)) nên khoảng gấp đôi lượt xuôi (bỏ qua lớp đầu tiên không cần \(\Delta W\)).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 9. Gradient qua thời gian</summary>
+  <div class="ex-body"><p>RNN có \(\gamma\lVert W_h\rVert=0.9\) và \(1.1\). Cận trên của chuẩn Jacobian sau 50 bước?</p>
+  <p><em>Lời giải:</em> \(0.9^{50}\approx0.0052\) và \(1.1^{50}\approx117\). Chỉ cần lệch 10% so với 1 là đủ để thông tin 50 bước trước gần như biến mất hoặc có thể bị khuếch đại gấp trăm lần.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 10. Momentum</summary>
+  <div class="ex-body"><p>Nếu gradient không đổi bằng \(g\), vận tốc momentum với \(\beta=0.9\) tiến tới giá trị nào? Điều đó nói gì về việc chọn tốc độ học khi bật momentum?</p>
+  <p><em>Lời giải:</em> \(v=\beta v+g\Rightarrow v=g/(1-\beta)=10g\). Bước hiệu dụng lớn gấp 10 lần ở vùng gradient nhất quán, nên khi thêm momentum thường cần giảm tốc độ học hoặc nhớ rằng các giá trị tối ưu thay đổi.</p></div>
+</details>
+
 <h2 id="tham-khao">Tài liệu tham khảo</h2>
 <ol class="refs">
   <li><a href="https://www.deeplearningbook.org">Deep Learning</a> — Goodfellow, Bengio, Courville; sách giáo khoa miễn phí trực tuyến.</li>
@@ -207,6 +414,10 @@ for epoch in range(30):
   <li>Rumelhart, Hinton, Williams (1986), <em>Learning representations by back-propagating errors</em>, Nature.</li>
   <li>Kingma và Ba (2014), <em>Adam: A Method for Stochastic Optimization</em>, arXiv:1412.6980. Loshchilov và Hutter, <em>Decoupled Weight Decay Regularization</em>, arXiv:1711.05101.</li>
   <li>Ioffe và Szegedy (2015), <em>Batch Normalization</em>, arXiv:1502.03167. He và cộng sự (2015), <em>Delving Deep into Rectifiers</em>, arXiv:1502.01852. Srivastava và cộng sự (2014), <em>Dropout</em>, JMLR.</li>
+  <li>Hornik, Stinchcombe, White (1989), <em>Multilayer feedforward networks are universal approximators</em>, Neural Networks. Hochreiter và Schmidhuber (1997), <em>Long Short-Term Memory</em>, Neural Computation.</li>
+  <li>Glorot và Bengio (2010), <em>Understanding the difficulty of training deep feedforward neural networks</em>, AISTATS. Sutskever và cộng sự (2013), <em>On the importance of initialization and momentum in deep learning</em>, ICML.</li>
+  <li>Pascanu, Mikolov, Bengio (2013), <em>On the difficulty of training recurrent neural networks</em>, arXiv:1211.5063. Ba, Kiros, Hinton (2016), <em>Layer Normalization</em>, arXiv:1607.06450.</li>
+  <li>Reddi, Kale, Kumar (2018), <em>On the Convergence of Adam and Beyond</em>, ICLR. Wilson và cộng sự (2017), <em>The Marginal Value of Adaptive Gradient Methods in Machine Learning</em>, NeurIPS. Santurkar và cộng sự (2018), <em>How Does Batch Normalization Help Optimization?</em>, NeurIPS.</li>
 </ol>
 
 </main>

@@ -387,6 +387,15 @@
     });
   }
 
+  /* ---------- Shared SVG arrowhead used by static diagrams (.arrow) ---------- */
+  function buildSvgDefs() {
+    if (!document.querySelector('.diagram')) return;
+    var ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', '0'); svg.setAttribute('height', '0'); svg.setAttribute('aria-hidden', 'true'); svg.style.position = 'absolute';
+    svg.innerHTML = '<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker></defs>';
+    document.body.appendChild(svg);
+  }
+
   /* ---------- Boot ---------- */
   function boot() {
     buildHeader();
@@ -395,6 +404,7 @@
     buildToc();
     buildPageNav();
     buildMath();
+    buildSvgDefs();
     buildSearch();
     initViz();
     if (window.matchMedia) {

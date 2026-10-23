@@ -4,6 +4,28 @@
   const { ui: U, el } = Viz;
   const fmt = (v, d = 3) => (Math.abs(v) >= 1e6 || (v !== 0 && Math.abs(v) < 1e-4)) ? v.toExponential(2) : v.toFixed(d);
 
+  /* Shared least-squares polynomial fit (ridge on all but the intercept) on t = 2x - 1 for x in [0, 1].
+     Also used by the bias-variance demo in viz-ml2.js. */
+  Viz.poly = {
+    fit(xs, ys, d, lam) {
+      const m = d + 1, n = xs.length, A = Array.from({ length: m }, () => new Array(m).fill(0)), b = new Array(m).fill(0);
+      for (let k = 0; k < n; k++) {
+        const t = 2 * xs[k] - 1, p = []; for (let j = 0; j < m; j++) p.push(t ** j);
+        for (let i = 0; i < m; i++) { b[i] += p[i] * ys[k]; for (let j = 0; j < m; j++) A[i][j] += p[i] * p[j]; }
+      }
+      for (let i = 0; i < m; i++) A[i][i] += (i ? lam : 0) + 1e-12;
+      for (let i = 0; i < m; i++) {                          // Gaussian elimination with partial pivoting
+        let q = i; for (let r = i + 1; r < m; r++) if (Math.abs(A[r][i]) > Math.abs(A[q][i])) q = r;
+        [A[i], A[q]] = [A[q], A[i]]; [b[i], b[q]] = [b[q], b[i]];
+        for (let r = i + 1; r < m; r++) { const f = A[r][i] / A[i][i]; for (let c = i; c < m; c++) A[r][c] -= f * A[i][c]; b[r] -= f * b[i]; }
+      }
+      const w = new Array(m).fill(0);
+      for (let i = m - 1; i >= 0; i--) { let v = b[i]; for (let c = i + 1; c < m; c++) v -= A[i][c] * w[c]; w[i] = v / A[i][i]; }
+      return w;
+    },
+    eval(w, x) { const t = 2 * x - 1; let s = 0; for (let j = w.length - 1; j >= 0; j--) s = s * t + w[j]; return s; }
+  };
+
   /* Shared helper: map data ranges to canvas pixels */
   function frame(W, H, xr, yr, pad) {
     pad = pad || { l: 36, r: 12, t: 12, b: 26 };
@@ -229,31 +251,8 @@
       const r2 = Viz.rng(seed + 5000); tx = []; ty = [];
       for (let i = 0; i < 300; i++) { const x = r2(); tx.push(x); ty.push(truth(x) + Viz.randn(r2) * SD); }
     }
-    function solve(A, bv) {
-      const n = bv.length;
-      for (let i = 0; i < n; i++) {
-        let p = i; for (let r = i + 1; r < n; r++) if (Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r;
-        [A[i], A[p]] = [A[p], A[i]]; [bv[i], bv[p]] = [bv[p], bv[i]];
-        for (let r = i + 1; r < n; r++) {
-          const m = A[r][i] / A[i][i];
-          for (let c = i; c < n; c++) A[r][c] -= m * A[i][c];
-          bv[r] -= m * bv[i];
-        }
-      }
-      const w = new Array(n).fill(0);
-      for (let i = n - 1; i >= 0; i--) { let s = bv[i]; for (let c = i + 1; c < n; c++) s -= A[i][c] * w[c]; w[i] = s / A[i][i]; }
-      return w;
-    }
-    function fit(d, lam) {
-      const m = d + 1, A = Array.from({ length: m }, () => new Array(m).fill(0)), bv = new Array(m).fill(0);
-      for (let k = 0; k < N; k++) {
-        const t = 2 * xs[k] - 1, p = []; for (let j = 0; j < m; j++) p.push(t ** j);
-        for (let i = 0; i < m; i++) { bv[i] += p[i] * ys[k]; for (let j = 0; j < m; j++) A[i][j] += p[i] * p[j]; }
-      }
-      for (let i = 0; i < m; i++) A[i][i] += (i ? lam : 0) + 1e-12;
-      return solve(A, bv);
-    }
-    const pred = (w, x) => { const t = 2 * x - 1; let s = 0; for (let j = w.length - 1; j >= 0; j--) s = s * t + w[j]; return s; };
+    const fit = (d, lam) => Viz.poly.fit(xs, ys, d, lam);
+    const pred = Viz.poly.eval;
     const mse = (w, X, Y) => X.reduce((s, x, i) => s + (pred(w, x) - Y[i]) ** 2, 0) / X.length;
     const lamOf = () => le <= -9 ? 0 : Math.pow(10, le);
 
