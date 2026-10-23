@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xử lý ngôn ngữ tự nhiên (NLP) · Tự học AI</title>
+<meta name="description" content="NLP từ cơ bản đến hiện đại: tokenization, TF-IDF, n-gram, BPE, word embedding, BERT, các tác vụ NLP, đặc thù tiếng Việt và cách đánh giá.">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/search-index.js"></script>
+<script defer src="assets/js/site.js"></script>
+<script defer src="assets/js/viz-nlp.js"></script>
+</head>
+<body data-page="nlp">
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div id="site-header"></div>
+<div class="page">
+<main class="content" id="main">
+
+<h1>Xử lý ngôn ngữ tự nhiên (NLP)</h1>
+<p class="lead">NLP dạy máy làm việc với ngôn ngữ của con người: phân loại, trích xuất, dịch, tóm tắt, hỏi đáp, hội thoại. Trang này đi theo dòng lịch sử có chủ đích: từ đếm từ đến vector ngữ nghĩa, rồi tới mô hình ngữ cảnh. Hiểu chuỗi ý tưởng này giúp bạn thấy LLM không phải “phép màu” mà là bước tiếp theo hợp lý.</p>
+<div class="callout note"><span class="callout-title">Cần biết trước</span>Trang Machine Learning (đặc biệt phân loại và cross-entropy) và nền tảng Deep Learning (embedding, softmax, huấn luyện bằng gradient).</div>
+
+<h2 id="tong-quan">Bài toán và thách thức</h2>
+<p>Máy tính chỉ xử lý số, vì vậy mọi hệ thống NLP đều phải trả lời câu hỏi: <em>biểu diễn văn bản thành số như thế nào?</em> Lịch sử gần như là chuỗi các câu trả lời ngày càng tốt:</p>
+<ol>
+  <li>Đếm từ (bag-of-words, TF-IDF): rời rạc, thưa, mất thứ tự.</li>
+  <li>Mô hình ngôn ngữ n-gram: tính xác suất chuỗi từ bằng thống kê đếm.</li>
+  <li>Word embedding (word2vec, GloVe): mỗi từ là một vector đặc, từ gần nghĩa ở gần nhau.</li>
+  <li>Biểu diễn theo ngữ cảnh (ELMo, BERT, GPT): vector của một từ phụ thuộc cả câu.</li>
+</ol>
+<p>Ngôn ngữ khó vì có nhập nhằng (“bàn” là đồ vật hay động từ?), phụ thuộc xa, thành ngữ, sắc thái và thay đổi theo ngữ cảnh văn hóa.</p>
+
+<h2 id="tieng-viet">Đặc thù của tiếng Việt</h2>
+<ul>
+  <li><strong>Từ không bằng âm tiết.</strong> Tiếng Việt viết cách nhau bằng dấu cách theo <em>âm tiết</em>, nhưng một từ có thể gồm nhiều âm tiết (“học máy” = 1 từ, 2 âm tiết). Tách từ theo khoảng trắng sẽ cắt sai. Có các công cụ tách từ tiếng Việt (ví dụ VnCoreNLP, underthesea); hãy kiểm tra bản mới nhất và giấy phép trước khi dùng.</li>
+  <li><strong>Dấu thanh và dấu phụ.</strong> “ma, má, mả, mã, mà, mạ” là các từ khác nhau. Văn bản đời thường hay viết không dấu hoặc sai dấu, làm tăng nhiễu.</li>
+  <li><strong>Chuẩn hóa Unicode.</strong> Cùng một chữ có thể được mã hóa theo dạng dựng sẵn (NFC) hoặc tổ hợp (NFD), nên hai chuỗi trông giống hệt nhau vẫn có thể khác nhau về byte.</li>
+</ul>
+<pre><code class="language-python">import unicodedata
+
+a = "ệ"          # "ệ" ở dạng dựng sẵn: 1 ký tự
+b = "ệ"   # "ệ" ở dạng tổ hợp: chữ e + dấu nặng + dấu mũ
+
+print(a == b)                                   # False: khác nhau dù hiển thị giống nhau
+print(unicodedata.normalize("NFC", b) == a)     # True: chuẩn hóa về một dạng trước khi xử lý</code></pre>
+<div class="callout tip"><span class="callout-title">Quy tắc thực hành</span>Luôn chuẩn hóa Unicode (thường là NFC) ở bước đầu của pipeline dữ liệu tiếng Việt. Một số mô hình tiền huấn luyện cho tiếng Việt (ví dụ họ PhoBERT) theo hiểu biết của mình được huấn luyện trên văn bản đã tách từ, vì vậy hãy đọc model card để biết định dạng đầu vào mong đợi.</div>
+
+<h2 id="bow-tfidf">Bag-of-words, TF-IDF và cosine</h2>
+<p>Biểu diễn đơn giản nhất: mỗi văn bản là một vector đếm số lần xuất hiện của từng từ trong từ vựng (bag-of-words), bỏ qua thứ tự. TF-IDF giảm trọng số các từ xuất hiện ở hầu hết văn bản (như “và”, “là”) và nhấn mạnh các từ đặc trưng:</p>
+$$\text{tf-idf}(t,d)=\text{tf}(t,d)\cdot\log\frac{N}{\text{df}(t)}$$
+<p>với \(N\) là số văn bản và \(\text{df}(t)\) là số văn bản chứa từ \(t\). (Các thư viện có biến thể làm trơn khác nhau; ví dụ scikit-learn mặc định dùng một dạng có làm trơn, hãy đọc tài liệu.) Độ tương tự giữa hai vector thường đo bằng <strong>cosine</strong>, chỉ phụ thuộc <em>hướng</em>, không phụ thuộc độ dài:</p>
+$$\cos\theta=\frac{\mathbf{u}\cdot\mathbf{v}}{\lVert\mathbf{u}\rVert\,\lVert\mathbf{v}\rVert}\in[-1,1]$$
+<div class="viz" data-viz="cos1" data-title="Cosine similarity: kéo hai vector">
+  <p class="viz-help">Kéo đầu mũi tên. Thử nhân đôi độ dài của v: tích vô hướng đổi, cosine thì không. Đây là lý do cosine được dùng để so sánh embedding.</p>
+</div>
+<pre><code class="language-python">from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+docs = [
+    "học máy là một nhánh của trí tuệ nhân tạo",
+    "học sâu là một nhánh của học máy",
+    "hôm nay trời mưa to",
+]
+vec = TfidfVectorizer()          # tách theo khoảng trắng; chưa gộp từ ghép tiếng Việt
+X = vec.fit_transform(docs)
+print(cosine_similarity(X[0], X).round(2))   # văn bản 0 giống văn bản 1 hơn văn bản 2</code></pre>
+<p>TF-IDF vẫn là baseline mạnh và rẻ cho tìm kiếm và phân loại văn bản. Hạn chế: “xe hơi” và “ô tô” hoàn toàn khác nhau trong không gian này, vì không có khái niệm đồng nghĩa.</p>
+
+<h2 id="ngram">Mô hình ngôn ngữ n-gram và perplexity</h2>
+<p>Mô hình ngôn ngữ gán xác suất cho chuỗi từ. Theo quy tắc chuỗi \(P(w_1,\dots,w_T)=\prod_t P(w_t\mid w_{1:t-1})\). N-gram xấp xỉ bằng cách chỉ nhìn \(n-1\) từ gần nhất, ước lượng bằng đếm:</p>
+$$P(w_t\mid w_{t-2},w_{t-1})\approx\frac{C(w_{t-2},w_{t-1},w_t)}{C(w_{t-2},w_{t-1})}$$
+<p>Vấn đề: cụm chưa từng thấy có xác suất 0, nên cần làm trơn (add-k, Kneser–Ney...). Và \(n\) lớn thì số cụm tăng theo hàm mũ. Độ đo chuẩn là <strong>perplexity</strong>:</p>
+$$\text{PPL}=\exp\!\Big(-\frac{1}{T}\sum_{t=1}^{T}\log P(w_t\mid w_{\lt t})\Big)$$
+<p>Hiểu trực quan: PPL là “số lựa chọn có xác suất ngang nhau” mà mô hình đang phân vân trung bình ở mỗi bước. Mô hình đoán đều trên \(V\) từ có PPL = \(V\); PPL càng thấp càng tốt. Perplexity vẫn là thước đo huấn luyện cốt lõi của LLM (liên hệ trực tiếp với cross-entropy), nhưng chỉ so sánh được khi cùng bộ tách token và cùng dữ liệu.</p>
+
+<h2 id="subword">Tokenization theo từ con (subword) và BPE</h2>
+<p>Từ vựng theo từ nguyên vẹn gặp hai vấn đề: quá lớn và luôn có từ chưa gặp (OOV). Tách theo ký tự thì chuỗi quá dài. Giải pháp hiện đại là <strong>subword</strong>: từ phổ biến giữ nguyên, từ hiếm được ghép từ các mảnh. Thuật toán <strong>Byte-Pair Encoding (BPE)</strong>:</p>
+<ol>
+  <li>Bắt đầu với từ vựng là các ký tự (cùng ký hiệu hết từ).</li>
+  <li>Đếm mọi cặp token liền kề trong dữ liệu.</li>
+  <li>Gộp cặp phổ biến nhất thành token mới, lặp lại cho tới khi đạt kích thước từ vựng mong muốn.</li>
+</ol>
+<p>Hãy tự chạy từng bước. Với văn bản mẫu (ví dụ kinh điển của Sennrich và cộng sự), bạn sẽ thấy các hậu tố như “est” nổi lên. Sau đó thử mã hóa một từ chưa từng xuất hiện, như “lowest”.</p>
+<div class="viz" data-viz="bpe1" data-title="BPE từng bước">
+  <p class="viz-help">Sửa văn bản trong ô để huấn luyện bộ tách từ trên dữ liệu của riêng bạn. Khi các cặp đồng hạng, mô phỏng chọn cặp có thứ tự chữ cái nhỏ hơn (các thư viện thật có thể chọn khác).</p>
+</div>
+<p>Các hệ thống thực tế dùng biến thể: BPE ở mức byte (không bao giờ gặp OOV), WordPiece, hoặc Unigram qua thư viện SentencePiece. Hệ quả quan trọng: <strong>mô hình không thấy “chữ” mà thấy token</strong>. Điều này giải thích vì sao LLM đôi khi đếm chữ cái trong một từ hay làm số học nhiều chữ số kém, và vì sao cùng một câu tiếng Việt có thể tốn nhiều token hơn tiếng Anh với một số bộ tách (ảnh hưởng chi phí và độ dài ngữ cảnh khả dụng).</p>
+
+<h2 id="embedding">Word embedding</h2>
+<p><em>Giả thuyết phân bố</em>: các từ xuất hiện trong ngữ cảnh giống nhau thường có nghĩa gần nhau. Word2vec (Mikolov và cộng sự, 2013) biến ý tưởng này thành bài toán dự đoán. Với <strong>skip-gram</strong>, từ trung tâm \(c\) dự đoán các từ ngữ cảnh \(o\):</p>
+$$p(o\mid c)=\frac{\exp(\mathbf{u}_o^\top\mathbf{v}_c)}{\sum_{w\in V}\exp(\mathbf{u}_w^\top\mathbf{v}_c)}$$
+<p>Mẫu số phải cộng trên toàn bộ từ vựng nên rất đắt; <em>negative sampling</em> thay bằng bài toán phân loại nhị phân: tăng \(\log\sigma(\mathbf{u}_o^\top\mathbf{v}_c)\) cho cặp thật và giảm cho \(K\) cặp “nhiễu” lấy mẫu ngẫu nhiên. Sau huấn luyện, \(\mathbf{v}_w\) là embedding của từ \(w\) (thường 100–300 chiều).</p>
+<ul>
+  <li>Từ gần nghĩa có cosine cao; có cả những quan hệ tuyến tính nổi tiếng như “vua − đàn ông + phụ nữ ≈ nữ hoàng”, nhưng đó là ví dụ đẹp, không phải quy luật luôn đúng.</li>
+  <li><strong>Hạn chế</strong>: mỗi từ chỉ có một vector, nên “bank” (ngân hàng / bờ sông) hay “đá” (hòn đá / đá bóng) bị trộn lẫn; và embedding thừa hưởng thiên kiến của dữ liệu huấn luyện.</li>
+</ul>
+
+<h2 id="ngu-canh">Biểu diễn theo ngữ cảnh: từ ELMo đến BERT</h2>
+<p>Thay vì tra bảng vector cố định, mạng nơ-ron đọc cả câu rồi tạo vector cho từng token <em>phụ thuộc ngữ cảnh</em>. Với kiến trúc Transformer (giải thích ở trang LLM), có ba họ chính:</p>
+<table>
+  <thead><tr><th>Họ</th><th>Ví dụ</th><th>Huấn luyện</th><th>Hợp với</th></tr></thead>
+  <tbody>
+    <tr><td>Encoder</td><td>BERT, RoBERTa</td><td>Che ngẫu nhiên một phần token (khoảng 15% trong BERT gốc) rồi đoán lại (masked LM)</td><td>Phân loại, NER, tìm kiếm, embedding câu</td></tr>
+    <tr><td>Decoder</td><td>họ GPT, LLaMA</td><td>Đoán token kế tiếp (autoregressive)</td><td>Sinh văn bản, hội thoại</td></tr>
+    <tr><td>Encoder–decoder</td><td>T5, BART</td><td>Biến chuỗi vào thành chuỗi ra</td><td>Dịch, tóm tắt</td></tr>
+  </tbody>
+</table>
+<p>Mô hình chung của giai đoạn 2018–2020: <strong>tiền huấn luyện</strong> (pretrain) trên lượng văn bản khổng lồ không nhãn, rồi <strong>tinh chỉnh</strong> (fine-tune) trên một lượng nhỏ dữ liệu có nhãn cho tác vụ đích. Phần sau của lộ trình (LLM) cho thấy ở quy mô đủ lớn, nhiều tác vụ có thể làm chỉ bằng cách đưa chỉ dẫn cho mô hình.</p>
+
+<h2 id="tac-vu">Các tác vụ NLP điển hình</h2>
+<table>
+  <thead><tr><th>Tác vụ</th><th>Đầu vào → đầu ra</th><th>Ví dụ</th></tr></thead>
+  <tbody>
+    <tr><td>Phân loại văn bản</td><td>văn bản → nhãn</td><td>Cảm xúc, thư rác, chủ đề</td></tr>
+    <tr><td>Gán nhãn chuỗi (NER, POS)</td><td>token → nhãn mỗi token</td><td>Tìm tên người, địa danh</td></tr>
+    <tr><td>Hỏi đáp trích xuất</td><td>câu hỏi + đoạn → khoảng văn bản</td><td>Đọc hiểu</td></tr>
+    <tr><td>Dịch máy, tóm tắt</td><td>chuỗi → chuỗi</td><td>Việt ↔ Anh, tóm tắt tin</td></tr>
+    <tr><td>Truy hồi thông tin</td><td>truy vấn → danh sách tài liệu</td><td>Tìm kiếm, RAG</td></tr>
+  </tbody>
+</table>
+<h3 id="hf-code">Thử nhanh với thư viện Hugging Face</h3>
+<pre><code class="language-python"># pip install transformers torch
+from transformers import pipeline, AutoTokenizer
+
+# 1) Phân loại cảm xúc (mô hình mặc định được chọn bởi thư viện, thường là tiếng Anh)
+clf = pipeline("sentiment-analysis")
+print(clf("This course is clear and well organized."))
+
+# 2) Điền từ bị che: bản chất huấn luyện của BERT
+fill = pipeline("fill-mask", model="bert-base-uncased")
+print(fill("Machine [MASK] is a branch of artificial intelligence.")[:3])
+
+# 3) Xem một câu được tách thành token (subword) như thế nào
+tok = AutoTokenizer.from_pretrained("bert-base-uncased")
+print(tok.tokenize("Tokenization of unbelievably long words"))</code></pre>
+<p>Với tiếng Việt, hãy tìm mô hình trên Hugging Face Hub có hỗ trợ tiếng Việt hoặc đa ngôn ngữ, và đọc model card (dữ liệu huấn luyện, định dạng đầu vào, giấy phép) trước khi dùng. Mình không đưa tên mô hình cụ thể vì danh sách này thay đổi nhanh.</p>
+
+<h2 id="danh-gia">Đánh giá hệ thống NLP</h2>
+<ul>
+  <li><strong>Phân loại / gán nhãn</strong>: accuracy, precision/recall/F1 (với NER tính ở mức thực thể).</li>
+  <li><strong>Dịch máy</strong>: BLEU (độ chính xác n-gram có phạt câu quá ngắn), chrF, và các chỉ số học từ mô hình như BERTScore.</li>
+  <li><strong>Tóm tắt</strong>: ROUGE (độ phủ n-gram so với bản tham chiếu).</li>
+  <li><strong>Mô hình ngôn ngữ</strong>: perplexity.</li>
+</ul>
+<div class="callout warn"><span class="callout-title">Chỉ số tự động có giới hạn</span>BLEU và ROUGE chỉ đo mức trùng từ với bản tham chiếu, nên có thể phạt oan một bản dịch đúng nhưng diễn đạt khác. Với tác vụ sinh văn bản mở, đánh giá của con người (hoặc “LLM làm giám khảo” có kiểm chứng) thường cần thiết; hãy xem trang LLM.</div>
+
+<h2 id="bai-tap">Bài tập</h2>
+<details class="exercise">
+  <summary>Bài 1. Dự đoán các phép gộp BPE</summary>
+  <div class="ex-body">
+    <p>Với corpus mặc định (low×5, lower×2, newest×6, widest×3), hãy tự đếm cặp liền kề rồi dự đoán ba phép gộp đầu tiên, sau đó kiểm tra bằng minh họa BPE.</p>
+    <p><em>Gợi ý:</em> cặp (e, s), (s, t), (t, &lt;/w&gt;) đều xuất hiện 9 lần. Kết quả phụ thuộc cách xử lý đồng hạng; với quy ước trong minh họa, ba phép gộp đầu là e+s, es+t, est+&lt;/w&gt;.</p>
+  </div>
+</details>
+<details class="exercise">
+  <summary>Bài 2. Cosine và độ dài</summary>
+  <div class="ex-body">
+    <p>Cho \(\mathbf{u}=(1,2)\), \(\mathbf{v}=(2,4)\), \(\mathbf{w}=(2,-1)\). Tính cosine của (u, v) và (u, w).</p>
+    <p><em>Lời giải:</em> v = 2u nên cos = 1. u·w = 2 − 2 = 0 nên cos = 0 (vuông góc).</p>
+  </div>
+</details>
+<details class="exercise">
+  <summary>Bài 3. Perplexity</summary>
+  <div class="ex-body">
+    <p>Một mô hình gán xác suất 1/4 cho mọi token trong một câu 10 token. Perplexity là bao nhiêu? Nếu gán 1/2 thì sao?</p>
+    <p><em>Lời giải:</em> \(\exp(-\tfrac1{10}\cdot10\ln\tfrac14)=4\); với 1/2 thì bằng 2.</p>
+  </div>
+</details>
+<details class="exercise">
+  <summary>Bài 4. Dự án nhỏ</summary>
+  <div class="ex-body"><p>Lấy khoảng 200 câu bình luận tiếng Việt có nhãn (tự tạo hoặc từ một bộ dữ liệu công khai mà bạn kiểm tra giấy phép). Xây baseline TF-IDF + hồi quy logistic, báo cáo F1 bằng kiểm định chéo. Thử chuẩn hóa Unicode và tách từ, rồi xem F1 thay đổi ra sao.</p></div>
+</details>
+
+<h2 id="tham-khao">Tài liệu tham khảo</h2>
+<ol class="refs">
+  <li><a href="https://web.stanford.edu/~jurafsky/slp3/"><em>Speech and Language Processing</em></a> — Jurafsky và Martin, bản thảo miễn phí trực tuyến, giáo trình NLP kinh điển.</li>
+  <li><a href="https://web.stanford.edu/class/cs224n/">Stanford CS224N</a> — NLP với Deep Learning (bài giảng và bài tập công khai).</li>
+  <li><a href="https://huggingface.co/learn">Hugging Face Learn</a> — các khóa học về NLP/LLM và thư viện Transformers.</li>
+  <li>Mikolov và cộng sự (2013), <em>Efficient Estimation of Word Representations in Vector Space</em>, arXiv:1301.3781; và <em>Distributed Representations of Words and Phrases and their Compositionality</em>, arXiv:1310.4546.</li>
+  <li>Pennington, Socher, Manning (2014), <em>GloVe: Global Vectors for Word Representation</em>, EMNLP.</li>
+  <li>Sennrich, Haddow, Birch (2015), <em>Neural Machine Translation of Rare Words with Subword Units</em>, arXiv:1508.07909. Kudo và Richardson (2018), <em>SentencePiece</em>, arXiv:1808.06226.</li>
+  <li>Devlin và cộng sự (2018), <em>BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding</em>, arXiv:1810.04805.</li>
+  <li>Nguyen và Nguyen (2020), <em>PhoBERT: Pre-trained language models for Vietnamese</em>, Findings of EMNLP 2020 (mình nhớ tên bài và tác giả, bạn nên tra lại thông tin xuất bản).</li>
+</ol>
+
+</main>
+<aside class="toc" id="toc" aria-label="Mục lục"></aside>
+</div>
+<div id="site-footer"></div>
+</body>
+</html>

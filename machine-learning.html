@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Machine Learning · Tự học AI</title>
+<meta name="description" content="Machine Learning từ nền tảng: hồi quy, gradient descent, phân loại, overfitting, điều chuẩn, đánh giá mô hình, cây quyết định, k-means và scikit-learn.">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/search-index.js"></script>
+<script defer src="assets/js/site.js"></script>
+<script defer src="assets/js/viz-ml.js"></script>
+</head>
+<body data-page="ml">
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div id="site-header"></div>
+<div class="page">
+<main class="content" id="main">
+
+<h1>Machine Learning</h1>
+<p class="lead">Machine Learning (ML, học máy) là việc để máy tự tìm quy luật từ dữ liệu thay vì lập trình từng quy tắc. Trang này đi từ mô hình đơn giản nhất đến cách đánh giá một hệ thống ML một cách trung thực. Đây là nền móng cho Deep Learning, NLP và LLM ở các trang sau.</p>
+
+<div class="callout note"><span class="callout-title">Cần biết trước</span>Python cơ bản, NumPy ở mức cộng trừ nhân ma trận, đạo hàm của hàm một biến. Mọi kiến thức còn lại được giới thiệu tại chỗ.</div>
+
+<h2 id="gioi-thieu">ML là gì? Ba nhóm bài toán</h2>
+<p>Ta có dữ liệu và muốn một hàm \(f\) “đủ tốt” trên dữ liệu <em>chưa từng thấy</em>. Tùy dạng dữ liệu mà phân ra:</p>
+<ul>
+  <li><strong>Học có giám sát (supervised)</strong>: có cặp \((x, y)\). <em>Hồi quy</em> dự đoán số thực (giá nhà), <em>phân loại</em> dự đoán nhãn (thư rác hay không).</li>
+  <li><strong>Học không giám sát (unsupervised)</strong>: chỉ có \(x\). Gom cụm, giảm chiều, phát hiện bất thường.</li>
+  <li><strong>Học tăng cường (reinforcement)</strong>: tác tử hành động trong môi trường và nhận phần thưởng. (Nền tảng của một phần quá trình hậu huấn luyện LLM, xem trang LLM.)</li>
+</ul>
+<p>Quy trình chung gồm bốn thành phần: <strong>mô hình</strong> \(f_\theta\) với tham số \(\theta\), <strong>hàm mất mát</strong> \(J(\theta)\) đo mức sai, <strong>thuật toán tối ưu</strong> để tìm \(\theta\) làm \(J\) nhỏ, và <strong>cách đánh giá</strong> trên dữ liệu giữ riêng.</p>
+
+<h2 id="tuyen-tinh">Hồi quy tuyến tính</h2>
+<p>Với vector đặc trưng \(\mathbf{x}\in\mathbb{R}^d\), mô hình dự đoán</p>
+$$\hat{y} = \mathbf{w}^\top \mathbf{x} + b$$
+<p>và ta chọn \(\mathbf{w}, b\) để cực tiểu hóa sai số bình phương trung bình (MSE) trên \(n\) mẫu:</p>
+$$J(\mathbf{w}, b) = \frac{1}{n}\sum_{i=1}^{n}\left(\hat{y}_i - y_i\right)^2$$
+<p>Gộp \(b\) vào \(\mathbf{w}\) bằng cách thêm cột toàn số 1 vào ma trận dữ liệu \(X\), bài toán có <strong>nghiệm đóng</strong> (phương trình chuẩn):</p>
+$$\mathbf{w}^\star = (X^\top X)^{-1} X^\top \mathbf{y}$$
+<p>Nghiệm đóng đẹp nhưng tốn khoảng \(O(d^3)\) thời gian và không tồn tại nếu \(X^\top X\) suy biến. Với dữ liệu lớn hoặc mô hình phức tạp (mạng nơ-ron), ta dùng phương pháp lặp: gradient descent.</p>
+
+<h2 id="gradient-descent">Gradient descent</h2>
+<p>Ý tưởng: đứng ở \(\theta\), đi một bước ngược hướng đạo hàm vì đó là hướng làm \(J\) giảm nhanh nhất tại chỗ:</p>
+$$\theta \leftarrow \theta - \eta\,\nabla_\theta J(\theta)$$
+<p>với \(\eta\) là <strong>tốc độ học</strong> (learning rate). Với MSE của hồi quy tuyến tính:</p>
+$$\frac{\partial J}{\partial w} = \frac{2}{n}\sum_{i}\left(\hat{y}_i - y_i\right)x_i, \qquad \frac{\partial J}{\partial b} = \frac{2}{n}\sum_{i}\left(\hat{y}_i - y_i\right)$$
+
+<h3 id="gd-1d">Tốc độ học quyết định mọi thứ</h3>
+<p>Thử kéo \(\eta\) trong minh họa dưới đây. Với \(f(w)=(w-2)^2\), mỗi bước nhân khoảng cách tới đáy với \(1-2\eta\), nên hội tụ khi \(0\lt\eta\lt1\), dao động khi \(\eta>0.5\) và phân kỳ khi \(\eta>1\). Chuyển sang hàm hai đáy để thấy gradient descent chỉ tìm được cực tiểu <em>cục bộ</em> gần điểm xuất phát.</p>
+<div class="viz" data-viz="gd1" data-title="Gradient descent trên hàm một biến">
+  <p class="viz-help">Bấm “Một bước” nhiều lần hoặc “Chạy tự động”. Bấm vào đồ thị để đặt lại điểm xuất phát.</p>
+</div>
+
+<h3 id="gd-hoi-quy">Huấn luyện hồi quy tuyến tính bằng gradient descent</h3>
+<p>Bây giờ có hai tham số \(w, b\). Hãy thử tăng \(\eta\) lên khoảng 0.03–0.04 khi <em>chưa</em> chuẩn hóa \(x\): mô hình dễ phân kỳ vì \(x\) có thang đo lớn làm đường mất mát rất dốc theo hướng \(w\). Bật “Chuẩn hóa x” và cùng \(\eta\) sẽ ổn định hơn nhiều. Đó là lý do ta luôn chuẩn hóa đặc trưng.</p>
+<div class="viz" data-viz="reg1" data-title="Hồi quy tuyến tính học bằng gradient descent">
+  <p class="viz-help">Bấm vào đồ thị để thêm điểm dữ liệu. Đường chấm xanh lá là nghiệm đóng (OLS) để so sánh.</p>
+</div>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+X = rng.uniform(0, 10, size=100)
+y = 0.7 * X + 2 + rng.normal(0, 0.9, size=100)
+
+mu, sigma = X.mean(), X.std()
+Z = (X - mu) / sigma                 # chuẩn hóa đặc trưng
+
+w, b, lr = 0.0, 0.0, 0.1
+for step in range(500):
+    err = w * Z + b - y              # dự đoán trừ nhãn
+    w -= lr * 2 * np.mean(err * Z)
+    b -= lr * 2 * np.mean(err)
+
+# đổi về thang đo gốc: y ≈ a*x + c
+a, c = w / sigma, b - w * mu / sigma
+print(a, c)                          # gần 0.7 và 2 (lệch một chút do nhiễu)</code></pre>
+<div class="callout tip"><span class="callout-title">Các biến thể</span>
+<strong>Batch GD</strong> dùng toàn bộ dữ liệu cho mỗi bước; <strong>SGD</strong> dùng một mẫu; <strong>mini-batch</strong> dùng một lô nhỏ (phổ biến nhất). Lô nhỏ cho gradient nhiễu nhưng rẻ và thường giúp thoát điểm kẹt. Các bộ tối ưu như momentum và Adam được giải thích ở trang Deep Learning.</div>
+
+<h2 id="logistic">Phân loại với hồi quy logistic</h2>
+<p>Với bài toán hai lớp \(y\in\{0,1\}\), ta muốn đầu ra là xác suất. Hàm sigmoid ép một số thực về khoảng \((0,1)\):</p>
+$$p = \sigma(z) = \frac{1}{1+e^{-z}}, \qquad z = \mathbf{w}^\top\mathbf{x} + b$$
+<p>Mất mát phù hợp là <strong>cross-entropy nhị phân</strong> (âm log-likelihood của Bernoulli):</p>
+$$J = -\frac{1}{n}\sum_{i}\Big[y_i\log p_i + (1-y_i)\log(1-p_i)\Big]$$
+<p>Kết quả đạo hàm gọn đáng ngạc nhiên: \(\partial J/\partial z_i = (p_i - y_i)/n\), nên \(\nabla_{\mathbf w}J = \frac1n X^\top(\mathbf{p}-\mathbf{y})\), có cùng dạng với hồi quy tuyến tính. Ranh giới quyết định \(\mathbf{w}^\top\mathbf{x}+b=0\) là một siêu phẳng. Với nhiều lớp, dùng softmax (xem trang Deep Learning).</p>
+
+<h2 id="tong-quat-hoa">Overfitting, bias–variance và điều chuẩn</h2>
+<p>Mục tiêu thật sự của ML là <strong>tổng quát hóa</strong>: tốt trên dữ liệu mới. Mô hình quá linh hoạt sẽ “học thuộc” nhiễu của tập huấn luyện (overfitting); mô hình quá đơn giản không bắt được quy luật (underfitting). Với mất mát bình phương, sai số kỳ vọng phân rã thành</p>
+$$\mathbb{E}\big[(y-\hat f(x))^2\big] = \text{Bias}^2 + \text{Var} + \sigma^2$$
+<p>Trong đó \(\text{Bias}^2\) là sai số do mô hình quá đơn giản, \(\text{Var}\) là độ nhạy của mô hình với mẫu huấn luyện cụ thể, và \(\sigma^2\) là nhiễu vốn có của dữ liệu, không thể giảm.</p>
+<p><strong>Điều chuẩn (regularization)</strong> thêm một khoản phạt vào mất mát để kiềm chế độ phức tạp. Với L2 (ridge): \(J_\lambda = J + \lambda\lVert\mathbf{w}\rVert_2^2\), nghiệm đóng \(\mathbf{w}=(X^\top X+\lambda I)^{-1}X^\top\mathbf{y}\). L1 (lasso) phạt \(\lVert\mathbf{w}\rVert_1\) và có xu hướng đưa nhiều trọng số về đúng 0.</p>
+<p>Trong minh họa sau, 15 điểm huấn luyện được sinh từ \(\sin(2\pi x)\) cộng nhiễu. Hãy tăng bậc đa thức khi \(\lambda=0\) và quan sát: sai số huấn luyện luôn giảm, còn sai số kiểm tra giảm rồi tăng vọt. Sau đó bật \(\lambda\) để “kéo” đường cong trơn lại.</p>
+<div class="viz" data-viz="poly1" data-title="Overfitting và điều chuẩn L2">
+  <p class="viz-help">Đường cam là mô hình, đường xanh lá nét đứt là hàm thật. Biểu đồ dưới so sánh sai số trên dữ liệu đã thấy và dữ liệu mới theo từng bậc.</p>
+</div>
+
+<h2 id="danh-gia">Đánh giá mô hình cho đúng</h2>
+<h3 id="chia-du-lieu">Chia dữ liệu và kiểm định chéo</h3>
+<ul>
+  <li><strong>Train / validation / test</strong>: huấn luyện trên train, chọn siêu tham số trên validation, và chỉ chạm vào test <em>một lần</em> ở cuối để báo cáo.</li>
+  <li><strong>k-fold cross-validation</strong>: chia dữ liệu làm k phần, lần lượt giữ một phần làm validation rồi lấy trung bình; hữu ích khi dữ liệu ít.</li>
+  <li><strong>Rò rỉ dữ liệu (data leakage)</strong>: mọi bước học từ dữ liệu (chuẩn hóa, chọn đặc trưng, điền giá trị thiếu) phải được “fit” chỉ trên tập train. Dùng <code>Pipeline</code> để tránh lỗi này.</li>
+  <li>Với dữ liệu theo thời gian, chia theo thời gian (quá khứ để train, tương lai để test), không xáo trộn ngẫu nhiên.</li>
+</ul>
+<h3 id="chi-so">Các chỉ số phân loại</h3>
+<p>Từ ma trận nhầm lẫn gồm TP, FP, FN, TN:</p>
+$$\text{Precision}=\frac{TP}{TP+FP},\quad \text{Recall}=\frac{TP}{TP+FN},\quad F_1=\frac{2\cdot \text{Precision}\cdot\text{Recall}}{\text{Precision}+\text{Recall}}$$
+<p>Độ chính xác (accuracy) dễ gây hiểu lầm khi lớp mất cân bằng: nếu chỉ 1% mẫu là dương tính thì mô hình luôn đoán “âm tính” đạt 99% accuracy mà vô dụng. Khi đó hãy xem precision/recall, PR-AUC hoặc ROC-AUC. ROC-AUC có thể hiểu là xác suất một mẫu dương ngẫu nhiên được chấm điểm cao hơn một mẫu âm ngẫu nhiên.</p>
+<div class="callout warn"><span class="callout-title">Chọn ngưỡng theo chi phí</span>Mặc định ngưỡng 0.5 hiếm khi tối ưu. Trong chẩn đoán bệnh, bỏ sót (FN) thường đắt hơn báo nhầm (FP); trong lọc thư rác thì ngược lại. Hãy chọn ngưỡng theo chi phí thực tế của bài toán.</div>
+
+<h2 id="mo-hinh-khac">Một số mô hình kinh điển khác</h2>
+<h3 id="knn">k láng giềng gần nhất (k-NN)</h3>
+<p>Dự đoán nhãn bằng bỏ phiếu của \(k\) điểm huấn luyện gần nhất. Không có bước “huấn luyện”, nhưng dự đoán chậm với dữ liệu lớn và rất nhạy với thang đo đặc trưng. Hãy chú ý: với \(k=1\), độ chính xác trên chính tập huấn luyện luôn 100% (mỗi điểm là láng giềng của chính nó) nhưng độ chính xác “bỏ riêng từng điểm” mới phản ánh khả năng tổng quát.</p>
+<div class="viz" data-viz="knn1" data-title="Vùng quyết định của k-NN">
+  <p class="viz-help">Bấm vào đồ thị để thêm điểm. Tăng k để ranh giới trơn hơn; thử bộ dữ liệu XOR và so sánh với mô hình tuyến tính.</p>
+</div>
+<h3 id="cay">Cây quyết định và rừng ngẫu nhiên</h3>
+<p>Cây chia dữ liệu bằng chuỗi câu hỏi “đặc trưng nào ≤ ngưỡng?”, chọn phép chia làm giảm độ “lẫn tạp” nhiều nhất, ví dụ Gini \(G=1-\sum_k p_k^2\) hoặc entropy \(H=-\sum_k p_k\log_2 p_k\). Một cây sâu dễ overfit; <strong>rừng ngẫu nhiên</strong> (random forest) huấn luyện nhiều cây trên các mẫu bootstrap với tập đặc trưng ngẫu nhiên rồi lấy trung bình, giảm phương sai. Với dữ liệu dạng bảng, các mô hình cây tăng cường gradient (gradient boosting) thường là baseline rất mạnh.</p>
+<h3 id="kmeans">k-means (gom cụm)</h3>
+<p>Tìm \(k\) tâm cụm \(\boldsymbol\mu_1,\dots,\boldsymbol\mu_k\) cực tiểu hóa \(\sum_i \lVert \mathbf{x}_i-\boldsymbol\mu_{c(i)}\rVert^2\) bằng cách lặp hai bước: (1) gán mỗi điểm cho tâm gần nhất, (2) cập nhật mỗi tâm bằng trung bình của cụm. Thuật toán hội tụ về cực tiểu cục bộ, nên cần khởi tạo nhiều lần và chuẩn hóa đặc trưng; chọn \(k\) bằng phương pháp khuỷu tay (elbow) hoặc hệ số silhouette.</p>
+
+<h2 id="sklearn">Quy trình hoàn chỉnh với scikit-learn</h2>
+<pre><code class="language-python">from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report
+
+X, y = load_breast_cancer(return_X_y=True)
+X_tr, X_te, y_tr, y_te = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42
+)
+
+# Pipeline: scaler chỉ được fit trên dữ liệu train của từng fold, tránh rò rỉ
+model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+
+scores = cross_val_score(model, X_tr, y_tr, cv=5, scoring="f1")
+print("F1 CV:", scores.mean(), "±", scores.std())
+
+model.fit(X_tr, y_tr)
+print(classification_report(y_te, model.predict(X_te)))   # dùng test set đúng một lần</code></pre>
+<p>Hãy luôn bắt đầu bằng một <strong>baseline đơn giản</strong> (dự đoán trung bình, hồi quy logistic) trước khi thử mô hình phức tạp. Nếu mô hình phức tạp không thắng baseline rõ rệt, vấn đề thường nằm ở dữ liệu hoặc cách đánh giá, không phải ở thuật toán.</p>
+
+<h2 id="bai-tap">Bài tập</h2>
+<details class="exercise">
+  <summary>Bài 1. Điều kiện hội tụ</summary>
+  <div class="ex-body">
+    <p>Với \(f(w)=(w-2)^2\), chứng minh bước cập nhật \(w_{t+1}-2=(1-2\eta)(w_t-2)\). Tìm khoảng \(\eta\) để hội tụ, rồi kiểm tra lại bằng minh họa.</p>
+    <p><em>Lời giải:</em> \(f'(w)=2(w-2)\) nên \(w_{t+1}=w_t-2\eta(w_t-2)\). Trừ 2 hai vế được hệ thức trên. Hội tụ khi \(|1-2\eta|\lt1\), tức \(0\lt\eta\lt1\).</p>
+  </div>
+</details>
+<details class="exercise">
+  <summary>Bài 2. Tính chỉ số từ ma trận nhầm lẫn</summary>
+  <div class="ex-body">
+    <p>Một bộ lọc cho TP=40, FP=10, FN=20, TN=930. Tính accuracy, precision, recall, F1.</p>
+    <p><em>Lời giải:</em> accuracy = 970/1000 = 0.97; precision = 40/50 = 0.80; recall = 40/60 ≈ 0.667; F1 = 2·0.8·0.667/(0.8+0.667) ≈ 0.727. Accuracy cao nhưng bỏ sót 1/3 ca dương tính.</p>
+  </div>
+</details>
+<details class="exercise">
+  <summary>Bài 3. Khám phá overfitting</summary>
+  <div class="ex-body">
+    <p>Trong minh họa overfitting, đặt \(\lambda=0\) rồi tăng bậc từ 0 đến 12. Ghi lại bậc có sai số kiểm tra nhỏ nhất. Sau đó đặt bậc 12 và tăng dần \(\lambda\): sai số kiểm tra thay đổi thế nào? Bấm “Lấy mẫu mới” vài lần: kết luận có ổn định giữa các mẫu không?</p>
+  </div>
+</details>
+<details class="exercise">
+  <summary>Bài 4. Rò rỉ dữ liệu</summary>
+  <div class="ex-body">
+    <p>Viết hai đoạn code: một đoạn chuẩn hóa toàn bộ dữ liệu rồi mới chia train/test, một đoạn dùng <code>Pipeline</code>. Giải thích vì sao đoạn đầu cho điểm kiểm tra lạc quan hơn thực tế.</p>
+  </div>
+</details>
+
+<h2 id="tham-khao">Tài liệu tham khảo</h2>
+<ol class="refs">
+  <li><a href="https://developers.google.com/machine-learning/crash-course">Machine Learning Crash Course</a> (Google) — khóa học miễn phí, có bài tập thực hành.</li>
+  <li><a href="https://scikit-learn.org/stable/user_guide.html">scikit-learn User Guide</a> — mô tả chi tiết thuật toán và API.</li>
+  <li><a href="https://www.statlearning.com">An Introduction to Statistical Learning</a> — sách giáo trình miễn phí, dễ tiếp cận (James, Witten, Hastie, Tibshirani).</li>
+  <li><a href="https://mml-book.github.io">Mathematics for Machine Learning</a> — toán nền tảng (Deisenroth, Faisal, Ong).</li>
+  <li><em>Pattern Recognition and Machine Learning</em> (Christopher Bishop, 2006) — sách giáo khoa kinh điển, nhiều toán hơn.</li>
+  <li>Khóa <em>Machine Learning Specialization</em> của Andrew Ng (DeepLearning.AI, Stanford Online) trên Coursera. Mình không chắc đường dẫn chính xác nên không dán link; hãy tìm tên khóa trên Coursera.</li>
+</ol>
+
+</main>
+<aside class="toc" id="toc" aria-label="Mục lục"></aside>
+</div>
+<div id="site-footer"></div>
+</body>
+</html>

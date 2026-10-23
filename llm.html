@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mô hình ngôn ngữ lớn (LLM) · Tự học AI</title>
+<meta name="description" content="LLM từ bên trong: dự đoán token kế tiếp, Transformer và self-attention, scaling laws, SFT/RLHF/DPO, giải mã, prompting, LoRA và RAG.">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/search-index.js"></script>
+<script defer src="assets/js/site.js"></script>
+<script defer src="assets/js/viz-llm.js"></script>
+</head>
+<body data-page="llm">
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div id="site-header"></div>
+<div class="page">
+<main class="content" id="main">
+
+<h1>Mô hình ngôn ngữ lớn (LLM)</h1>
+<p class="lead">LLM (Large Language Model) là mạng nơ-ron Transformer rất lớn, được huấn luyện để dự đoán token kế tiếp trên lượng văn bản khổng lồ, rồi được căn chỉnh để làm theo chỉ dẫn. Trang này mở “chiếc hộp” ra: mô hình tính gì, học gì, sinh chữ thế nào, và dùng nó ra sao cho đúng.</p>
+<div class="callout warn"><span class="callout-title">Lĩnh vực thay đổi rất nhanh</span>Nguyên lý ở trang này (attention, dự đoán token, căn chỉnh theo ưu tiên) khá bền vững, nhưng tên mô hình, giới hạn ngữ cảnh, giá, tính năng API và kỹ thuật huấn luyện cụ thể thay đổi theo tháng. Mình cố ý không nêu bảng so sánh mô hình; hãy đọc tài liệu chính thức mới nhất của nhà cung cấp khi cần số liệu hiện hành.</div>
+
+<h2 id="la-gi">LLM thực chất làm gì?</h2>
+<p>Văn bản được tách thành token (xem trang NLP). Mô hình học phân phối xác suất của token kế tiếp khi biết các token trước đó, theo quy tắc chuỗi:</p>
+$$P_\theta(x_1,\dots,x_T)=\prod_{t=1}^{T}P_\theta\big(x_t\mid x_{\lt t}\big),\qquad L(\theta)=-\frac{1}{T}\sum_{t=1}^{T}\log P_\theta\big(x_t\mid x_{\lt t}\big)$$
+<p>Huấn luyện là cực tiểu hóa \(L\) (cross-entropy) bằng gradient descent trên hàng nghìn tỷ token. Để dự đoán tốt, mô hình buộc phải nén vào tham số rất nhiều thứ: ngữ pháp, kiến thức thế giới, các mẫu suy luận. Khi dùng, ta lặp lại: tính phân phối, chọn một token, nối vào chuỗi, tính tiếp. Đây là <strong>sinh tự hồi quy (autoregressive)</strong>.</p>
+<p>Hệ quả cần nhớ: LLM tối ưu cho “văn bản nghe hợp lý tiếp theo” chứ không tối ưu trực tiếp cho “sự thật”. Nhiều đặc điểm bất ngờ (và cả lỗi bịa đặt) bắt nguồn từ đây.</p>
+
+<h2 id="transformer">Kiến trúc Transformer</h2>
+<p>Các bước cho một chuỗi \(n\) token, kích thước ẩn \(d\):</p>
+<ol>
+  <li><strong>Embedding</strong>: mỗi token id tra bảng để lấy vector \(d\) chiều.</li>
+  <li><strong>Mã hóa vị trí</strong>: attention tự nó không biết thứ tự, nên phải đưa thông tin vị trí vào. Bản gốc dùng sin/cos; các mô hình hiện đại thường dùng biến thể quay vector (RoPE) hoặc độ lệch vị trí. Dạng sin/cos: \(PE_{(pos,2i)}=\sin(pos/10000^{2i/d})\), \(PE_{(pos,2i+1)}=\cos(pos/10000^{2i/d})\).</li>
+  <li>Xếp chồng \(L\) <strong>khối</strong>, mỗi khối gồm self-attention và mạng truyền thẳng (FFN), cùng kết nối tắt (residual) và chuẩn hóa lớp.</li>
+  <li><strong>Đầu ra</strong>: nhân với ma trận (thường dùng chung với bảng embedding) ra logit trên toàn từ vựng, rồi softmax.</li>
+</ol>
+
+<h3 id="attention">Self-attention</h3>
+<p>Từ đầu vào \(X\in\mathbb{R}^{n\times d}\), tạo ba phép chiếu: truy vấn \(Q=XW_Q\), khóa \(K=XW_K\), giá trị \(V=XW_V\). Mỗi token “hỏi” (query) tất cả token khác (key) xem liên quan bao nhiêu, rồi lấy trung bình có trọng số các giá trị (value):</p>
+$$\text{Attention}(Q,K,V)=\text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}+M\right)V$$
+<p>\(M\) là mặt nạ nhân quả: bằng \(-\infty\) ở các vị trí tương lai (phía trên đường chéo) để token chỉ nhìn được quá khứ, nhờ đó huấn luyện được song song trên mọi vị trí mà không “nhìn trộm” đáp án. Phép chia cho \(\sqrt{d_k}\) có lý do: nếu các thành phần của \(q,k\) độc lập, kỳ vọng 0, phương sai 1 thì \(q\cdot k\) có phương sai \(d_k\); không chia thì điểm số lớn, softmax bão hòa thành gần one-hot và gradient triệt tiêu. Hãy tự kiểm chứng:</p>
+<div class="viz" data-viz="attn1" data-title="Trọng số self-attention (mô hình đồ chơi)">
+  <p class="viz-help">Tắt “Chia cho √d_k” rồi tăng d_k: entropy giảm, softmax trở nên nhọn. Bật mặt nạ nhân quả để thấy ma trận tam giác dưới.</p>
+</div>
+<p><strong>Multi-head attention</strong> chạy \(h\) phép attention song song với các phép chiếu riêng (mỗi đầu có \(d_k=d/h\)), nối kết quả và nhân \(W_O\). Mỗi đầu có thể chuyên về một kiểu quan hệ khác nhau.</p>
+
+<h3 id="khoi">Một khối Transformer (dạng pre-LN)</h3>
+$$\mathbf{x}\leftarrow\mathbf{x}+\text{MHA}\big(\text{LN}(\mathbf{x})\big),\qquad \mathbf{x}\leftarrow\mathbf{x}+\text{FFN}\big(\text{LN}(\mathbf{x})\big),\qquad \text{FFN}(\mathbf{x})=W_2\,\phi(W_1\mathbf{x})$$
+<p>FFN thường mở rộng \(d\to 4d\to d\). Kết nối tắt giúp gradient chảy thẳng qua nhiều lớp, là điều kiện để xếp chồng hàng chục, hàng trăm khối.</p>
+
+<h2 id="tham-so">Đếm tham số, bộ nhớ và chi phí</h2>
+<p>Mỗi khối có khoảng \(4d^2\) tham số cho attention (bốn ma trận \(d\times d\): \(W_Q,W_K,W_V,W_O\)) và \(8d^2\) cho FFN (hai ma trận \(d\times4d\) và \(4d\times d\)). Vậy</p>
+$$N_{\text{blocks}}\approx 12\,L\,d^2,\qquad N_{\text{total}}\approx 12Ld^2+V\,d$$
+<p>với \(V\) là kích thước từ vựng. Kiểm tra với cấu hình được báo cáo cho GPT-2 bản nhỏ (\(L=12,\;d=768,\;V=50257\)): \(12\cdot12\cdot768^2\approx 84.9\) triệu cộng \(50257\cdot768\approx38.6\) triệu cho embedding, tổng khoảng 123.5 triệu, khớp con số “124M” thường được nêu (bạn nên đối chiếu với tài liệu gốc). Hai chi phí cần để ý:</p>
+<ul>
+  <li><strong>Attention tốn \(O(n^2)\)</strong> theo độ dài ngữ cảnh \(n\) cho cả thời gian lẫn bộ nhớ (ở cài đặt cơ bản), nên ngữ cảnh rất dài là bài toán kỹ thuật khó.</li>
+  <li><strong>KV cache</strong>: khi sinh, ta lưu lại key và value của các token cũ để khỏi tính lại. Với cấu hình giả định \(L=32,\;d=4096\), lưu số thực 16-bit, mỗi token cần \(2\cdot32\cdot4096\cdot2\) byte \(=512\) KiB; 4096 token là khoảng 2 GiB cho mỗi chuỗi. (Nhiều mô hình giảm con số này bằng grouped-query attention.)</li>
+</ul>
+
+<h2 id="pretraining">Tiền huấn luyện và quy luật mở rộng</h2>
+<p>Công sức chủ yếu nằm ở giai đoạn <strong>tiền huấn luyện</strong>: thu thập, làm sạch, khử trùng lặp dữ liệu; huấn luyện trên cụm GPU/TPU lớn trong thời gian dài. Hai con số quy mô: số tham số \(N\) và số token huấn luyện \(D\). Một ước lượng thường dùng cho tổng số phép tính khi huấn luyện:</p>
+$$C\approx 6\,N\,D\ \text{FLOPs}$$
+<p>Nghiên cứu về <strong>scaling laws</strong> (Kaplan và cộng sự, 2020) cho thấy mất mát giảm theo luật lũy thừa khi tăng \(N\), \(D\) và tính toán. Công trình Chinchilla (Hoffmann và cộng sự, 2022) kết luận nhiều mô hình lúc đó được huấn luyện thiếu dữ liệu so với kích thước, và với một ngân sách tính toán cố định thì nên tăng \(N\) và \(D\) gần như tỉ lệ với nhau; quy tắc ngón tay cái thường được trích là cỡ 20 token cho mỗi tham số. Đây là con số xấp xỉ phụ thuộc cách ước lượng, và thực tế các nhóm còn huấn luyện lâu hơn mức đó để mô hình nhỏ rẻ hơn khi triển khai. Hãy đọc bài gốc trước khi dùng con số này cho việc quan trọng.</p>
+
+<h2 id="post-training">Hậu huấn luyện: biến “bộ đoán chữ” thành trợ lý</h2>
+<p>Mô hình sau tiền huấn luyện chỉ tiếp nối văn bản. Để nó hữu ích và an toàn hơn, thường có các bước:</p>
+<ol>
+  <li><strong>SFT (supervised fine-tuning)</strong>: tinh chỉnh trên các cặp (chỉ dẫn, câu trả lời mẫu) do con người hoặc quy trình sinh dữ liệu tạo ra; thường chỉ tính mất mát trên phần trả lời.</li>
+  <li><strong>Học từ ưu tiên (preference learning)</strong>. Con người (hoặc mô hình) so sánh hai câu trả lời. RLHF huấn luyện <em>mô hình phần thưởng</em> \(r(x,y)\) sao cho \(P(y_w\succ y_l)=\sigma\big(r(x,y_w)-r(x,y_l)\big)\), rồi tối ưu chính sách \(\pi\) bằng học tăng cường (ví dụ PPO) có phạt lệch khỏi mô hình tham chiếu:
+  $$\max_{\pi}\ \mathbb{E}_{x,\;y\sim\pi}\big[r(x,y)\big]-\beta\,\mathrm{KL}\big(\pi\,\Vert\,\pi_{\text{ref}}\big)$$
+  <strong>DPO</strong> (Rafailov và cộng sự, 2023) bỏ bước học tăng cường, tối ưu trực tiếp trên các cặp ưu tiên:
+  $$L_{\text{DPO}}=-\log\sigma\!\Big(\beta\log\tfrac{\pi(y_w\mid x)}{\pi_{\text{ref}}(y_w\mid x)}-\beta\log\tfrac{\pi(y_l\mid x)}{\pi_{\text{ref}}(y_l\mid x)}\Big)$$</li>
+  <li>Một hướng được dùng rộng rãi gần đây cho các mô hình “suy luận”: học tăng cường với phần thưởng có thể kiểm chứng tự động (đáp án toán đúng, bài kiểm thử code chạy qua). Chi tiết thay đổi nhanh, hãy đọc báo cáo kỹ thuật mới của từng phòng thí nghiệm.</li>
+</ol>
+<p>Lưu ý: căn chỉnh theo ưu tiên của người đánh giá có thể đẩy mô hình tới hành vi “chiều lòng” (sycophancy) hoặc trả lời dài dòng, vì những đặc điểm đó đôi khi được chấm điểm cao.</p>
+
+<h2 id="giai-ma">Giải mã: từ phân phối xác suất ra chữ</h2>
+<p>Mô hình cho logit \(z_i\) trên từng token. Cách chọn token quyết định phong cách đầu ra:</p>
+<ul>
+  <li><strong>Tham lam (greedy)</strong>: luôn chọn token xác suất cao nhất. Xác định, nhưng dễ lặp.</li>
+  <li><strong>Lấy mẫu với temperature</strong>: \(p_i\propto\exp(z_i/T)\). \(T\to0\) tiến về greedy; \(T>1\) làm phân phối phẳng hơn, đa dạng hơn nhưng dễ lạc đề.</li>
+  <li><strong>Top-k</strong>: chỉ giữ \(k\) token đầu. <strong>Top-p (nucleus)</strong>: giữ tập nhỏ nhất có tổng xác suất đạt \(p\) (Holtzman và cộng sự).</li>
+</ul>
+<div class="viz" data-viz="samp1" data-title="Temperature, top-k, top-p">
+  <p class="viz-help">Thử T rất thấp, T = 2, rồi kết hợp top-p thấp. Lấy mẫu 500 lần để thấy phân phối thực tế. Thứ tự áp dụng các bộ lọc có thể khác giữa các thư viện, hãy xem tài liệu của thư viện bạn dùng.</p>
+</div>
+<p>Ngay cả với \(T=0\), kết quả của dịch vụ LLM có thể không hoàn toàn lặp lại giữa các lần gọi do tính toán số thực song song và việc phân lô; đừng giả định tính xác định tuyệt đối.</p>
+
+<h2 id="prompting">Prompting và học trong ngữ cảnh</h2>
+<p>Ở quy mô đủ lớn, LLM có thể học một tác vụ chỉ từ ví dụ ngay trong prompt mà không đổi trọng số (<em>in-context learning</em>; Brown và cộng sự, 2020). Một số thực hành đã được kiểm chứng rộng rãi:</p>
+<ul>
+  <li><strong>Cụ thể hóa</strong>: nêu vai trò, mục tiêu, đối tượng đọc, định dạng đầu ra, ràng buộc. Đưa ngữ cảnh cần thiết thay vì mong mô hình đoán.</li>
+  <li><strong>Few-shot</strong>: 2–5 ví dụ đại diện thường cải thiện độ ổn định về định dạng.</li>
+  <li><strong>Cho phép suy luận từng bước</strong> (chain-of-thought; Wei và cộng sự, 2022) giúp nhiều bài toán nhiều bước; một số mô hình hiện đại đã tự suy luận nội bộ nên hiệu quả của mẹo này tùy mô hình.</li>
+  <li><strong>Đầu ra có cấu trúc</strong> (JSON theo schema) và kiểm tra hợp lệ bằng code.</li>
+  <li>Xem prompt như code: lưu phiên bản, đo bằng một <strong>bộ kiểm thử</strong> ví dụ có đáp án, thay đổi từng thứ một.</li>
+</ul>
+
+<h2 id="tuy-chinh">Đưa tri thức riêng vào: prompt, RAG hay fine-tune?</h2>
+<table>
+  <thead><tr><th>Cách</th><th>Khi nào hợp</th><th>Lưu ý</th></tr></thead>
+  <tbody>
+    <tr><td>Prompt tốt + ví dụ</td><td>Bắt đầu mọi dự án</td><td>Rẻ, nhanh; bị giới hạn bởi độ dài ngữ cảnh.</td></tr>
+    <tr><td>RAG</td><td>Tri thức lớn, thay đổi, cần trích nguồn</td><td>Chất lượng truy hồi quyết định chất lượng câu trả lời.</td></tr>
+    <tr><td>Fine-tune</td><td>Muốn đổi phong cách/định dạng/hành vi ổn định; có dữ liệu chất lượng</td><td>Không phải cách đáng tin để “nạp sự kiện” mới; tốn công đánh giá.</td></tr>
+  </tbody>
+</table>
+<h3 id="rag">RAG (Retrieval-Augmented Generation)</h3>
+<p>Chia tài liệu thành đoạn, mã hóa mỗi đoạn thành vector embedding, lưu vào chỉ mục. Khi có câu hỏi, mã hóa câu hỏi, lấy các đoạn gần nhất theo cosine, đưa vào prompt cùng chỉ dẫn “chỉ dựa vào các đoạn này”. Khung tối giản (hàm <code>embed</code> bạn thay bằng mô hình embedding thật):</p>
+<pre><code class="language-python">import numpy as np
+
+def embed(texts: list[str]) -&gt; np.ndarray:
+    """Trả về ma trận (n, d). Thay bằng mô hình embedding thật (API hoặc thư viện cục bộ)."""
+    raise NotImplementedError
+
+docs = ["Đoạn tài liệu 1 ...", "Đoạn tài liệu 2 ...", "Đoạn tài liệu 3 ..."]
+D = embed(docs)
+D = D / np.linalg.norm(D, axis=1, keepdims=True)     # chuẩn hóa: cosine = tích vô hướng
+
+def retrieve(query: str, k: int = 3):
+    q = embed([query])[0]
+    q = q / np.linalg.norm(q)
+    scores = D @ q
+    top = np.argsort(-scores)[:k]
+    return [(docs[i], float(scores[i])) for i in top]
+
+def build_prompt(query: str) -&gt; str:
+    ctx = "\n\n".join(f"[{i + 1}] {text}" for i, (text, _) in enumerate(retrieve(query)))
+    return (
+        "Chỉ trả lời dựa vào các đoạn bên dưới và trích số đoạn bạn dùng. "
+        "Nếu không đủ thông tin, hãy nói bạn không biết.\n\n"
+        f"{ctx}\n\nCâu hỏi: {query}"
+    )</code></pre>
+<p>Trong thực tế bạn còn cần: cách chia đoạn hợp lý, truy hồi lai (từ khóa + vector), xếp hạng lại (reranking), đánh giá riêng phần truy hồi (có tìm đúng đoạn không?) và phần sinh (có bám nguồn không?).</p>
+<h3 id="lora">Fine-tune hiệu quả tham số: LoRA</h3>
+<p>Thay vì cập nhật cả ma trận trọng số \(W\in\mathbb{R}^{d\times k}\), LoRA đóng băng \(W\) và chỉ học một cập nhật hạng thấp:</p>
+$$W'=W+\frac{\alpha}{r}BA,\qquad B\in\mathbb{R}^{d\times r},\;A\in\mathbb{R}^{r\times k},\;r\ll\min(d,k)$$
+<p>Với \(d=k=4096\) và \(r=8\): \(2\cdot4096\cdot8=65{,}536\) tham số huấn luyện, chỉ khoảng 0.39% so với \(4096^2=16{,}777{,}216\) của ma trận gốc. Do đó có thể tinh chỉnh mô hình lớn trên phần cứng khiêm tốn hơn nhiều.</p>
+
+<h2 id="goi-code">Gọi LLM trong code</h2>
+<p>Hai mẫu thường gặp: gọi API của nhà cung cấp, hoặc chạy mô hình mở cục bộ. Ví dụ dùng SDK Python của Anthropic (tên mô hình hãy lấy từ tài liệu hiện hành):</p>
+<pre><code class="language-python"># pip install anthropic
+import anthropic
+
+client = anthropic.Anthropic()          # đọc khóa từ biến môi trường ANTHROPIC_API_KEY
+msg = client.messages.create(
+    model="&lt;MODEL_ID&gt;",                 # thay bằng tên mô hình trong tài liệu hiện hành
+    max_tokens=512,
+    messages=[{"role": "user", "content": "Giải thích self-attention trong 3 câu."}],
+)
+print(msg.content[0].text)</code></pre>
+<pre><code class="language-python"># pip install transformers torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+MODEL_ID = "..."                        # chọn một mô hình phù hợp trên Hugging Face Hub
+tok = AutoTokenizer.from_pretrained(MODEL_ID)
+model = AutoModelForCausalLM.from_pretrained(MODEL_ID)
+
+inputs = tok("Xin chào, hôm nay", return_tensors="pt")
+out = model.generate(**inputs, max_new_tokens=50, do_sample=True, temperature=0.7, top_p=0.9)
+print(tok.decode(out[0], skip_special_tokens=True))</code></pre>
+<div class="callout warn"><span class="callout-title">Bảo mật khóa API</span>Không đưa khóa vào code hay repo (xem trang GitHub). Đặt chi phí tối đa (hạn mức) và ghi log mức sử dụng để tránh hóa đơn bất ngờ.</div>
+
+<h2 id="han-che">Hạn chế và rủi ro cần hiểu</h2>
+<ul>
+  <li><strong>Bịa đặt (hallucination)</strong>: mô hình có thể sinh thông tin sai nhưng rất tự tin, kể cả trích dẫn và đường link không tồn tại. Giảm thiểu: RAG có trích nguồn, công cụ (tìm kiếm, tính toán), kiểm chứng đầu ra bằng code hoặc con người, cho phép mô hình nói “không biết”.</li>
+  <li><strong>Ngày cắt kiến thức</strong>: mô hình không biết gì sau thời điểm dữ liệu huấn luyện, trừ khi được cung cấp qua ngữ cảnh hoặc công cụ.</li>
+  <li><strong>Ngữ cảnh không phải bộ nhớ hoàn hảo</strong>: thông tin ở giữa ngữ cảnh dài đôi khi bị dùng kém hơn thông tin ở đầu và cuối (Liu và cộng sự, 2023). Hãy kiểm tra với dữ liệu của bạn.</li>
+  <li><strong>Thiên kiến và nội dung độc hại</strong> thừa hưởng từ dữ liệu; cần kiểm thử theo nhóm người dùng và tình huống.</li>
+  <li><strong>Prompt injection</strong>: văn bản không đáng tin (trang web, email, tài liệu) có thể chứa chỉ dẫn lừa mô hình. Không bao giờ coi nội dung truy xuất là mệnh lệnh; xem thêm trang Agentic AI.</li>
+  <li><strong>Quyền riêng tư</strong>: cân nhắc dữ liệu cá nhân gửi cho dịch vụ bên thứ ba và chính sách lưu trữ của nhà cung cấp.</li>
+  <li><strong>Đánh giá khó</strong>: điểm benchmark công khai có thể bị rò rỉ vào dữ liệu huấn luyện và không phản ánh bài toán của bạn. Hãy xây bộ đánh giá riêng. Dùng “LLM làm giám khảo” thì phải kiểm tra độ nhất quán với đánh giá của người.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<details class="exercise">
+  <summary>Bài 1. Đếm tham số</summary>
+  <div class="ex-body"><p>Một mô hình có \(L=24\), \(d=2048\). Ước lượng số tham số trong các khối Transformer (bỏ qua embedding).</p>
+  <p><em>Lời giải:</em> \(12\cdot24\cdot2048^2=1{,}207{,}959{,}552\approx1.2\) tỷ.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 2. Temperature bằng tay</summary>
+  <div class="ex-body"><p>Logit \((2,1,0)\). Tính softmax với \(T=1\) và \(T=0.5\).</p>
+  <p><em>Lời giải:</em> \(T=1\): \((0.665,\,0.245,\,0.090)\). \(T=0.5\) tương đương logit \((4,2,0)\): \((0.867,\,0.117,\,0.016)\). Temperature thấp làm phân phối nhọn hơn.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 3. Chi phí huấn luyện</summary>
+  <div class="ex-body"><p>Dùng \(C\approx6ND\) cho \(N=7\times10^9\) tham số và \(D=1.4\times10^{11}\) token. Nếu một cụm đạt thông lượng hiệu dụng \(10^{15}\) FLOP/s, huấn luyện mất bao lâu?</p>
+  <p><em>Lời giải:</em> \(C=6\cdot7\times10^9\cdot1.4\times10^{11}=5.88\times10^{21}\) FLOP; chia cho \(10^{15}\) được \(5.88\times10^{6}\) giây, tức khoảng 68 ngày (đây là tính toán minh họa, thông lượng thực tế còn phụ thuộc hiệu suất sử dụng phần cứng).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 4. Thiết kế bộ đánh giá</summary>
+  <div class="ex-body"><p>Chọn một tác vụ thật (ví dụ phân loại email hỗ trợ). Viết 30 ví dụ có đáp án đúng, thử 3 phiên bản prompt, đo độ chính xác và ghi lại các ca sai. Phiên bản nào ổn định nhất, và vì sao?</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 5. Tự xây mô hình nhỏ</summary>
+  <div class="ex-body"><p>Làm theo loạt bài xây dựng GPT nhỏ từ đầu của Karpathy (xem phần tài liệu) và huấn luyện trên một tệp văn bản nhỏ. Ghi lại mất mát và cách đầu ra thay đổi khi huấn luyện lâu hơn.</p></div>
+</details>
+
+<h2 id="tham-khao">Tài liệu tham khảo</h2>
+<ol class="refs">
+  <li>Vaswani và cộng sự (2017), <em>Attention Is All You Need</em>, arXiv:1706.03762.</li>
+  <li><a href="https://jalammar.github.io/illustrated-transformer/">The Illustrated Transformer</a> — Jay Alammar; giải thích trực quan.</li>
+  <li><a href="https://karpathy.ai/zero-to-hero.html">Neural Networks: Zero to Hero</a> — Andrej Karpathy, gồm phần xây dựng GPT từ đầu (mình tin link đúng, bạn nên kiểm tra).</li>
+  <li>Brown và cộng sự (2020), <em>Language Models are Few-Shot Learners</em>, arXiv:2005.14165.</li>
+  <li>Kaplan và cộng sự (2020), <em>Scaling Laws for Neural Language Models</em>, arXiv:2001.08361. Hoffmann và cộng sự (2022), <em>Training Compute-Optimal Large Language Models</em>, arXiv:2203.15556.</li>
+  <li>Ouyang và cộng sự (2022), <em>Training language models to follow instructions with human feedback</em>, arXiv:2203.02155. Rafailov và cộng sự (2023), <em>Direct Preference Optimization</em>, arXiv:2305.18290.</li>
+  <li>Hu và cộng sự (2021), <em>LoRA: Low-Rank Adaptation of Large Language Models</em>, arXiv:2106.09685.</li>
+  <li>Lewis và cộng sự (2020), <em>Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks</em>, arXiv:2005.11401.</li>
+  <li>Wei và cộng sự (2022), <em>Chain-of-Thought Prompting Elicits Reasoning in Large Language Models</em>, arXiv:2201.11903.</li>
+  <li>Holtzman và cộng sự (2019), <em>The Curious Case of Neural Text Degeneration</em>, arXiv:1904.09751. Liu và cộng sự (2023), <em>Lost in the Middle</em>, arXiv:2307.03172.</li>
+</ol>
+<p class="meta">Mình trích số arXiv và tên bài theo trí nhớ; hãy tìm bằng tên bài trên arxiv.org để xác nhận trước khi dẫn lại.</p>
+
+</main>
+<aside class="toc" id="toc" aria-label="Mục lục"></aside>
+</div>
+<div id="site-footer"></div>
+</body>
+</html>

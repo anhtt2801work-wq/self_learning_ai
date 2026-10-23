@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hướng dẫn Git và GitHub · Tự học AI</title>
+<meta name="description" content="Học Git và GitHub từ đầu: commit, nhánh, merge, pull request, GitHub Actions, GitHub Pages và cách dùng Git cho dự án AI.">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/search-index.js"></script>
+<script defer src="assets/js/site.js"></script>
+<script defer src="assets/js/viz-git.js"></script>
+</head>
+<body data-page="github">
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div id="site-header"></div>
+<div class="page">
+<main class="content" id="main">
+
+<h1>Hướng dẫn Git và GitHub</h1>
+<p class="lead">Mọi dự án AI nghiêm túc đều cần quản lý phiên bản: code thí nghiệm thay đổi liên tục, bạn cần quay lại bản chạy tốt, làm việc nhóm và chia sẻ kết quả. Trang này đưa bạn từ con số 0 đến quy trình làm việc thực tế trên GitHub.</p>
+
+<h2 id="tong-quan">Git và GitHub khác nhau thế nào?</h2>
+<ul>
+  <li><strong>Git</strong> là phần mềm quản lý phiên bản phân tán chạy trên máy bạn. Nó lưu lịch sử thay đổi của thư mục dự án dưới dạng các <em>commit</em>.</li>
+  <li><strong>GitHub</strong> là dịch vụ web lưu trữ kho Git (repository) từ xa, thêm các tính năng cộng tác: issue, pull request, review, Actions (CI/CD), Pages... GitLab và Bitbucket là các dịch vụ tương tự.</li>
+</ul>
+<p>Khái niệm cốt lõi cần nhớ:</p>
+<table>
+  <thead><tr><th>Thuật ngữ</th><th>Ý nghĩa</th></tr></thead>
+  <tbody>
+    <tr><td>Repository (repo)</td><td>Thư mục dự án cùng toàn bộ lịch sử (thư mục ẩn <code>.git</code>).</td></tr>
+    <tr><td>Commit</td><td>Một “ảnh chụp” trạng thái dự án kèm thông điệp, tác giả, thời gian và con trỏ tới commit cha.</td></tr>
+    <tr><td>Branch (nhánh)</td><td>Con trỏ có tên trỏ vào một commit; commit mới sẽ đẩy con trỏ đi tiếp.</td></tr>
+    <tr><td>HEAD</td><td>Con trỏ cho biết bạn đang đứng ở đâu (thường là nhánh hiện tại).</td></tr>
+    <tr><td>Remote</td><td>Bản sao repo ở nơi khác, thường tên là <code>origin</code>.</td></tr>
+    <tr><td>Pull request (PR)</td><td>Đề nghị gộp một nhánh vào nhánh khác trên GitHub, kèm thảo luận và review.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="cai-dat">Cài đặt và cấu hình lần đầu</h2>
+<p>Cài Git từ <a href="https://git-scm.com/downloads">git-scm.com/downloads</a> (hoặc qua trình quản lý gói như <code>apt</code>, <code>brew</code>, <code>winget</code>), rồi khai báo danh tính. Thông tin này được ghi vào mọi commit của bạn.</p>
+<pre><code class="language-bash">git --version
+git config --global user.name "Ten Cua Ban"
+git config --global user.email "ban@example.com"
+git config --global init.defaultBranch main
+git config --global --list</code></pre>
+<div class="callout tip"><span class="callout-title">Mẹo</span>Dùng cùng địa chỉ email mà bạn đã thêm vào tài khoản GitHub để commit được gắn đúng với hồ sơ của bạn.</div>
+
+<h2 id="xac-thuc">Xác thực với GitHub</h2>
+<p>Khi đẩy code lên GitHub bạn cần chứng minh danh tính. Hai cách phổ biến: <strong>SSH key</strong> hoặc <strong>HTTPS với token</strong> (GitHub không còn chấp nhận mật khẩu tài khoản cho thao tác Git qua HTTPS). Cách SSH gọn nhất về lâu dài:</p>
+<pre><code class="language-bash"># 1) Tạo khóa (giữ nguyên đường dẫn mặc định, nên đặt passphrase)
+ssh-keygen -t ed25519 -C "ban@example.com"
+
+# 2) In khóa công khai rồi dán vào GitHub:
+#    Settings → SSH and GPG keys → New SSH key
+cat ~/.ssh/id_ed25519.pub
+
+# 3) Kiểm tra kết nối
+ssh -T git@github.com</code></pre>
+<div class="callout warn"><span class="callout-title">Không bao giờ chia sẻ khóa riêng</span>Chỉ file <code>.pub</code> được dán lên GitHub. File không có đuôi (<code>id_ed25519</code>) là khóa riêng tư, tuyệt đối không commit hay gửi cho ai. Giao diện cài đặt của GitHub có thể đổi tên menu theo thời gian, hãy đối chiếu với tài liệu chính thức.</div>
+
+<h2 id="luong-co-ban">Ba vùng và vòng đời của một thay đổi</h2>
+<p>Hiểu mô hình ba vùng giúp bạn không còn bối rối với <code>add</code>, <code>commit</code>, <code>push</code>:</p>
+<div class="flow">
+  <div><b>Working directory</b>file bạn đang sửa</div><div class="arrow">git add →</div>
+  <div><b>Staging area (index)</b>những gì sẽ vào commit tiếp theo</div><div class="arrow">git commit →</div>
+  <div><b>Local repository</b>lịch sử commit trên máy</div><div class="arrow">git push →</div>
+  <div><b>Remote (GitHub)</b>bản chia sẻ cho cả nhóm</div>
+</div>
+<pre><code class="language-bash">git init                         # biến thư mục hiện tại thành repo
+git status                       # xem trạng thái (dùng thật nhiều)
+git add train.py README.md       # đưa file vào staging (git add -p để chọn từng đoạn)
+git commit -m "Thêm script huấn luyện baseline"
+git log --oneline --graph --decorate --all
+git diff                         # thay đổi chưa staged
+git diff --staged                # thay đổi đã staged</code></pre>
+<h3 id="commit-tot">Viết commit message tốt</h3>
+<ul>
+  <li>Mỗi commit làm <em>một việc</em> có thể mô tả gọn; dễ review, dễ hoàn tác.</li>
+  <li>Dòng đầu ngắn (khoảng 50–72 ký tự), dùng thể mệnh lệnh: “Fix lỗi chia cho 0 khi chuẩn hóa”.</li>
+  <li>Nhiều đội dùng quy ước <a href="https://www.conventionalcommits.org">Conventional Commits</a> như <code>feat:</code>, <code>fix:</code>, <code>docs:</code>.</li>
+</ul>
+
+<h2 id="mo-phong">Thực hành: mô phỏng commit, nhánh và merge</h2>
+<p>Hãy tự gõ vài lệnh vào mô phỏng dưới đây để thấy đồ thị commit thay đổi thế nào. Thử “Kịch bản mẫu” trước, rồi tự gõ <code>git branch</code>, <code>git switch</code>, <code>git merge</code>.</p>
+<div class="viz" data-viz="git1" data-title="Mô phỏng đồ thị commit">
+  <p class="viz-help">Mô phỏng chỉ hiểu một phần nhỏ của Git: commit, branch, switch/checkout, merge, log. Nó không có file thật và không xử lý xung đột.</p>
+</div>
+<p>Hai điều đáng quan sát: (1) khi nhánh <code>main</code> chưa có commit mới, <code>merge</code> chỉ đẩy con trỏ đi tiếp (<em>fast-forward</em>); (2) khi hai nhánh cùng có commit mới, Git tạo <em>merge commit</em> có hai commit cha.</p>
+
+<h2 id="nhanh">Nhánh, merge, rebase và xung đột</h2>
+<pre><code class="language-bash">git switch -c feature/dropout    # tạo và chuyển sang nhánh mới (Git ≥ 2.23)
+# ... sửa code, commit ...
+git switch main
+git merge feature/dropout        # gộp nhánh vào main
+git branch -d feature/dropout    # xóa nhánh đã gộp</code></pre>
+<p><strong>Rebase</strong> là cách khác để tích hợp: “đặt lại” các commit của nhánh bạn lên đầu nhánh đích để lịch sử thẳng hàng.</p>
+<pre><code class="language-bash">git switch feature/dropout
+git rebase main                  # chỉ làm trên nhánh của riêng bạn</code></pre>
+<div class="callout warn"><span class="callout-title">Quy tắc vàng của rebase</span>Rebase viết lại commit (tạo commit mới với mã băm mới). Đừng rebase các nhánh mà người khác đã kéo về.</div>
+<h3 id="xung-dot">Giải quyết xung đột (conflict)</h3>
+<p>Xung đột xảy ra khi hai nhánh sửa cùng vùng của cùng một file. Git đánh dấu trong file:</p>
+<pre><code class="language-text">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+learning_rate = 0.001
+=======
+learning_rate = 0.0003
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; feature/dropout</code></pre>
+<ol>
+  <li>Mở file, chọn (hoặc kết hợp) nội dung đúng, xóa ba dòng đánh dấu.</li>
+  <li><code>git add &lt;file&gt;</code> để báo đã xử lý xong.</li>
+  <li><code>git commit</code> (với merge) hoặc <code>git rebase --continue</code> (với rebase).</li>
+</ol>
+<p>Nếu rối, <code>git merge --abort</code> hoặc <code>git rebase --abort</code> đưa mọi thứ về trạng thái trước khi bắt đầu.</p>
+
+<h2 id="remote">Làm việc với remote</h2>
+<pre><code class="language-bash">git clone git@github.com:&lt;user&gt;/&lt;repo&gt;.git     # tải repo về
+git remote -v                                      # xem các remote
+git remote add origin git@github.com:&lt;user&gt;/&lt;repo&gt;.git   # nếu bạn git init trước
+git push -u origin main                            # đẩy lần đầu, nhớ upstream
+git fetch origin                                   # tải thông tin mới, chưa thay đổi file của bạn
+git pull                                           # fetch + tích hợp (mặc định là merge)
+git pull --rebase                                  # fetch + rebase</code></pre>
+<p>Phân biệt <code>fetch</code> và <code>pull</code>: <code>fetch</code> an toàn vì chỉ cập nhật bản đồ của remote; <code>pull</code> còn đổi cả nhánh hiện tại của bạn.</p>
+
+<h2 id="github-flow">Quy trình cộng tác trên GitHub</h2>
+<p>Quy trình “GitHub flow” gọn và phổ biến:</p>
+<ol>
+  <li><strong>Issue</strong>: mô tả việc cần làm hoặc lỗi cần sửa.</li>
+  <li><strong>Nhánh</strong>: tạo nhánh từ <code>main</code>, đặt tên có nghĩa (<code>fix/nan-loss</code>).</li>
+  <li><strong>Commit và push</strong> nhánh lên GitHub.</li>
+  <li><strong>Pull request</strong>: mô tả thay đổi, liên kết issue (viết <code>Closes #12</code> trong mô tả để tự đóng issue khi merge).</li>
+  <li><strong>Review và CI</strong>: đồng đội nhận xét, kiểm thử tự động chạy.</li>
+  <li><strong>Merge</strong> vào <code>main</code> rồi xóa nhánh.</li>
+</ol>
+<h3 id="fork">Đóng góp cho dự án của người khác (fork)</h3>
+<pre><code class="language-bash"># Sau khi bấm Fork trên GitHub:
+git clone git@github.com:&lt;ban&gt;/&lt;repo&gt;.git
+git remote add upstream git@github.com:&lt;chu-du-an&gt;/&lt;repo&gt;.git
+git fetch upstream
+git switch -c fix/typo upstream/main
+# sửa, commit, push lên fork của bạn rồi mở Pull Request</code></pre>
+
+<h2 id="actions">GitHub Actions: kiểm thử tự động (CI)</h2>
+<p>Tạo file <code>.github/workflows/ci.yml</code>; mỗi lần push hoặc mở PR, GitHub sẽ chạy các bước bạn khai báo:</p>
+<pre><code class="language-yaml">name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: pytest -q</code></pre>
+<p>Số phiên bản của các action (<code>@v4</code>, <code>@v5</code>) thay đổi theo thời gian; hãy xem trang của từng action trên GitHub Marketplace để dùng bản hiện hành. Với dự án AI, CI nên chạy kiểm thử nhỏ, nhanh (kiểm tra hình dạng tensor, hàm tiền xử lý), không huấn luyện mô hình lớn.</p>
+
+<h2 id="pages">GitHub Pages: xuất bản website này</h2>
+<p>Website bạn đang đọc là site tĩnh (HTML/CSS/JS), nên đưa lên GitHub Pages rất dễ:</p>
+<ol>
+  <li>Đẩy code lên GitHub.</li>
+  <li>Vào <em>Settings → Pages</em> của repo, chọn nguồn triển khai (từ một nhánh, hoặc <em>GitHub Actions</em>).</li>
+  <li>Đợi workflow hoàn tất; địa chỉ dạng <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/</code>.</li>
+</ol>
+<p>Repo này đã kèm sẵn workflow <code>.github/workflows/pages.yml</code>. Bạn chỉ cần chọn nguồn là GitHub Actions trong Settings → Pages.</p>
+
+<h2 id="ai-repo">Dùng Git cho dự án AI</h2>
+<p>Dự án AI có vài đặc thù mà dự án web thông thường ít gặp:</p>
+<h3 id="gitignore">1. Đừng commit thứ không nên commit</h3>
+<pre><code class="language-text"># .gitignore gợi ý cho dự án Python/AI
+__pycache__/
+.venv/
+.env
+.ipynb_checkpoints/
+data/raw/
+*.pt
+*.ckpt
+wandb/
+mlruns/</code></pre>
+<div class="callout warn"><span class="callout-title">Lộ API key là sự cố phổ biến nhất</span>
+Nếu lỡ commit khóa API hay mật khẩu, hãy <strong>thu hồi (revoke) và tạo khóa mới ngay</strong>. Xóa commit là chưa đủ vì bản cũ có thể đã được sao chép hoặc nằm trong lịch sử. Lưu bí mật trong biến môi trường hoặc file <code>.env</code> (đã ignore) và dùng <em>Secrets</em> của GitHub cho Actions. GitHub có tính năng quét bí mật (secret scanning), hãy kiểm tra tài liệu để biết phạm vi áp dụng cho tài khoản của bạn.</div>
+<h3 id="du-lieu-lon">2. Dữ liệu và mô hình dung lượng lớn</h3>
+<p>Git không phù hợp để lưu file nhị phân lớn (dữ liệu, trọng số mô hình). GitHub từ chối file vượt một ngưỡng kích thước (khoảng 100 MB theo hiểu biết của mình, bạn nên kiểm tra giới hạn hiện hành trong tài liệu GitHub). Giải pháp thường dùng:</p>
+<ul>
+  <li><strong>Git LFS</strong>: lưu con trỏ trong Git, nội dung thật ở kho riêng (<code>git lfs install</code>, <code>git lfs track "*.bin"</code>). Có hạn mức dung lượng và băng thông.</li>
+  <li><strong>DVC</strong> (Data Version Control) hoặc lưu ở object storage / Hugging Face Hub, trong repo chỉ giữ file mô tả và script tải về.</li>
+</ul>
+<h3 id="tai-lap">3. Khả năng tái lập</h3>
+<ul>
+  <li>Ghi rõ phiên bản thư viện (<code>requirements.txt</code> hoặc <code>pyproject.toml</code> kèm lock file).</li>
+  <li>Cố định seed ngẫu nhiên và lưu cấu hình mỗi lần chạy, kèm mã băm commit đã dùng.</li>
+  <li>Notebook: cân nhắc xóa output trước khi commit để diff gọn (có công cụ hỗ trợ như <code>nbstripout</code>, hãy kiểm tra tài liệu của công cụ).</li>
+  <li>README cần có: mục tiêu, cách cài đặt, cách chạy, kết quả chính, giấy phép.</li>
+</ul>
+
+<h2 id="hoan-tac">Hoàn tác và gỡ rối</h2>
+<table>
+  <thead><tr><th>Tình huống</th><th>Lệnh</th></tr></thead>
+  <tbody>
+    <tr><td>Bỏ thay đổi chưa staged của một file</td><td><code>git restore &lt;file&gt;</code> (mất thay đổi đó)</td></tr>
+    <tr><td>Bỏ file khỏi staging</td><td><code>git restore --staged &lt;file&gt;</code></td></tr>
+    <tr><td>Sửa commit message vừa tạo (chưa push)</td><td><code>git commit --amend</code></td></tr>
+    <tr><td>Hoàn tác commit đã push, an toàn</td><td><code>git revert &lt;sha&gt;</code> (tạo commit đảo ngược)</td></tr>
+    <tr><td>Cất tạm thay đổi để đổi nhánh</td><td><code>git stash</code> rồi <code>git stash pop</code></td></tr>
+    <tr><td>Tìm lại commit “biến mất”</td><td><code>git reflog</code></td></tr>
+    <tr><td>Đưa nhánh về một commit, bỏ hết thay đổi</td><td><code>git reset --hard &lt;sha&gt;</code> (nguy hiểm, mất thay đổi chưa commit)</td></tr>
+  </tbody>
+</table>
+
+<h2 id="cheatsheet">Bảng lệnh nhanh</h2>
+<table>
+  <thead><tr><th>Mục đích</th><th>Lệnh</th></tr></thead>
+  <tbody>
+    <tr><td>Bắt đầu</td><td><code>git init</code>, <code>git clone &lt;url&gt;</code></td></tr>
+    <tr><td>Xem</td><td><code>git status</code>, <code>git log --oneline --graph</code>, <code>git diff</code></td></tr>
+    <tr><td>Ghi lại</td><td><code>git add</code>, <code>git commit -m</code></td></tr>
+    <tr><td>Nhánh</td><td><code>git branch</code>, <code>git switch</code>, <code>git merge</code>, <code>git rebase</code></td></tr>
+    <tr><td>Đồng bộ</td><td><code>git fetch</code>, <code>git pull</code>, <code>git push</code></td></tr>
+    <tr><td>Hoàn tác</td><td><code>git restore</code>, <code>git revert</code>, <code>git stash</code>, <code>git reflog</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="bai-tap">Bài tập</h2>
+<details class="exercise">
+  <summary>Bài 1. Tạo repo, rẽ nhánh và cố ý tạo xung đột</summary>
+  <div class="ex-body">
+    <p>Tạo repo mới với file <code>config.py</code> chứa <code>lr = 0.001</code>. Trên nhánh <code>a</code> đổi thành <code>0.01</code>, trên nhánh <code>b</code> đổi thành <code>0.0003</code>, rồi merge cả hai vào <code>main</code>. Giải quyết xung đột.</p>
+    <p><em>Gợi ý:</em> merge nhánh đầu sẽ fast-forward; merge nhánh thứ hai mới sinh xung đột.</p>
+  </div>
+</details>
+<details class="exercise">
+  <summary>Bài 2. Xuất bản trang cá nhân bằng GitHub Pages</summary>
+  <div class="ex-body"><p>Fork hoặc clone repo này, sửa tiêu đề trang chủ, đẩy lên GitHub và bật Pages. Mở một Pull Request vào <code>main</code> của repo của bạn, để CI hoặc workflow Pages chạy.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 3. Dọn dẹp bí mật</summary>
+  <div class="ex-body"><p>Tạo repo thử, commit một file <code>.env</code> giả chứa <code>API_KEY=thu-nghiem</code>. Thêm <code>.env</code> vào <code>.gitignore</code>, dùng <code>git rm --cached .env</code>, commit. Sau đó trả lời: vì sao khóa vẫn còn trong lịch sử, và cần làm gì nếu đó là khóa thật?</p></div>
+</details>
+
+<h2 id="tham-khao">Tài liệu tham khảo</h2>
+<ol class="refs">
+  <li><a href="https://git-scm.com/book">Pro Git</a> — sách miễn phí, tài liệu học Git toàn diện.<div class="meta">Tác giả: Scott Chacon và Ben Straub.</div></li>
+  <li><a href="https://git-scm.com/doc">Tài liệu Git chính thức</a> — tham chiếu lệnh.</li>
+  <li><a href="https://docs.github.com">GitHub Docs</a> — hướng dẫn cho repo, Actions, Pages, bảo mật.</li>
+  <li><a href="https://skills.github.com">GitHub Skills</a> — các khóa thực hành tương tác do GitHub cung cấp.</li>
+  <li><a href="https://www.conventionalcommits.org">Conventional Commits</a> — quy ước viết commit message.</li>
+</ol>
+<p class="meta">Giao diện GitHub và số phiên bản của các action thay đổi theo thời gian. Khi hướng dẫn ở đây khác với màn hình bạn thấy, hãy tin tài liệu chính thức.</p>
+
+</main>
+<aside class="toc" id="toc" aria-label="Mục lục"></aside>
+</div>
+<div id="site-footer"></div>
+</body>
+</html>
