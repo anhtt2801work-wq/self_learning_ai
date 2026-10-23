@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kết hợp công cụ AI · Tự học AI</title>
+<meta name="description" content="Cách kết hợp Claude, Gemini, Antigravity, Cursor, Copilot, Codex, Perplexity, Consensus và Gemini Notebook: bản đồ công cụ, mô hình phối hợp, tệp chỉ dẫn dùng chung, MCP, review chéo, chi phí và bảo mật.">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/search-index.js"></script>
+<script defer src="assets/js/site.js"></script>
+<script defer src="assets/js/viz-combo.js"></script>
+</head>
+<body data-page="combo">
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div id="site-header"></div>
+<div class="page">
+<main class="content" id="main">
+
+<h1>Kết hợp công cụ AI</h1>
+<p class="lead">Không có công cụ nào tốt nhất cho mọi việc. Trang này hướng dẫn dùng Claude, Gemini, Antigravity, Cursor, Copilot, Codex, Perplexity, Consensus và Gemini Notebook cùng nhau: đi từ chiến lược (ai làm vai gì) đến thực thi (tệp cấu hình, lệnh, quy trình, kiểm soát chi phí và rủi ro). Mục tiêu của bạn gồm lập trình, làm nghiên cứu, làm web, làm dự án nhóm và soạn tài liệu học.</p>
+
+<h2 id="doc-truoc">Đọc trước: phạm vi và độ tin cậy</h2>
+<div class="callout warn"><span class="callout-title">Lĩnh vực đổi theo tuần, và mình không kiểm chứng được hết</span>
+<p>Nội dung phản ánh những gì mình tra được ngày 23/10/2026. Trong môi trường soạn bài này mình chỉ <strong>mở trực tiếp được tài liệu của Claude Code</strong>; với các công cụ còn lại, mình dựa vào kết quả tìm kiếm (một phần là trang chính thức, phần lớn là bài viết thứ cấp). Vì vậy mỗi thông tin kỹ thuật được gắn nhãn:</p>
+<ul>
+  <li><span class="conf ok">✔</span> đã đọc trực tiếp tài liệu chính thức;</li>
+  <li><span class="conf mid">◐</span> từ trang chính thức nhưng qua tóm tắt tìm kiếm, hoặc nhiều nguồn thứ cấp thống nhất;</li>
+  <li><span class="conf low">✱</span> nguồn thứ cấp hoặc chưa xác nhận. Hãy kiểm tra bằng <code>--help</code> hoặc tài liệu hiện hành trước khi dựa vào.</li>
+</ul>
+<p>Hai điều mình chưa biết: <strong>Evose</strong> là sản phẩm nào (tìm kiếm chỉ ra các sản phẩm tên gần giống nhưng không khớp rõ ràng, xem phần cuối mục 1), và bạn có <strong>gói Copilot</strong> hay <strong>gói Cursor</strong> nào (bạn nêu gói Claude Pro, Gemini Pro, Perplexity Pro). Phần gợi ý bên dưới không giả định hai điều đó.</p></div>
+
+<h2 id="ban-do">1. Bản đồ công cụ: ai làm vai gì</h2>
+<p>Cách nghĩ hữu ích: chia công cụ theo <strong>vai</strong> hơn là theo thương hiệu. Có công cụ <em>hỗ trợ khi gõ</em> (gợi ý từng dòng), công cụ <em>tác tử trong kho mã</em> (đọc cả dự án, sửa nhiều file, chạy lệnh), công cụ <em>nghiên cứu có trích dẫn</em> và công cụ <em>làm việc trên nguồn của bạn</em>. Một công cụ có thể giữ nhiều vai, nhưng bạn nên chọn <strong>một công cụ chính cho mỗi vai</strong> và thêm công cụ thứ hai chỉ để kiểm tra chéo.</p>
+<table>
+  <thead><tr><th>Công cụ</th><th>Vai chính</th><th>Điểm cần nhớ</th><th>Độ chắc</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Claude Code</strong> (CLI, IDE, ứng dụng, web)</td><td>Tác tử trong kho mã: kế hoạch, sửa nhiều file, chạy lệnh và kiểm thử, review, tự động hóa bằng <code>claude -p</code> và GitHub Actions</td><td>Đọc <code>CLAUDE.md</code> (và <code>AGENTS.md</code> khi không có CLAUDE.md); hỗ trợ MCP, worktree, chế độ plan. Đi kèm gói Pro nhưng dùng chung hạn mức với chat; dùng nhiều sẽ hết hạn mức nhanh</td><td><span class="conf ok">✔</span> tính năng<br><span class="conf mid">◐</span> hạn mức</td></tr>
+    <tr><td><strong>Claude</strong> (chat, Projects)</td><td>Soạn thảo, phân tích văn bản dài, giải thích, lập dàn ý</td><td>Dùng cùng hạn mức với Claude Code</td><td><span class="conf mid">◐</span></td></tr>
+    <tr><td><strong>Gemini</strong> (ứng dụng, gói Google AI Pro)</td><td>Hỏi đáp, tìm kiếm tổng hợp, ngữ cảnh dài, hệ sinh thái Google</td><td>Gói Pro gồm hạn mức cho nhiều sản phẩm Google AI; các con số hạn mức đổi và chỉ có ở nguồn thứ cấp</td><td><span class="conf low">✱</span></td></tr>
+    <tr><td><strong>Antigravity</strong> (IDE và CLI <code>agy</code>)</td><td>Tác tử trong IDE của Google: giao việc cho tác tử, xem kết quả</td><td>Nạp quy tắc từ <code>AGENTS.md</code>, <code>GEMINI.md</code> hoặc <code>.agents/rules/</code>. Nhiều nguồn cho biết CLI <code>agy</code> thay Gemini CLI cho tài khoản cá nhân từ 18/06/2026</td><td><span class="conf mid">◐</span> quy tắc<br><span class="conf low">✱</span> CLI</td></tr>
+    <tr><td><strong>Cursor</strong></td><td>IDE có tác tử và gợi ý khi gõ; có CLI</td><td>Đọc <code>AGENTS.md</code> và <code>.cursor/rules</code>; dùng chung <code>mcp.json</code> giữa IDE và CLI</td><td><span class="conf mid">◐</span></td></tr>
+    <tr><td><strong>GitHub Copilot</strong> trong VS Code và trên GitHub</td><td>Gợi ý khi gõ, chat/agent trong VS Code, coding agent và review trên GitHub</td><td>Hỗ trợ <code>AGENTS.md</code> và <code>.github/copilot-instructions.md</code>; MCP trong VS Code qua <code>.vscode/mcp.json</code>. Tính năng phụ thuộc gói bạn có</td><td><span class="conf mid">◐</span></td></tr>
+    <tr><td><strong>ChatGPT và Codex</strong></td><td>Chat; Codex là tác tử lập trình có CLI (<code>codex exec</code> cho chế độ không tương tác)</td><td>Codex đọc <code>AGENTS.md</code>; cấu hình ở <code>~/.codex/config.toml</code>, MCP khai báo bằng <code>[mcp_servers.tên]</code></td><td><span class="conf mid">◐</span></td></tr>
+    <tr><td><strong>Perplexity</strong> (Pro)</td><td>Tìm kiếm web có trích dẫn nguồn</td><td>Có máy chủ MCP của hãng (gói npm <code>@perplexity-ai/mcp-server</code>, cần khóa API; hãy kiểm tra xem gói Pro của bạn có kèm API hay tính riêng)</td><td><span class="conf mid">◐</span></td></tr>
+    <tr><td><strong>Consensus</strong></td><td>Tìm bài báo học thuật đã bình duyệt</td><td>Có máy chủ MCP từ xa dùng OAuth; một thư viện đại học nêu giới hạn khoảng 1000 lượt tìm mỗi tháng. Địa chỉ và hạn mức cần xác nhận trên trang của Consensus</td><td><span class="conf low">✱</span></td></tr>
+    <tr><td><strong>Gemini Notebook</strong> (tên cũ NotebookLM)</td><td>Hỏi đáp và tóm tắt dựa trên các nguồn <em>bạn</em> nạp vào</td><td>Google đổi tên NotebookLM thành Gemini Notebook ngày 16/07/2026; sổ tay cũ giữ nguyên. Chỉ thấy máy chủ MCP do cộng đồng viết, không thấy API chính thức cho tài khoản cá nhân</td><td><span class="conf mid">◐</span> đổi tên<br><span class="conf low">✱</span> MCP</td></tr>
+  </tbody>
+</table>
+<div class="callout note"><span class="callout-title">Về “Evose”</span>Mình không xác định được Evose là sản phẩm nào: kết quả tìm kiếm trả về các sản phẩm khác (một nền tảng tác tử mã nguồn mở tên Evo AI, một công ty tên Evos, một nền tảng cho ngành xây dựng tên gần giống…), chưa có gì khớp rõ với tên bạn viết. Hãy gửi liên kết hoặc mô tả ngắn. Trong lúc chờ, hãy coi nó là một <strong>khối tự động hóa</strong>: nếu nó hỗ trợ MCP, webhook hoặc API thì cắm vào đúng chỗ “máy chủ MCP” và “GitHub Actions” ở các mục sau, thay vì chia sẻ ngữ cảnh bằng tay.</div>
+<p>Thử chọn một việc cụ thể và xem công cụ nào nên đảm nhận vai nào, trong số các công cụ bạn đang có:</p>
+<div class="viz" data-viz="route1" data-title="Chọn công cụ theo việc cần làm">
+  <p class="viz-help">Bỏ chọn công cụ bạn không dùng để thấy phương án thay thế. Gạch ngang nghĩa là bạn không có công cụ đó. Đây là gợi ý theo vai trò, không phải kết quả so sánh hiệu năng.</p>
+</div>
+
+<h2 id="mo-hinh">2. Các mô hình phối hợp</h2>
+<figure class="diagram">
+<svg viewBox="0 0 640 262" role="img" aria-label="Quy trình năm bước: nghiên cứu, lập kế hoạch, triển khai, review chéo, trọng tài; cùng biến thể chạy song song trên hai nhánh rồi so sánh">
+  <rect class="box c1" x="6" y="22" width="112" height="44" rx="8"/><text x="62" y="41" text-anchor="middle" class="small bold">1 Nghiên cứu</text><text x="62" y="57" text-anchor="middle" class="small muted">nguồn có trích dẫn</text>
+  <rect class="box c2" x="134" y="22" width="112" height="44" rx="8"/><text x="190" y="41" text-anchor="middle" class="small bold">2 Lập kế hoạch</text><text x="190" y="57" text-anchor="middle" class="small muted">bạn duyệt</text>
+  <rect class="box c3" x="262" y="22" width="112" height="44" rx="8"/><text x="318" y="41" text-anchor="middle" class="small bold">3 Triển khai</text><text x="318" y="57" text-anchor="middle" class="small muted">trên nhánh riêng</text>
+  <rect class="box c4" x="390" y="22" width="112" height="44" rx="8"/><text x="446" y="41" text-anchor="middle" class="small bold">4 Review chéo</text><text x="446" y="57" text-anchor="middle" class="small muted">công cụ khác</text>
+  <rect class="box" x="518" y="22" width="116" height="44" rx="8"/><text x="576" y="41" text-anchor="middle" class="small bold">5 Trọng tài</text><text x="576" y="57" text-anchor="middle" class="small muted">test · CI · người</text>
+  <path class="arrow" d="M118 44 H132"/><path class="arrow" d="M246 44 H260"/><path class="arrow" d="M374 44 H388"/><path class="arrow" d="M502 44 H516"/>
+  <path class="arrow c3" d="M446 68 V92 H318 V68"/><text x="382" y="88" text-anchor="middle" class="small muted">sửa theo phản hồi</text>
+  <text x="62" y="86" text-anchor="middle" class="small">Perplexity</text><text x="62" y="100" text-anchor="middle" class="small">Consensus</text><text x="62" y="114" text-anchor="middle" class="small">Gemini Notebook</text>
+  <text x="190" y="86" text-anchor="middle" class="small">Claude (plan mode)</text><text x="190" y="100" text-anchor="middle" class="small">hoặc công cụ bạn chọn</text>
+  <text x="318" y="118" text-anchor="middle" class="small">Claude Code</text><text x="318" y="132" text-anchor="middle" class="small">Cursor · Antigravity</text>
+  <text x="446" y="118" text-anchor="middle" class="small">nhà cung cấp khác</text><text x="446" y="132" text-anchor="middle" class="small">với bước 3</text><text x="576" y="86" text-anchor="middle" class="small">lint, kiểm thử, CI</text><text x="576" y="100" text-anchor="middle" class="small">+ người duyệt cuối</text>
+  <text x="10" y="168" class="small bold">Biến thể: chạy song song rồi so sánh</text>
+  <rect class="box c1" x="10" y="180" width="170" height="30" rx="6"/><text x="95" y="199" text-anchor="middle" class="small">worktree A: Claude Code</text>
+  <rect class="box c2" x="10" y="220" width="170" height="30" rx="6"/><text x="95" y="239" text-anchor="middle" class="small">worktree B: công cụ khác</text>
+  <path class="arrow" d="M180 195 L270 214"/><path class="arrow" d="M180 235 L270 222"/>
+  <rect class="box c3" x="272" y="198" width="150" height="40" rx="8"/><text x="347" y="215" text-anchor="middle" class="small">so diff + chạy test</text><text x="347" y="230" text-anchor="middle" class="small muted">cùng một bộ test</text>
+  <path class="arrow" d="M422 218 H452"/>
+  <rect class="box" x="454" y="198" width="170" height="40" rx="8"/><text x="539" y="215" text-anchor="middle" class="small">chọn một bản hoặc ghép</text><text x="539" y="230" text-anchor="middle" class="small muted">qua một pull request</text>
+</svg>
+<figcaption>Năm bước tuần tự và biến thể song song. Điểm mấu chốt: bước 4 dùng công cụ khác bước 3, và bước 5 là thứ không phải mô hình (kiểm thử chạy thật, CI, con người).</figcaption>
+</figure>
+<ol>
+  <li><strong>Phân vai theo giai đoạn</strong>: nghiên cứu → kế hoạch → code → review → kiểm thử → tài liệu. Mỗi công cụ ở một chỗ nó mạnh; chuyển giao bằng <em>sản phẩm cụ thể</em> (tệp kế hoạch, nhánh Git, PR), không bằng việc sao chép đoạn chat qua lại.</li>
+  <li><strong>Review chéo</strong>: một công cụ viết, công cụ khác (nhà cung cấp khác) review. Vì sao hiệu quả, và khi nào không hiệu quả, xem minh họa dưới.</li>
+  <li><strong>Chạy song song trên nhánh riêng</strong> (mỗi tác tử một worktree), cho cùng một bộ kiểm thử làm trọng tài, rồi chọn kết quả tốt hơn. Tốn gấp đôi chi phí, nên chỉ dành cho việc khó hoặc rủi ro cao.</li>
+  <li><strong>Một người điều phối</strong>: bạn (hoặc một tác tử) chia việc cho công cụ khác, ví dụ Claude Code gọi CLI khác bằng lệnh không tương tác. Hợp để tự động hóa, nhưng chú ý chi phí và an toàn (mục 6).</li>
+</ol>
+<h3 id="toan-review">Vì sao review chéo hữu ích, và giới hạn của nó</h3>
+<p>Giả sử người review 1 bắt được một lỗi với xác suất \(d_1\), người 2 với \(d_2\). Đặt \(m_i=1-d_i\) là xác suất bỏ sót. Nếu hai lần bỏ sót là độc lập, xác suất <em>cả hai cùng sót</em> là \(m_1m_2\), nên xác suất bắt được ít nhất một người là \(1-m_1m_2\). Với \(d_1=0.6\), \(d_2=0.5\): \(1-0.4\cdot0.5=0.8\). Nhưng hai mô hình thường sai theo cùng một kiểu. Gọi \(\rho\) là tương quan giữa hai biến “bỏ sót” (Bernoulli); khi đó</p>
+$$P_{\mathrm{both}}=m_1m_2+\rho\sqrt{m_1(1-m_1)\,m_2(1-m_2)}$$
+<p>(bị chặn trong miền khả dĩ \([\max(0,m_1+m_2-1),\ \min(m_1,m_2)]\)). Với cùng \(d_1,d_2\): \(\rho=0.5\) cho 0.6775; \(\rho=1\) (luôn sót cùng lỗi) cho 0.6, đúng bằng người giỏi hơn một mình, tức thêm người thứ hai không mang lại gì. Các giá trị này là <strong>giả định minh họa</strong>, không phải số đo của công cụ nào; mức \(\rho\) thật phải đo trên lỗi thật của bạn. Kết luận thực dụng: cho thêm một người review chỉ có giá trị khi nó <em>sai khác kiểu</em> với người kia, và kiểm thử chạy thật là “người review” có \(\rho\) thấp nhất vì nó kiểm tra bằng cách thực thi.</p>
+<div class="viz" data-viz="xrev1" data-title="Hai người review: xác suất bắt được lỗi theo mức tương quan">
+  <p class="viz-help">Kéo ρ từ 0 lên 1 và quan sát: lợi ích so với người giỏi hơn biến mất. Thử đặt d₂ rất thấp: người review yếu gần như không thêm gì dù độc lập.</p>
+</div>
+<pre><code class="language-python">import numpy as np
+
+def both_miss(m1, m2, rho):
+    """Xác suất cả hai người review cùng bỏ sót một lỗi.
+    m = 1 - xác suất bắt được; rho = tương quan giữa hai biến 'bỏ sót' (Bernoulli)."""
+    p = m1 * m2 + rho * np.sqrt(m1 * (1 - m1) * m2 * (1 - m2))
+    lo, hi = max(0.0, m1 + m2 - 1), min(m1, m2)          # miền khả dĩ của xác suất đồng thời
+    return float(min(max(p, lo), hi))
+
+d1, d2 = 0.6, 0.5                                        # mỗi người bắt được 60% / 50% lỗi (GIẢ ĐỊNH, không phải số đo)
+for rho in (0.0, 0.5, 1.0):
+    print(f"rho={rho}: xác suất bắt được ít nhất một người = {1 - both_miss(1 - d1, 1 - d2, rho):.4f}")
+
+# kiểm tra bằng mô phỏng: sinh cặp Bernoulli tương quan từ phân phối đồng thời
+rng = np.random.default_rng(0)
+m1, m2, rho = 1 - d1, 1 - d2, 0.5
+p11 = both_miss(m1, m2, rho)
+p10, p01, p00 = m1 - p11, m2 - p11, 1 - m1 - m2 + p11
+draws = rng.choice(4, size=400_000, p=[p11, p10, p01, p00])      # 0: cả hai bỏ sót, 1: chỉ người 1 bỏ sót, 2: chỉ người 2 bỏ sót, 3: cả hai bắt được
+print("mô phỏng bắt được ít nhất một:", round(float(np.mean(draws != 0)), 4))
+x1, x2 = (draws == 0) | (draws == 1), (draws == 0) | (draws == 2)
+print("tương quan mẫu:", round(float(np.corrcoef(x1, x2)[0, 1]), 3))</code></pre>
+
+<h2 id="keo-dinh">3. Keo dính: tệp chỉ dẫn, MCP và Git</h2>
+<p>Muốn nhiều công cụ phối hợp mà không ép bạn chép tay ngữ cảnh, cần ba thứ dùng chung: <strong>chỉ dẫn dự án</strong>, <strong>công cụ/dữ liệu bên ngoài</strong> (MCP) và <strong>kho mã làm trung tâm</strong>.</p>
+<figure class="diagram">
+<svg viewBox="0 0 640 290" role="img" aria-label="Git, pull request, CI và AGENTS.md ở giữa; các công cụ Claude Code, Cursor, Antigravity, Codex, Copilot và nhóm công cụ nghiên cứu ở xung quanh">
+  <rect class="box c3" x="210" y="105" width="220" height="80" rx="10"/><text x="320" y="132" text-anchor="middle" class="small bold">Kho Git / GitHub</text><text x="320" y="150" text-anchor="middle" class="small">nhánh · pull request · CI</text><text x="320" y="168" text-anchor="middle" class="small">AGENTS.md · .mcp.json</text>
+  <rect class="box c1" x="10" y="14" width="150" height="44" rx="8"/><text x="85" y="40" text-anchor="middle" class="small">Claude Code</text>
+  <rect class="box c1" x="10" y="123" width="150" height="44" rx="8"/><text x="85" y="149" text-anchor="middle" class="small">Cursor</text>
+  <rect class="box c1" x="10" y="232" width="150" height="44" rx="8"/><text x="85" y="258" text-anchor="middle" class="small">Antigravity</text>
+  <rect class="box c2" x="480" y="14" width="150" height="44" rx="8"/><text x="555" y="40" text-anchor="middle" class="small">Codex</text>
+  <rect class="box c2" x="480" y="123" width="150" height="44" rx="8"/><text x="555" y="149" text-anchor="middle" class="small">Copilot (VS Code, GitHub)</text>
+  <rect class="box c4" x="470" y="226" width="164" height="56" rx="8"/><text x="552" y="248" text-anchor="middle" class="small">Perplexity · Consensus</text><text x="552" y="264" text-anchor="middle" class="small">Gemini Notebook · Gemini</text>
+  <path class="line" d="M160 36 L240 105"/><path class="line" d="M160 145 H210"/><path class="line" d="M160 254 L240 185"/><path class="line" d="M480 36 L400 105"/><path class="line" d="M480 145 H430"/>
+  <path class="line c4 dash" d="M470 254 L400 185"/><text x="456" y="212" class="small muted">MCP hoặc làm tay</text>
+  <text x="105" y="94" class="small muted">đọc AGENTS.md</text><text x="105" y="214" class="small muted">đọc AGENTS.md</text><text x="440" y="94" text-anchor="start" class="small muted">PR, review</text>
+</svg>
+<figcaption>Mọi công cụ trao đổi qua kho mã (nhánh, PR, CI) và đọc chung một tệp chỉ dẫn. Công cụ nghiên cứu nối vào bằng MCP khi có, hoặc bằng tay.</figcaption>
+</figure>
+<h3 id="chi-dan">3.1 Một bản gốc chỉ dẫn: AGENTS.md</h3>
+<p>Mỗi công cụ từng có tệp riêng (<code>CLAUDE.md</code>, <code>GEMINI.md</code>, <code>.github/copilot-instructions.md</code>, <code>.cursor/rules</code>). Xu hướng hiện nay là một tệp mở <code>AGENTS.md</code> ở gốc repo mà nhiều công cụ đọc được. Tình hình đọc tệp, theo những gì mình xác nhận được:</p>
+<table>
+  <thead><tr><th>Công cụ</th><th>Đọc những tệp nào</th><th>Độ chắc</th></tr></thead>
+  <tbody>
+    <tr><td>Claude Code</td><td><code>CLAUDE.md</code>; đọc <code>AGENTS.md</code> khi không có <code>CLAUDE.md</code> hoặc <code>CLAUDE.local.md</code> (từ v2.1.277); nếu có CLAUDE.md thì <em>chỉ</em> đọc CLAUDE.md, trừ khi chỉnh “Project instructions” trong <code>/config</code> hoặc dùng dòng nhập <code>@AGENTS.md</code></td><td><span class="conf ok">✔</span></td></tr>
+    <tr><td>Cursor</td><td><code>AGENTS.md</code> (gốc và thư mục con), <code>.cursor/rules/*.mdc</code>; <code>.cursorrules</code> là định dạng cũ</td><td><span class="conf mid">◐</span></td></tr>
+    <tr><td>Copilot (coding agent, CLI, VS Code)</td><td><code>.github/copilot-instructions.md</code>, <code>.github/instructions/**/*.instructions.md</code>, <code>AGENTS.md</code>; changelog của GitHub cũng nêu <code>CLAUDE.md</code> và <code>GEMINI.md</code>. Khi có hai tệp ở gốc, cả hai đều được dùng, và tài liệu cảnh báo kết quả có thể không tất định nếu chúng mâu thuẫn</td><td><span class="conf mid">◐</span></td></tr>
+    <tr><td>Antigravity</td><td><code>AGENTS.md</code>, <code>GEMINI.md</code>, <code>.agents/rules/*.md</code> (workspace); <code>~/.gemini/</code> (toàn cục). Nguồn khác nhau về tệp nào ưu tiên hơn: chưa xác nhận</td><td><span class="conf mid">◐</span></td></tr>
+    <tr><td>Codex</td><td><code>AGENTS.md</code> ở gốc repo; <code>~/.codex/AGENTS.md</code> toàn cục</td><td><span class="conf mid">◐</span></td></tr>
+  </tbody>
+</table>
+<p>Thay vì chép nội dung ra nhiều nơi (dễ lệch nhau), hãy giữ <strong>một bản gốc</strong> và để các công cụ khác trỏ tới. Bộ tạo dưới đây dựng sơ đồ tệp và lệnh theo các công cụ bạn dùng:</p>
+<div class="viz" data-viz="instr1" data-title="Bố cục tệp chỉ dẫn dùng chung">
+  <p class="viz-help">Chọn các công cụ bạn dùng trong dự án. Mỗi mục kèm nhãn độ chắc. Luôn kiểm tra lại bằng câu hỏi ở bước cuối, vì tài liệu có thể đã lỗi thời.</p>
+</div>
+<div class="callout tip"><span class="callout-title">Viết chỉ dẫn thế nào</span>Chỉ ghi những gì bạn sẽ phải nhắc lại: lệnh cài đặt, kiểm thử, lint, quy ước đặt tên, thư mục không được chạm, “không bao giờ commit .env”. Tài liệu Claude Code nhấn mạnh chỉ dẫn càng cụ thể và ngắn thì càng được tuân thủ nhất quán, và chúng là <em>ngữ cảnh</em> chứ không phải cơ chế cưỡng chế: điều cần chặn tuyệt đối phải đặt ở quyền hạn, hook hoặc CI (xem mục 6).</div>
+<h3 id="mcp">3.2 MCP: một định nghĩa máy chủ, nhiều công cụ dùng</h3>
+<p>MCP (Model Context Protocol) cho phép cắm công cụ và dữ liệu ngoài vào nhiều ứng dụng AI. Mỗi công cụ lưu cấu hình ở một chỗ khác nhau và dùng tên khóa hơi khác nhau, nên dễ gõ sai:</p>
+<table>
+  <thead><tr><th>Công cụ</th><th>Tệp / lệnh</th><th>Khóa gốc</th><th>Độ chắc</th></tr></thead>
+  <tbody>
+    <tr><td>Claude Code</td><td><code>claude mcp add</code>; <code>.mcp.json</code> (dự án), <code>~/.claude.json</code> (cá nhân)</td><td><code>mcpServers</code></td><td><span class="conf ok">✔</span></td></tr>
+    <tr><td>Cursor</td><td><code>.cursor/mcp.json</code>, <code>~/.cursor/mcp.json</code>; CLI dùng chung cấu hình</td><td><code>mcpServers</code></td><td><span class="conf mid">◐</span></td></tr>
+    <tr><td>VS Code (Copilot)</td><td><code>.vscode/mcp.json</code>; công cụ chỉ dùng trong chế độ agent</td><td><code>servers</code></td><td><span class="conf low">✱</span></td></tr>
+    <tr><td>Codex</td><td><code>~/.codex/config.toml</code>, <code>.codex/config.toml</code></td><td><code>[mcp_servers.tên]</code></td><td><span class="conf mid">◐</span></td></tr>
+    <tr><td>Antigravity</td><td><code>mcp_config.json</code> (vị trí khác nhau giữa các nguồn)</td><td><code>mcpServers</code>; máy chủ từ xa dùng <code>serverUrl</code></td><td><span class="conf low">✱</span></td></tr>
+  </tbody>
+</table>
+<p>Bộ tạo bên dưới xuất cấu hình cho từng công cụ từ <em>một</em> định nghĩa. Dữ liệu điền sẵn là ví dụ, không phải xác nhận rằng địa chỉ hay gói đó còn đúng.</p>
+<div class="viz" data-viz="mcpgen1" data-title="Từ một định nghĩa MCP sang cấu hình từng công cụ">
+  <p class="viz-help">Thử hai ví dụ có sẵn rồi tự nhập. Khóa API không được ghi vào tệp: dùng biến môi trường hoặc ô nhập bí mật của công cụ.</p>
+</div>
+<p>Mỗi máy chủ MCP bạn gắn là <strong>một nguồn quyền hạn và một bề mặt tấn công</strong>: chỉ cài từ nguồn tin cậy, cấp quyền tối thiểu, và nhớ rằng nội dung nó trả về có thể chứa chỉ dẫn độc hại (xem trang <a href="agentic-ai.html#prompt-injection">Agentic AI</a>). Đặc biệt với Claude Code: <code>.mcp.json</code> trong một repo bạn mới clone có thể khai báo máy chủ sẽ được kết nối trong chế độ <code>-p</code> mà không hỏi (xem mục 6).</p>
+<h3 id="git-trung-tam">3.3 Git và CI làm trung tâm</h3>
+<ul>
+  <li><strong>Mỗi tác tử một nhánh (hoặc một worktree)</strong>: không bao giờ để hai tác tử cùng sửa một thư mục làm việc. Claude Code có sẵn <code>claude --worktree &lt;tên&gt;</code> <span class="conf ok">✔</span>; với công cụ khác dùng <code>git worktree add ../tên-nhánh -b tên-nhánh</code>.</li>
+  <li><strong>PR là điểm trao đổi</strong>: mô tả thay đổi, liên kết issue, để review và CI chạy ở đó (xem trang <a href="github.html#github-flow">GitHub</a>).</li>
+  <li><strong>CI làm trọng tài khách quan</strong>: kiểm thử, lint, kiểm tra liên kết. Website bạn đang đọc dùng chính cách này: <code>tools/check_site.py</code> và kiểm tra cú pháp JavaScript chạy trên mỗi PR.</li>
+  <li><strong>Bảo vệ nhánh <code>main</code></strong>: bắt buộc PR, CI xanh và người duyệt; các tác tử không được đẩy thẳng vào <code>main</code>.</li>
+</ul>
+
+<h2 id="quy-trinh">4. Quy trình mẫu theo mục tiêu</h2>
+<h3 id="qt-tinh-nang">A. Làm tính năng mới (lập trình, làm web)</h3>
+<ol>
+  <li><strong>Tra tài liệu hiện hành</strong> bằng Perplexity hoặc Gemini; ghi lại đường dẫn nguồn chính thức (không dùng ký ức của mô hình cho API đổi nhanh).</li>
+  <li><strong>Lập kế hoạch ở chế độ chỉ đọc</strong>: <code>claude --permission-mode plan</code> <span class="conf ok">✔</span>. Đọc kế hoạch, sửa, rồi mới cho phép sửa file.</li>
+  <li><strong>Triển khai trên nhánh riêng</strong>: <code>claude --worktree tinh-nang-x</code> <span class="conf ok">✔</span>, hoặc tác tử trong Cursor/Antigravity trên một nhánh.</li>
+  <li><strong>Chạy kiểm thử cục bộ và tự xem kết quả</strong> (với web: mở trang thật, thử màn hình nhỏ và chế độ tối).</li>
+  <li><strong>Review chéo</strong> bằng công cụ khác (mục 4.1), rồi PR, CI, người duyệt.</li>
+</ol>
+<h3 id="qt-loi">B. Sửa lỗi hoặc refactor lớn</h3>
+<ol>
+  <li>Viết (hoặc nhờ công cụ viết) một <strong>kiểm thử tái hiện lỗi</strong> trước. Đây là trọng tài chung cho mọi công cụ.</li>
+  <li>Xin <em>giả thuyết và cách kiểm chứng</em> từ hai công cụ độc lập, đừng xin bản vá ngay; so hai danh sách.</li>
+  <li>Cho một công cụ sửa, một công cụ khác review; chạy lại kiểm thử và bộ kiểm thử đầy đủ.</li>
+</ol>
+<h3 id="qt-nghien-cuu">C. Nghiên cứu rồi soạn tài liệu học</h3>
+<ol>
+  <li><strong>Tìm</strong>: Consensus (bài học thuật) và Perplexity (web, tài liệu kỹ thuật). Lưu danh sách nguồn với liên kết.</li>
+  <li><strong>Kiểm chứng từng nguồn</strong>: mở bài gốc, đọc đoạn mà nhận định dựa vào, ghi lại sai lệch. Các công cụ tìm kiếm có thể gán nhận định cho một nguồn không hề nói điều đó.</li>
+  <li><strong>Gom nguồn đã xác nhận vào Gemini Notebook</strong> để hỏi đáp, tóm tắt, tạo câu hỏi ôn tập có căn cứ.</li>
+  <li><strong>Soạn bằng Claude</strong>, chỉ cho dùng nguồn đã xác nhận; yêu cầu đánh dấu chỗ nào là suy luận của mô hình.</li>
+  <li><strong>Chạy lại mọi con số và đoạn code</strong> trước khi đăng; ghi rõ chỗ chưa kiểm chứng được. Đây cũng là quy trình soạn các trang của website này.</li>
+</ol>
+<h3 id="qt-nhom">D. Dự án nhóm</h3>
+<ul>
+  <li>Thống nhất một <code>AGENTS.md</code> và đưa vào Git; mỗi người dùng công cụ họ quen miễn là PR qua cùng CI.</li>
+  <li>Ghi quy tắc trong tệp, không trong trí nhớ: ai được cho tác tử chạy lệnh gì, có được gắn MCP mới không, cách xử lý khóa API.</li>
+  <li>Dán nhãn PR do tác tử viết để người review biết cần đọc kỹ hơn; yêu cầu mô tả PR nêu đã chạy kiểm thử nào.</li>
+</ul>
+
+<h3 id="cli-tu-dong">4.1 Chạy công cụ không tương tác và review chéo bằng lệnh</h3>
+<p>Phần lớn CLI có chế độ chạy một lần rồi thoát, hợp để viết script. Lệnh nào bạn chưa chạy thử thì chạy <code>--help</code> trước:</p>
+<table>
+  <thead><tr><th>Công cụ</th><th>Lệnh không tương tác</th><th>Ghi chú</th><th>Độ chắc</th></tr></thead>
+  <tbody>
+    <tr><td>Claude Code</td><td><code>claude -p "…"</code>; <code>git diff | claude -p "…"</code></td><td>Đọc stdin (tối đa 10 MB); <code>--output-format json</code>; <code>--allowedTools</code>; <code>--permission-mode</code>; <code>--max-budget-usd</code></td><td><span class="conf ok">✔</span></td></tr>
+    <tr><td>Codex</td><td><code>codex exec --sandbox read-only "…"</code></td><td>Tùy chọn sandbox: read-only, workspace-write, danger-full-access. <code>--full-auto</code> bị đánh dấu lỗi thời. Giá trị phê duyệt xem <code>--help</code></td><td><span class="conf mid">◐</span></td></tr>
+    <tr><td>Antigravity CLI</td><td><code>agy -p "…"</code></td><td>Theo bài viết thứ cấp; tài liệu chính thức chưa đối chiếu được</td><td><span class="conf low">✱</span></td></tr>
+    <tr><td>Cursor CLI</td><td><code>cursor-agent -p "…"</code> (có nơi ghi là <code>agent</code>)</td><td>Có báo cáo chế độ in kết quả không tự thoát trên một số bản: luôn bọc bằng <code>timeout</code></td><td><span class="conf low">✱</span></td></tr>
+  </tbody>
+</table>
+<p>Script dưới đây gửi cùng một diff cho các CLI đang có trên máy và ghi kết quả vào <code>reviews/</code>. Mình đã chạy thử <strong>logic của script</strong> (bỏ qua công cụ chưa cài, chạy song song, giới hạn thời gian, liệt kê kết quả có phát hiện) bằng các lệnh giả; mình <strong>chưa</strong> chạy nó với các CLI thật ngoài Claude Code, nên các cờ phải được bạn kiểm tra:</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# review-all.sh: gửi cùng một diff cho nhiều CLI để review chéo, ghi kết quả vào reviews/
+# Dùng: bash review-all.sh [nhánh-gốc]   (mặc định origin/main)
+set -u
+BASE="${1:-origin/main}"
+OUT=reviews; mkdir -p "$OUT"
+git diff "$BASE"...HEAD &gt; "$OUT/change.diff"
+[ -s "$OUT/change.diff" ] || { echo "Không có thay đổi so với $BASE"; exit 1; }
+
+PROMPT="Hãy review thay đổi trong file $OUT/change.diff. Chỉ liệt kê vấn đề thật (lỗi logic, bảo mật, thiếu kiểm thử), mỗi vấn đề một dòng dạng file:dòng - mô tả - mức độ. Nếu không có vấn đề, trả lời đúng một dòng: KHONG CO VAN DE."
+run() {   # run &lt;tên&gt; &lt;lệnh...&gt;: bỏ qua nếu CLI không được cài, giới hạn 300 giây
+  local name="$1"; shift
+  command -v "$1" &gt;/dev/null 2&gt;&amp;1 || { echo "bỏ qua $name (chưa cài $1)"; return; }
+  timeout 300 "$@" &gt; "$OUT/$name.md" 2&gt; "$OUT/$name.err" \
+    &amp;&amp; echo "xong  $name -&gt; $OUT/$name.md" || echo "LỖI   $name (xem $OUT/$name.err)"
+}
+
+# Cờ của từng CLI thay đổi theo phiên bản: chạy `&lt;lệnh&gt; --help` để đối chiếu trước khi dùng.
+run claude  claude -p "$PROMPT" --permission-mode plan &amp;        # ✔ -p và --permission-mode có trong tài liệu Claude Code
+run codex   codex exec --sandbox read-only "$PROMPT" &amp;          # ◐ theo tài liệu non-interactive của Codex
+run agy     agy -p "$PROMPT" &amp;                                  # ✱ theo bài viết thứ cấp
+run cursor  cursor-agent -p "$PROMPT" &amp;                         # ✱ có báo cáo treo; timeout ở trên là lưới an toàn
+wait
+echo; grep -L "KHONG CO VAN DE" "$OUT"/*.md 2&gt;/dev/null | sed 's/^/có phát hiện: /'</code></pre>
+<div class="callout warn"><span class="callout-title">Không chạy chế độ không tương tác trong repo bạn chưa tin</span>Theo tài liệu Claude Code, nếu không có <code>--bare</code>, một lượt <code>claude -p</code> chạy các hook trong <code>.claude/settings.json</code> của dự án và kết nối các máy chủ trong <code>.mcp.json</code> ngay cả ở thư mục bạn chưa tin, và không hiện hộp thoại xác nhận. Với repo lạ, hãy đọc các tệp đó trước hoặc dùng <code>--bare</code> kèm cờ tường minh (chế độ này không dùng đăng nhập gói thuê bao: cần <code>ANTHROPIC_API_KEY</code>). Các CLI khác có thể có hành vi tương tự; hãy đọc tài liệu của chúng.</div>
+<h3 id="github-actions">4.2 Review và tự động hóa trên GitHub</h3>
+<p>Để Claude phản hồi khi ai đó nhắc <code>@claude</code> trong issue hoặc PR, dùng GitHub Action của Anthropic <span class="conf ok">✔</span>. Cách nhanh: chạy <code>/install-github-app</code> trong Claude Code (cần quyền admin repo và <code>gh</code> đã đăng nhập). Gói Pro có thể dùng token thuê bao tạo bằng <code>claude setup-token</code> và lưu vào secret <code>CLAUDE_CODE_OAUTH_TOKEN</code>; người dùng API dùng <code>ANTHROPIC_API_KEY</code>. Workflow tối thiểu (theo tài liệu, thay <code>anthropic_api_key</code> bằng <code>claude_code_oauth_token</code> nếu dùng token thuê bao; phiên bản action và <code>checkout</code> hãy lấy theo tài liệu hiện hành):</p>
+<pre><code class="language-yaml">name: Claude Code
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+jobs:
+  claude:
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6        # theo ví dụ trong tài liệu; kiểm tra phiên bản hiện hành
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}   # tạo bằng: claude setup-token
+          claude_args: "--max-turns 8"</code></pre>
+<p>Hạn chế chi phí bằng <code>--max-turns</code> trong <code>claude_args</code>, timeout cho workflow và giới hạn đồng thời, như tài liệu khuyến nghị. Copilot cũng có review tự động trên PR nếu gói của bạn có tính năng đó <span class="conf mid">◐</span>; bật cả hai chỉ có ý nghĩa nếu bạn thực sự cần hai lớp (xem phần toán ở mục 2).</p>
+
+<h2 id="chi-phi-bao-mat">5. Chi phí, hạn mức và chất lượng</h2>
+<ul>
+  <li><strong>Hạn mức là tài nguyên chung của một nhà cung cấp</strong>: Claude Code dùng chung hạn mức với chat Claude (cửa sổ đặt lại cỡ vài giờ cộng giới hạn theo tuần theo các nguồn thứ cấp <span class="conf mid">◐</span>). Gói Google AI Pro cũng dùng hạn mức theo cửa sổ thời gian cho Antigravity <span class="conf low">✱</span>. Con số cụ thể đổi liên tục: đọc trang gói của nhà cung cấp.</li>
+  <li><strong>Tránh trả hai lần cho cùng một vai</strong>: một công cụ gợi ý khi gõ, một tác tử chính, một công cụ nghiên cứu, một công cụ review chéo. Đừng chạy hai tác tử đắt tiền cho việc đơn giản.</li>
+  <li><strong>Giữ ngữ cảnh nhỏ</strong>: ngữ cảnh dài làm chi phí tăng gần bậc hai theo số bước (xem phần chi phí ngữ cảnh ở trang <a href="agentic-ai.html#chi-phi-ngu-canh">Agentic AI</a>); chỉ dẫn gọn trong <code>AGENTS.md</code>, tóm tắt thay vì dán toàn bộ.</li>
+  <li><strong>Đặt trần cho chạy tự động</strong>: số lượt, thời gian, ngân sách (Claude Code có <code>--max-budget-usd</code> <span class="conf ok">✔</span>); với CI đặt timeout.</li>
+  <li><strong>Đo xem có đáng không</strong>: theo dõi trong vài tuần thời gian hoàn thành, số vòng sửa, lỗi lọt sau khi merge, chi phí. Nếu so hai cách làm, nhớ rằng cần đủ số mẫu mới kết luận được (xem phần A/B test ở trang <a href="mlops.html#ab-suy-dan">MLOps</a>).</li>
+</ul>
+
+<h2 id="bao-mat">6. Bảo mật và an toàn khi nhiều công cụ cùng làm</h2>
+<ul>
+  <li><strong>Bí mật</strong>: không dán khóa API, mật khẩu hay <code>.env</code> vào chat hay chỉ dẫn; đưa <code>.env</code> vào <code>.gitignore</code>; dùng secret của GitHub cho CI. Khóa lỡ lộ phải thu hồi (xem trang <a href="github.html#gitignore">GitHub</a>).</li>
+  <li><strong>Dữ liệu gửi đi đâu</strong>: mỗi công cụ có chính sách riêng về lưu trữ và dùng dữ liệu để huấn luyện, khác nhau giữa gói cá nhân và gói doanh nghiệp. Đọc trước khi đưa mã của công ty, dữ liệu nhạy cảm, hoặc bản thảo chưa công bố vào công cụ.</li>
+  <li><strong>Quyền hạn tối thiểu</strong>: cho tác tử chỉ các công cụ nó cần (<code>--allowedTools</code>, chế độ plan, sandbox của Codex <code>read-only</code>); tránh cờ bỏ qua mọi xác nhận trên máy có dữ liệu thật.</li>
+  <li><strong>Prompt injection</strong>: nội dung tác tử đọc (trang web, issue, tài liệu, kết quả MCP) có thể chứa chỉ dẫn độc hại. Đừng để cùng một tác tử vừa có dữ liệu riêng tư, vừa đọc nội dung không tin cậy, vừa có đường gửi dữ liệu ra ngoài (xem trang <a href="agentic-ai.html#prompt-injection">Agentic AI</a>).</li>
+  <li><strong>Chuỗi cung ứng</strong>: MCP server, plugin và gói <code>npx</code> chạy mã với quyền của bạn. Ghim phiên bản, đọc mã nguồn hoặc chỉ dùng nguồn uy tín.</li>
+  <li><strong>Hai tác tử, một thư mục</strong>: dễ ghi đè lên nhau. Dùng nhánh/worktree riêng.</li>
+  <li><strong>Con người vẫn là trọng tài cuối</strong> cho thay đổi không thể hoàn tác (xóa dữ liệu, phát hành, chi tiền).</li>
+</ul>
+
+<h2 id="thuc-hanh">7. Thực hành</h2>
+<details class="exercise">
+  <summary>Bài 1. Một bản gốc chỉ dẫn, nhiều công cụ</summary>
+  <div class="ex-body"><p>Tạo <code>AGENTS.md</code> ngắn cho một repo của bạn (lệnh kiểm thử, quy ước, điều cấm), tạo <code>CLAUDE.md</code> chỉ gồm <code>@AGENTS.md</code>. Mở repo bằng từng công cụ bạn dùng và hỏi: “liệt kê chỉ dẫn dự án bạn đang nạp và tên tệp nguồn”. Công cụ nào không thấy? Ghi lại và dùng bộ tạo ở mục 3.1 để tìm cách khắc phục cho công cụ đó.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 2. Đo mức tương quan giữa hai người review</summary>
+  <div class="ex-body"><p>Tạo một PR nhỏ có 6 lỗi cố ý (sai chỉ số, thiếu kiểm tra null, lộ khóa giả, điều kiện đảo ngược…). Cho hai công cụ khác nhà cung cấp review (script ở mục 4.1 hoặc làm tay). Đếm lỗi mỗi bên bắt được và lỗi bắt được bởi cả hai. Ước lượng \(d_1,d_2\) và xác suất cùng sót, rồi tính \(\rho\) thô. Với 6 lỗi, sai số rất lớn; điều này nhắc bạn vì sao con số chỉ mang tính gợi ý.</p>
+  <p><em>Gợi ý tính:</em> nếu \(d_1=d_2=4/6\) và cả hai cùng sót đúng 1 lỗi, \(P_{\mathrm{both}}=1/6\approx0.167\) trong khi giả định độc lập cho \((1/3)^2\approx0.111\), nên \(\rho\) dương nhẹ.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 3. Quy trình nghiên cứu có kiểm chứng</summary>
+  <div class="ex-body"><p>Chọn một chủ đề nhỏ. Lấy 5 nguồn bằng Consensus và Perplexity; mở từng bài, kiểm tra nhận định mà công cụ gán cho bài đó có đúng không (đúng, đúng một phần, sai). Đưa các nguồn đã xác nhận vào Gemini Notebook và nhờ viết tóm tắt; so với bản bạn tự đọc. Ghi tỉ lệ nhận định sai: đây là dữ liệu thật cho việc bạn nên tin bước nào đến đâu.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 4. Cắm một MCP vào hai công cụ</summary>
+  <div class="ex-body"><p>Dùng bộ tạo ở mục 3.2 để thêm cùng một máy chủ MCP (ví dụ Consensus) vào Claude Code và Cursor. Chạy một truy vấn qua mỗi công cụ, so kết quả và theo dõi hạn mức đã dùng. Dùng <code>/mcp</code> trong Claude Code để xem trạng thái kết nối.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 5. Chạy song song và so sánh</summary>
+  <div class="ex-body"><p>Chọn một việc nhỏ có kiểm thử. Chạy <code>claude --worktree a</code> và một công cụ khác trên worktree <code>b</code> với cùng yêu cầu. Chạy cùng bộ kiểm thử, so diff, rồi chọn hoặc ghép. Ghi chi phí (thời gian, hạn mức) của cả hai. Khi nào cách này đáng giá hơn một tác tử và một lượt review?</p></div>
+</details>
+
+<h2 id="tham-khao">Tài liệu tham khảo</h2>
+<p>Nhãn độ chắc áp dụng cho việc <em>mình đã mở được</em> trang đó hay chưa, không phải chất lượng của trang.</p>
+<ol class="refs">
+  <li><span class="conf ok">✔</span> <a href="https://code.claude.com/docs/en/memory">Claude Code: How Claude remembers your project</a> (CLAUDE.md, AGENTS.md, nhập tệp). <a href="https://code.claude.com/docs/en/mcp">MCP</a>. <a href="https://code.claude.com/docs/en/headless">Chạy Claude Code theo chương trình (<code>claude -p</code>)</a>. <a href="https://code.claude.com/docs/en/common-workflows">Common workflows</a> (worktree). <a href="https://code.claude.com/docs/en/github-actions">GitHub Actions</a>.</li>
+  <li><span class="conf mid">◐</span> <a href="https://github.blog/changelog/2025-08-28-copilot-coding-agent-now-supports-agents-md-custom-instructions">GitHub changelog: Copilot coding agent hỗ trợ AGENTS.md</a>; <a href="https://code.visualstudio.com/docs/agent-customization/custom-instructions">VS Code: custom instructions</a>.</li>
+  <li><span class="conf mid">◐</span> <a href="https://cursor.com/docs/rules">Cursor: Rules</a>; <a href="https://cursor.com/docs/cli/using">Cursor: Using Agent in CLI</a>.</li>
+  <li><span class="conf mid">◐</span> <a href="https://antigravity.google/docs/rules/">Antigravity: Rules</a>; <a href="https://antigravity.google/docs/mcp">Antigravity: MCP</a>.</li>
+  <li><span class="conf mid">◐</span> <a href="https://developers.openai.com/codex/noninteractive">Codex: Non-interactive mode</a>.</li>
+  <li><span class="conf mid">◐</span> <a href="https://docs.perplexity.ai/guides/mcp-server">Perplexity: MCP server</a>.</li>
+  <li><span class="conf mid">◐</span> <a href="https://blog.google/innovation-and-ai/products/gemini-notebook/notebooklm-gemini-notebook/">Google: NotebookLM is now Gemini Notebook</a> (đổi tên ngày 16/07/2026).</li>
+  <li><span class="conf low">✱</span> <a href="https://thenewstack.io/gemini-cli-antigravity-replacement/">The New Stack: Gemini CLI vs. Antigravity</a> (Antigravity CLI thay Gemini CLI); <a href="https://mcpservers.org/remote-mcp-servers/consensus">danh bạ máy chủ MCP từ xa: Consensus</a> (hãy xác nhận địa chỉ và hạn mức trên trang của Consensus).</li>
+</ol>
+<p class="meta">Mọi liên kết và số phiên bản trong trang này cần được kiểm tra lại tại thời điểm bạn dùng. Hạn mức, giá, tên sản phẩm và cờ lệnh của các công cụ AI đổi theo tuần.</p>
+
+</main>
+<aside class="toc" id="toc" aria-label="Mục lục"></aside>
+</div>
+<div id="site-footer"></div>
+</body>
+</html>

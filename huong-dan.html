@@ -123,6 +123,10 @@
     <tr><td>Phát hiện drift</td><td><a href="mlops.html#drift">MLOps</a></td><td>Giảm số mẫu để thấy cảnh báo giả của PSI.</td></tr>
     <tr><td>PSI theo khoảng và sàn nhiễu</td><td><a href="mlops.html#psi-suy-dan">MLOps</a></td><td>Đặt μ = 0, σ = 1, giảm n: PSI vẫn dương do nhiễu lấy mẫu.</td></tr>
     <tr><td>Chu kỳ huấn luyện lại</td><td><a href="mlops.html#chu-ky-huan-luyen">MLOps</a></td><td>Tăng chi phí huấn luyện lại C và xem T* dài ra.</td></tr>
+    <tr><td>Chọn công cụ theo việc cần làm</td><td><a href="ket-hop-cong-cu-ai.html#ban-do">Kết hợp AI</a></td><td>Bỏ chọn công cụ bạn không có và xem vai nào cần thay thế.</td></tr>
+    <tr><td>Review chéo: tương quan giữa hai người review</td><td><a href="ket-hop-cong-cu-ai.html#toan-review">Kết hợp AI</a></td><td>Kéo ρ từ 0 lên 1 và xem lợi ích so với người review giỏi hơn biến mất.</td></tr>
+    <tr><td>Bố cục tệp chỉ dẫn dùng chung</td><td><a href="ket-hop-cong-cu-ai.html#chi-dan">Kết hợp AI</a></td><td>Chọn các công cụ trong dự án của bạn và xem lệnh tạo AGENTS.md, CLAUDE.md.</td></tr>
+    <tr><td>Cấu hình MCP cho từng công cụ</td><td><a href="ket-hop-cong-cu-ai.html#mcp">Kết hợp AI</a></td><td>Nhập một máy chủ MCP và so sự khác biệt về tên khóa giữa các công cụ.</td></tr>
   </tbody>
 </table>
 <div class="callout note"><span class="callout-title">Minh họa là mô hình đồ chơi</span>Chúng giúp thấy cơ chế, không đại diện cho hiệu năng hệ thống thật. Chẳng hạn bảng logit trong minh họa giải mã do mình tự đặt, và trọng số attention dùng vector ngẫu nhiên nên không mang nghĩa ngôn ngữ. Phần mô tả của từng minh họa luôn nói rõ điều này.</div>
@@ -150,6 +154,7 @@ pip install mlflow fastapi uvicorn joblib pytest scipy   # bài MLOps</code></pr
     <tr><td>2. Học sâu</td><td>Deep Learning, rồi Computer Vision <em>hoặc</em> NLP (chọn một nhánh trước)</td><td>Tự cài backprop NumPy; transfer learning cho một bộ ảnh nhỏ, hoặc bộ phân loại văn bản.</td></tr>
     <tr><td>3. Mô hình lớn</td><td>NLP (nếu chưa), LLM</td><td>Một ứng dụng RAG nhỏ có bộ đánh giá riêng.</td></tr>
     <tr><td>4. Hệ thống</td><td>Agentic AI, MLOps</td><td>Một agent chỉ đọc có phê duyệt của con người; dịch vụ FastAPI + Docker + CI + giám sát drift.</td></tr>
+    <tr><td>5. Làm việc hiệu quả</td><td>Kết hợp AI (đọc song song với các giai đoạn trên)</td><td>Một <code>AGENTS.md</code> dùng chung và một quy trình review chéo cho dự án của bạn.</td></tr>
   </tbody>
 </table>
 <p>Quan trọng hơn thứ tự là vòng lặp: <strong>đọc → thử minh họa → làm bài tập → dựng dự án nhỏ và đưa lên GitHub</strong>.</p>
