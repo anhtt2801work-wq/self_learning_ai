@@ -14,12 +14,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGES = [
+    ("huong-dan.html", "Cách dùng"),
     ("github.html", "GitHub"),
     ("machine-learning.html", "Machine Learning"),
     ("deep-learning.html", "Deep Learning"),
+    ("computer-vision.html", "Computer Vision"),
     ("nlp.html", "NLP"),
     ("llm.html", "LLM"),
     ("agentic-ai.html", "Agentic AI"),
+    ("mlops.html", "MLOps"),
 ]
 SKIP = {"script", "style", "pre", "noscript"}
 MAX_CHARS = 1400

@@ -2,14 +2,18 @@
 (function () {
   'use strict';
 
+  // lesson: true marks pages that take part in the previous/next lesson links.
   var NAV = [
     { id: 'home', href: 'index.html', label: 'Trang chủ' },
-    { id: 'github', href: 'github.html', label: 'GitHub' },
-    { id: 'ml', href: 'machine-learning.html', label: 'Machine Learning' },
-    { id: 'dl', href: 'deep-learning.html', label: 'Deep Learning' },
-    { id: 'nlp', href: 'nlp.html', label: 'NLP' },
-    { id: 'llm', href: 'llm.html', label: 'LLM' },
-    { id: 'agent', href: 'agentic-ai.html', label: 'Agentic AI' }
+    { id: 'guide', href: 'huong-dan.html', label: 'Cách dùng' },
+    { id: 'github', href: 'github.html', label: 'GitHub', lesson: true },
+    { id: 'ml', href: 'machine-learning.html', label: 'Machine Learning', lesson: true },
+    { id: 'dl', href: 'deep-learning.html', label: 'Deep Learning', lesson: true },
+    { id: 'cv', href: 'computer-vision.html', label: 'Computer Vision', lesson: true },
+    { id: 'nlp', href: 'nlp.html', label: 'NLP', lesson: true },
+    { id: 'llm', href: 'llm.html', label: 'LLM', lesson: true },
+    { id: 'agent', href: 'agentic-ai.html', label: 'Agentic AI', lesson: true },
+    { id: 'mlops', href: 'mlops.html', label: 'MLOps', lesson: true }
   ];
   var PAGE = document.body.getAttribute('data-page') || 'home';
 
@@ -40,13 +44,14 @@
   function buildHeader() {
     var host = document.getElementById('site-header');
     if (!host) return;
-    var links = NAV.map(function (n) {
+    // The brand link already goes home, so the home page has no tab of its own.
+    var links = NAV.filter(function (n) { return n.id !== 'home'; }).map(function (n) {
       return '<a href="' + n.href + '"' + (n.id === PAGE ? ' aria-current="page"' : '') + '>' + n.label + '</a>';
     }).join('');
     host.className = 'site-header';
     host.innerHTML =
       '<div class="header-inner">' +
-      '<a class="brand" href="index.html">Tự học <span>AI</span></a>' +
+      '<a class="brand" href="index.html"' + (PAGE === 'home' ? ' aria-current="page"' : '') + '>Tự học <span>AI</span></a>' +
       '<nav class="nav-tabs" aria-label="Chủ đề">' + links + '</nav>' +
       '<div class="header-actions">' +
       '<button class="icon-btn" id="search-btn" type="button" aria-label="Tìm kiếm (phím /)">⌕ <span class="btn-text">Tìm kiếm</span> <kbd>/</kbd></button>' +
@@ -74,12 +79,13 @@
 
   function buildPageNav() {
     var content = document.querySelector('.content');
-    var i = NAV.findIndex(function (n) { return n.id === PAGE; });
-    if (!content || i < 1) return;
-    var prev = NAV[i - 1], next = NAV[i + 1];
+    var lessons = NAV.filter(function (n) { return n.lesson; });
+    var i = lessons.findIndex(function (n) { return n.id === PAGE; });
+    if (!content || i < 0) return;
+    var prev = lessons[i - 1], next = lessons[i + 1];
     var nav = el('nav', 'page-nav'); nav.setAttribute('aria-label', 'Bài trước / bài sau');
     nav.innerHTML =
-      (i > 1 ? '<a class="prev" href="' + prev.href + '"><small>← Trước</small>' + prev.label + '</a>' : '<span></span>') +
+      (prev ? '<a class="prev" href="' + prev.href + '"><small>← Trước</small>' + prev.label + '</a>' : '<span></span>') +
       (next ? '<a class="next" href="' + next.href + '"><small>Tiếp theo →</small>' + next.label + '</a>' : '');
     content.appendChild(nav);
   }

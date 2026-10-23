@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MLOps · Tự học AI</title>
+<meta name="description" content="MLOps: tái lập thí nghiệm, MLflow và DVC, kiểm thử cho ML, phục vụ mô hình với FastAPI và Docker, triển khai an toàn, giám sát drift, LLMOps và quản trị.">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/search-index.js"></script>
+<script defer src="assets/js/site.js"></script>
+<script defer src="assets/js/viz-mlops.js"></script>
+</head>
+<body data-page="mlops">
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div id="site-header"></div>
+<div class="page">
+<main class="content" id="main">
+
+<h1>MLOps</h1>
+<p class="lead">Huấn luyện được một mô hình tốt trong notebook mới chỉ là phần nhỏ của công việc. MLOps là tập hợp thực hành để đưa mô hình vào vận hành thật và giữ cho nó đáng tin cậy: tái lập được, kiểm thử được, triển khai và quay lui an toàn, được giám sát và cập nhật khi dữ liệu thay đổi.</p>
+<div class="callout note"><span class="callout-title">Cần biết trước</span>Trang GitHub (Git, CI), Machine Learning (đánh giá mô hình) và Python. Các công cụ cụ thể (MLflow, DVC, FastAPI, Docker) chỉ là ví dụ; hệ sinh thái thay đổi nhanh, nguyên lý thì bền hơn.</div>
+
+<h2 id="vong-doi">Vòng đời của một hệ thống ML</h2>
+<div class="flow">
+  <div><b>Dữ liệu</b>thu thập, làm sạch, gán nhãn, phiên bản hóa</div><div class="arrow">→</div>
+  <div><b>Huấn luyện</b>thí nghiệm, tái lập được</div><div class="arrow">→</div>
+  <div><b>Đánh giá</b>so với mô hình đang chạy</div><div class="arrow">→</div>
+  <div><b>Triển khai</b>đóng gói, phục vụ, rollout dần</div><div class="arrow">→</div>
+  <div><b>Giám sát</b>chất lượng, drift, độ trễ</div><div class="arrow">↺</div>
+</div>
+<p>Một quan sát kinh điển (Sculley và cộng sự, 2015, “Hidden Technical Debt in Machine Learning Systems”): mã mô hình chỉ là một ô nhỏ trong hệ thống; phần lớn công sức nằm ở dữ liệu, cấu hình, hạ tầng phục vụ và giám sát. ML còn có kiểu hỏng riêng: <em>hệ thống vẫn chạy, không báo lỗi, nhưng dự đoán xấu dần</em> vì thế giới đã đổi.</p>
+<p>Một số tài liệu chia mức trưởng thành từ “mọi thứ làm tay” đến “pipeline huấn luyện, kiểm thử và triển khai chạy tự động”. Đừng cố đạt mức cao nhất ngay; hãy tự động hóa phần đang gây đau nhất trước.</p>
+
+<h2 id="tai-lap">Tái lập: nền móng của mọi thứ khác</h2>
+<p>Nếu không tái lập được kết quả thì không thể gỡ lỗi, so sánh hay kiểm toán. Cần cố định bốn thứ: <strong>mã</strong> (commit Git), <strong>dữ liệu</strong> (phiên bản), <strong>môi trường</strong> (thư viện, hệ điều hành) và <strong>cấu hình/seed</strong>.</p>
+<pre><code class="language-text">project/
+├── data/               # KHÔNG commit dữ liệu lớn; dùng DVC hoặc object storage
+├── notebooks/          # khám phá; mã dùng lại thì chuyển sang src/
+├── src/                # tiền xử lý, huấn luyện, đánh giá (thư viện có thể import)
+├── app/                # dịch vụ phục vụ mô hình
+├── tests/
+├── configs/            # tham số huấn luyện (YAML), không viết cứng trong code
+├── requirements.txt    # hoặc pyproject.toml + lock file
+├── Dockerfile
+└── .github/workflows/  # CI</code></pre>
+<ul>
+  <li><strong>Ghim phiên bản thư viện</strong> và dùng môi trường ảo hoặc container. “Chạy được trên máy tôi” không phải bằng chứng.</li>
+  <li><strong>Đặt seed</strong> cho mọi nguồn ngẫu nhiên (Python, NumPy, framework). Lưu ý GPU và một số phép toán song song không đảm bảo kết quả giống hệt từng bit ngay cả khi đặt seed; hãy kiểm tra tài liệu của framework về tính xác định.</li>
+  <li><strong>Tách cấu hình khỏi mã</strong>, lưu cấu hình cùng kết quả mỗi lần chạy.</li>
+</ul>
+
+<h2 id="theo-doi">Theo dõi thí nghiệm và phiên bản dữ liệu/mô hình</h2>
+<h3 id="mlflow">Theo dõi thí nghiệm với MLflow</h3>
+<p>Mỗi lần chạy cần ghi: tham số, chỉ số, tệp kết quả, commit mã và phiên bản dữ liệu. Công cụ như MLflow (hoặc Weights &amp; Biases, Neptune...) làm việc đó và cho giao diện so sánh. Ví dụ tối giản với MLflow:</p>
+<pre><code class="language-python"># pip install mlflow scikit-learn
+import mlflow
+from sklearn.datasets import load_breast_cancer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
+
+X, y = load_breast_cancer(return_X_y=True)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
+
+mlflow.set_experiment("breast-cancer-baseline")
+for C in (0.1, 1.0, 10.0):
+    with mlflow.start_run():
+        mlflow.log_param("C", C)
+        model = LogisticRegression(C=C, max_iter=5000).fit(X_tr, y_tr)
+        mlflow.log_metric("f1_test", f1_score(y_te, model.predict(X_te)))
+# xem kết quả: chạy lệnh  mlflow ui  rồi mở địa chỉ nó in ra</code></pre>
+<div class="callout warn"><span class="callout-title">Đừng chọn mô hình bằng tập test</span>Ví dụ trên dùng tập test cho gọn. Trong dự án thật hãy chọn siêu tham số bằng validation/cross-validation và chỉ báo cáo test một lần (xem trang Machine Learning); nếu không, bạn đang “huấn luyện trên tập test” theo kiểu gián tiếp.</div>
+<h3 id="dvc">Phiên bản hóa dữ liệu</h3>
+<p>Git không phù hợp với tệp lớn. DVC lưu con trỏ nhỏ (tệp <code>.dvc</code>) trong Git, còn nội dung nằm ở kho lưu trữ riêng, nên mỗi commit gắn với đúng phiên bản dữ liệu:</p>
+<pre><code class="language-bash">pip install dvc
+dvc init
+dvc add data/train.csv           # tạo data/train.csv.dvc và thêm tệp dữ liệu vào .gitignore
+git add data/train.csv.dvc data/.gitignore
+git commit -m "Thêm dữ liệu huấn luyện v1"
+dvc remote add -d storage s3://ten-bucket/duong-dan   # kho lưu trữ từ xa (ví dụ)
+dvc push                          # đẩy dữ liệu lên kho; người khác dùng: dvc pull</code></pre>
+<p>Cùng ý tưởng cho mô hình: một <strong>model registry</strong> lưu từng phiên bản mô hình kèm số liệu đánh giá và trạng thái (đang thử nghiệm, đang chạy, đã gỡ). Trọng tâm là luôn trả lời được câu hỏi “mô hình đang chạy được huấn luyện bằng mã nào, dữ liệu nào, cấu hình nào?”.</p>
+
+<h2 id="kiem-thu">Kiểm thử cho hệ thống ML</h2>
+<p>Ngoài kiểm thử phần mềm thông thường, cần kiểm thử <strong>dữ liệu</strong> và <strong>hành vi mô hình</strong>:</p>
+<ul>
+  <li><strong>Dữ liệu</strong>: lược đồ (cột, kiểu), miền giá trị, tỉ lệ thiếu, phân phối nhãn, trùng lặp giữa train và test. Có thư viện hỗ trợ xác thực dữ liệu (ví dụ Great Expectations, Pandera); hãy xem tài liệu hiện hành.</li>
+  <li><strong>Mã tiền xử lý</strong>: kiểm thử đơn vị như mọi hàm khác, đặc biệt các hàm dùng chung cho huấn luyện và phục vụ.</li>
+  <li><strong>Mô hình</strong>: hình dạng đầu ra hợp lệ, không NaN, vượt baseline đơn giản, bất biến với thay đổi không liên quan (đảo thứ tự hàng, đổi chữ hoa/thường với văn bản), nhạy theo hướng đã biết (tăng thu nhập không làm giảm điểm tín dụng), và chất lượng trên các nhóm con quan trọng.</li>
+</ul>
+<pre><code class="language-python"># tests/test_model.py   (chạy bằng: pytest -q)
+import numpy as np
+import pytest
+from sklearn.datasets import load_breast_cancer
+from sklearn.dummy import DummyClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+
+@pytest.fixture(scope="module")
+def data():
+    X, y = load_breast_cancer(return_X_y=True)
+    return train_test_split(X, y, test_size=0.2, stratify=y, random_state=0)
+
+
+@pytest.fixture(scope="module")
+def model(data):
+    X_tr, _, y_tr, _ = data
+    return make_pipeline(StandardScaler(), LogisticRegression(max_iter=5000)).fit(X_tr, y_tr)
+
+
+def test_probabilities_are_valid(model, data):
+    proba = model.predict_proba(data[1])
+    assert proba.shape == (len(data[1]), 2)
+    assert np.isfinite(proba).all()
+    assert np.allclose(proba.sum(axis=1), 1.0)
+
+
+def test_row_order_invariance(model, data):
+    X_te = data[1]
+    perm = np.random.default_rng(0).permutation(len(X_te))
+    assert np.allclose(model.predict_proba(X_te)[perm], model.predict_proba(X_te[perm]))
+
+
+def test_beats_baseline(model, data):
+    X_tr, X_te, y_tr, y_te = data
+    base = DummyClassifier(strategy="most_frequent").fit(X_tr, y_tr)
+    assert f1_score(y_te, model.predict(X_te)) &gt; f1_score(y_te, base.predict(X_te)) + 0.1</code></pre>
+<p>Đưa các kiểm thử nhanh vào CI (xem trang GitHub). Huấn luyện đầy đủ thì chạy theo lịch hoặc theo yêu cầu, không chạy trên mỗi commit.</p>
+
+<h2 id="phuc-vu">Đóng gói và phục vụ mô hình</h2>
+<p>Hai mô thức chính: <strong>batch</strong> (chạy định kỳ trên lượng dữ liệu lớn, ghi kết quả vào kho: đơn giản, rẻ, chịu lỗi tốt) và <strong>online</strong> (trả lời từng yêu cầu trong vài chục đến vài trăm mili giây). Hãy chọn batch nếu nghiệp vụ cho phép; online khó vận hành hơn nhiều. Ví dụ dịch vụ online tối giản bằng FastAPI:</p>
+<pre><code class="language-python"># app/main.py   (chạy: uvicorn app.main:app --port 8000)
+from contextlib import asynccontextmanager
+
+import joblib
+import numpy as np
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+N_FEATURES = 30
+models = {}
+
+
+class Features(BaseModel):
+    values: list[float] = Field(min_length=N_FEATURES, max_length=N_FEATURES)
+
+
+class Prediction(BaseModel):
+    label: int
+    probability: float
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # chỉ nạp tệp do chính pipeline của bạn tạo ra (joblib/pickle có thể chạy mã khi nạp)
+    models["clf"] = joblib.load("model/clf.joblib")      # nạp mô hình một lần khi khởi động
+    yield
+    models.clear()
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.post("/predict", response_model=Prediction)
+def predict(features: Features):
+    x = np.asarray(features.values).reshape(1, -1)
+    p = float(models["clf"].predict_proba(x)[0, 1])
+    return Prediction(label=int(p &gt;= 0.5), probability=p)</code></pre>
+<pre><code class="language-text"># Dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app/ app/
+COPY model/ model/
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code></pre>
+<div class="callout warn"><span class="callout-title">An toàn khi nạp mô hình</span>Các định dạng dựa trên <code>pickle</code> (bao gồm nhiều tệp <code>joblib</code> và một số checkpoint) có thể <strong>chạy mã tùy ý khi nạp</strong>. Chỉ nạp tệp từ nguồn bạn tin cậy. Với trọng số chia sẻ công khai, ưu tiên định dạng không thực thi mã như safetensors hoặc ONNX khi có thể.</div>
+<h3 id="batching">Độ trễ, thông lượng và batching động</h3>
+<p>Suy luận trên GPU/CPU có chi phí cố định cho mỗi lần gọi (nạp kernel, truyền dữ liệu) cộng chi phí theo từng mẫu. Gộp nhiều yêu cầu thành một lô giúp tăng thông lượng, nhưng yêu cầu phải chờ lô đầy, nên độ trễ tăng ở tải thấp. Hãy thử:</p>
+<div class="viz" data-viz="batch1" data-title="Batching động: đánh đổi độ trễ và thông lượng">
+  <p class="viz-help">Đường xám là hệ thống xử lý từng yêu cầu một; đường xanh có batching. Khi λ vượt công suất, độ trễ p95 vọt lên (hàng đợi tăng không dừng). Thử đặt “chờ tối đa” bằng 0 và 100 ms ở tải thấp.</p>
+</div>
+<p>Các đòn bẩy khác để giảm chi phí và độ trễ: lượng tử hóa (quantization), chưng cất (distillation), biên dịch/tối ưu đồ thị (ví dụ xuất sang ONNX), bộ nhớ đệm cho yêu cầu lặp, và mô hình nhỏ hơn cho các ca dễ. Luôn đo độ trễ theo phân vị (p50, p95, p99), không chỉ trung bình.</p>
+
+<h2 id="trien-khai">Triển khai an toàn và CI/CD cho ML</h2>
+<p>Pipeline điển hình: thay đổi mã hoặc dữ liệu → CI (lint, kiểm thử đơn vị, kiểm tra dữ liệu) → huấn luyện tái lập được → đánh giá <em>so với mô hình đang chạy</em> trên cùng tập kiểm tra → đăng ký phiên bản → triển khai dần → giám sát. Điều kiện “tốt hơn” cần định nghĩa trước (chỉ số, ngưỡng, các nhóm con không được tệ đi).</p>
+<table>
+  <thead><tr><th>Chiến lược</th><th>Cách làm</th><th>Dùng khi</th></tr></thead>
+  <tbody>
+    <tr><td>Shadow</td><td>Mô hình mới nhận bản sao lưu lượng thật nhưng kết quả không trả cho người dùng; chỉ ghi log để so sánh.</td><td>Muốn kiểm tra an toàn trước khi ảnh hưởng người dùng.</td></tr>
+    <tr><td>Canary</td><td>Cho một phần nhỏ lưu lượng (ví dụ vài phần trăm) đi qua mô hình mới, tăng dần nếu ổn.</td><td>Mặc định tốt cho đa số dịch vụ online.</td></tr>
+    <tr><td>A/B test</td><td>Chia người dùng ngẫu nhiên thành nhóm, so sánh chỉ số kinh doanh với kiểm định thống kê.</td><td>Cần đo tác động thật lên hành vi người dùng.</td></tr>
+    <tr><td>Blue/green</td><td>Hai môi trường song song, chuyển lưu lượng một lần; quay lui chỉ là chuyển lại.</td><td>Cần quay lui tức thì.</td></tr>
+  </tbody>
+</table>
+<p>Luôn chuẩn bị <strong>quay lui</strong> (rollback) về phiên bản trước chỉ bằng một thao tác, và nhớ rằng quay lui mô hình đôi khi cũng cần quay lui các đặc trưng hoặc lược đồ dữ liệu đi kèm.</p>
+<div class="callout tip"><span class="callout-title">Lệch giữa huấn luyện và phục vụ (training–serving skew)</span>Nguồn lỗi âm thầm phổ biến bậc nhất: đặc trưng được tính một cách khi huấn luyện (SQL/pandas hàng loạt) và một cách khác khi phục vụ (code thời gian thực). Giảm thiểu bằng cách dùng chung mã tiền xử lý, hoặc kho đặc trưng (feature store); ghi log đặc trưng thực tế lúc phục vụ và so sánh với phân phối lúc huấn luyện; kiểm thử tương đương đầu ra giữa hai đường tính.</div>
+
+<h2 id="giam-sat">Giám sát sau triển khai</h2>
+<p>Cần giám sát ở ba tầng:</p>
+<ul>
+  <li><strong>Hệ thống</strong>: tỉ lệ lỗi, độ trễ p50/p95/p99, thông lượng, tài nguyên (CPU, GPU, bộ nhớ).</li>
+  <li><strong>Dữ liệu</strong>: tỉ lệ thiếu, miền giá trị, phân phối đặc trưng và phân phối dự đoán so với lúc huấn luyện (drift).</li>
+  <li><strong>Chất lượng mô hình</strong>: các chỉ số thật, khi có nhãn. Nhãn thường đến muộn (khoản vay có thể mất vài tháng mới biết vỡ nợ), nên cần chỉ báo sớm như drift và so sánh với mô hình tham chiếu.</li>
+</ul>
+<h3 id="drift">Data drift: PSI và KS</h3>
+<p>Hai thước đo phổ biến để so sánh phân phối một đặc trưng giữa lúc huấn luyện (tham chiếu \(p\)) và lúc đang chạy (\(q\)). <strong>PSI</strong> (Population Stability Index) chia đặc trưng thành các khoảng (thường theo phân vị của tập tham chiếu):</p>
+$$\text{PSI}=\sum_{i=1}^{B}\,(q_i-p_i)\,\ln\frac{q_i}{p_i}$$
+<p>Quy ước ngón tay cái lưu hành trong ngành tài chính: dưới 0.1 là ổn định, 0.1 đến 0.25 cần theo dõi, trên 0.25 là dịch chuyển lớn. Đó là heuristic chứ không phải định lý, hãy hiệu chỉnh theo bài toán của bạn. <strong>KS</strong> (Kolmogorov–Smirnov) là khoảng cách lớn nhất giữa hai hàm phân phối tích lũy: \(D=\sup_x|F_p(x)-F_q(x)|\). Hãy dịch chuyển phân phối và quan sát cả hai, kể cả hiện tượng cảnh báo giả khi lấy ít mẫu:</p>
+<div class="viz" data-viz="drift1" data-title="Phát hiện drift bằng PSI và KS">
+  <p class="viz-help">Phân phối lúc huấn luyện cố định là N(0,1). Kéo μ và σ như thể dữ liệu thật đã đổi. Mẫu nhỏ làm PSI dao động ngay cả khi không có drift thật.</p>
+</div>
+<pre><code class="language-python">import numpy as np
+from scipy.stats import ks_2samp
+
+def psi(reference, current, bins=10):
+    edges = np.quantile(reference, np.linspace(0, 1, bins + 1))
+    edges[0], edges[-1] = -np.inf, np.inf
+    p = np.histogram(reference, edges)[0] / len(reference)
+    q = np.histogram(current, edges)[0] / len(current)
+    p, q = np.clip(p, 1e-4, None), np.clip(q, 1e-4, None)      # tránh log(0)
+    return float(np.sum((q - p) * np.log(q / p)))
+
+rng = np.random.default_rng(0)
+ref = rng.normal(0, 1, 10_000)
+cur = rng.normal(0.5, 1, 2_000)
+print("PSI:", psi(ref, cur))
+print("KS :", ks_2samp(ref, cur))        # (statistic, pvalue)</code></pre>
+<p>Hai lưu ý quan trọng. (1) Với lượng dữ liệu lớn, kiểm định thống kê phát hiện cả những thay đổi nhỏ không có ý nghĩa thực tế, nên hãy xét <em>độ lớn</em> và tác động lên chỉ số mô hình chứ không chỉ p-value. (2) Drift không đồng nghĩa mô hình hỏng, và mô hình có thể hỏng khi không có drift đặc trưng nào (thay đổi quan hệ giữa đặc trưng và nhãn, gọi là concept drift). Cảnh báo cần dẫn tới một hành động đã thỏa thuận (xem xét, huấn luyện lại, quay lui), kèm sổ tay xử lý (runbook).</p>
+<h3 id="vong-phan-hoi">Vòng phản hồi và huấn luyện lại</h3>
+<p>Huấn luyện lại có thể theo lịch, theo ngưỡng giám sát hoặc theo sự kiện, nhưng mô hình mới phải qua cùng cổng đánh giá như mọi bản phát hành. Hãy cảnh giác với <em>vòng phản hồi</em>: khi dự đoán của mô hình ảnh hưởng dữ liệu tương lai (hệ thống gợi ý chỉ cho thấy những gì nó đã gợi ý), dữ liệu mới bị lệch theo chính mô hình.</p>
+
+<h2 id="llmops">LLMOps: điều gì khác với ML truyền thống</h2>
+<p>Ứng dụng dựa trên LLM (trang LLM, Agentic AI) giữ nguyên các nguyên tắc trên nhưng đối tượng cần quản lý đổi khác:</p>
+<ul>
+  <li><strong>Prompt và cấu hình là “mã”</strong>: đưa vào Git, đánh phiên bản, review thay đổi.</li>
+  <li><strong>Bộ đánh giá riêng</strong> (ví dụ vài chục đến vài trăm ca có đáp án hoặc tiêu chí chấm) chạy mỗi khi đổi prompt, đổi mô hình hoặc nhà cung cấp tự cập nhật mô hình; đây là “bộ kiểm thử hồi quy” của bạn. Nếu dùng LLM làm giám khảo, hãy kiểm tra độ nhất quán với người chấm.</li>
+  <li><strong>Truy vết (tracing)</strong>: lưu toàn bộ chuỗi lời gọi (prompt, kết quả truy hồi, lời gọi công cụ, đầu ra) để gỡ lỗi; chú ý quyền riêng tư của dữ liệu trong log.</li>
+  <li><strong>Chi phí và độ trễ</strong> tính theo token: theo dõi token vào/ra mỗi yêu cầu, dùng bộ nhớ đệm, mô hình nhỏ cho ca dễ, đặt hạn mức.</li>
+  <li><strong>Rào chắn (guardrails) và an toàn</strong>: kiểm tra đầu vào/đầu ra, chống prompt injection, giới hạn quyền của công cụ.</li>
+  <li><strong>Phụ thuộc bên ngoài</strong>: mô hình của nhà cung cấp có thể thay đổi hoặc ngừng hỗ trợ; ghim phiên bản mô hình khi có thể và có kế hoạch chuyển đổi.</li>
+</ul>
+
+<h2 id="quan-tri">Quản trị, bảo mật và chi phí</h2>
+<ul>
+  <li><strong>Tài liệu hóa mô hình</strong>: “model card” (Mitchell và cộng sự, 2019) mô tả mục đích, dữ liệu huấn luyện, chỉ số theo nhóm, hạn chế và cách dùng không phù hợp. Làm khi đưa vào registry, không để đến sau.</li>
+  <li><strong>Dữ liệu</strong>: nguồn gốc (lineage), giấy phép, dữ liệu cá nhân (tối thiểu hóa, ẩn danh hóa, thời hạn lưu), quyền truy cập theo nguyên tắc tối thiểu.</li>
+  <li><strong>Chuỗi cung ứng</strong>: kiểm soát phụ thuộc, quét lỗ hổng, hạn chế nạp mô hình/gói không tin cậy.</li>
+  <li><strong>Khả năng kiểm toán</strong>: giữ nhật ký ai triển khai gì, khi nào, dựa trên số liệu nào.</li>
+  <li><strong>Chi phí</strong>: gắn nhãn tài nguyên theo dự án, tắt cụm huấn luyện nhàn rỗi, đo chi phí cho mỗi dự đoán, cân nhắc batch thay vì online.</li>
+  <li><strong>Công bằng và tác động</strong>: kiểm tra chỉ số theo nhóm con và có đường để người dùng khiếu nại với các quyết định quan trọng.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<details class="exercise">
+  <summary>Bài 1. PSI bằng tay</summary>
+  <div class="ex-body"><p>Tập tham chiếu có 10 khoảng, mỗi khoảng 0.10. Dữ liệu đang chạy có tỉ lệ \((0.05,\,0.05,\,0.10,\,0.10,\,0.10,\,0.10,\,0.10,\,0.10,\,0.15,\,0.15)\). Tính PSI.</p>
+  <p><em>Lời giải:</em> hai khoảng 0.05 cho \(2\cdot(-0.05)\ln0.5\approx0.0693\); hai khoảng 0.15 cho \(2\cdot0.05\ln1.5\approx0.0405\); các khoảng còn lại bằng 0. Tổng \(\approx0.110\), nằm ở vùng “cần theo dõi”.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 2. Công suất của batching</summary>
+  <div class="ex-body"><p>Một mô hình mất \(20+2b\) ms để xử lý một lô \(b\) mẫu. Công suất tối đa khi \(b=1\) và khi \(b=16\) là bao nhiêu yêu cầu mỗi giây? Kiểm tra bằng minh họa batching.</p>
+  <p><em>Lời giải:</em> \(b=1\): \(1000/22\approx45.5\) yêu cầu/giây. \(b=16\): một lô mất 52 ms nên \(16/0.052\approx307.7\) yêu cầu/giây, gấp khoảng 6.8 lần. Cái giá là mỗi yêu cầu có thể phải chờ lô.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 3. Thiết kế kế hoạch giám sát</summary>
+  <div class="ex-body"><p>Mô hình phát hiện gian lận thẻ có nhãn thật chỉ đến sau khoảng 30 ngày (khách khiếu nại). Hãy thiết kế: (a) các chỉ báo sớm bạn theo dõi hằng ngày, (b) chỉ số chất lượng theo dõi hằng tháng, (c) điều kiện kích hoạt xem xét huấn luyện lại, (d) kế hoạch rollout bản mô hình mới.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 4. Viết kiểm thử hành vi</summary>
+  <div class="ex-body"><p>Với mô hình ở phần kiểm thử, viết thêm hai bài kiểm thử: (a) chia tập kiểm tra ra hai nhóm theo giá trị một đặc trưng và khẳng định F1 mỗi nhóm không thấp hơn tổng thể quá một ngưỡng bạn chọn; (b) dự đoán không đổi khi thêm một cột không dùng (bằng cách bọc trong pipeline chọn cột). Giải thích bạn chọn ngưỡng thế nào.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 5. Dựng dự án nhỏ end-to-end</summary>
+  <div class="ex-body"><p>Lấy một mô hình scikit-learn nhỏ: ghi thí nghiệm bằng MLflow, đóng gói bằng FastAPI + Docker, thêm CI chạy kiểm thử trên GitHub Actions (xem trang GitHub), và viết một script mô phỏng drift rồi gọi hàm PSI để cảnh báo. Đưa tất cả lên GitHub kèm README.</p></div>
+</details>
+
+<h2 id="tham-khao">Tài liệu tham khảo</h2>
+<ol class="refs">
+  <li>Sculley và cộng sự (2015), <em>Hidden Technical Debt in Machine Learning Systems</em>, NeurIPS.</li>
+  <li><a href="https://developers.google.com/machine-learning/guides/rules-of-ml">Rules of Machine Learning</a> — Martin Zinkevich (Google); các nguyên tắc kỹ thuật ML thực dụng (mình tin link đúng, bạn nên kiểm tra).</li>
+  <li><em>Designing Machine Learning Systems</em> — Chip Huyen (O’Reilly, 2022), sách về thiết kế hệ thống ML sản xuất.</li>
+  <li>Breck và cộng sự (2017), <em>The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction</em>.</li>
+  <li><a href="https://mlflow.org/docs/latest/">Tài liệu MLflow</a>, <a href="https://dvc.org/doc">tài liệu DVC</a>, <a href="https://fastapi.tiangolo.com">tài liệu FastAPI</a> — công cụ dùng trong bài; API thay đổi theo phiên bản, hãy đối chiếu bản bạn cài.</li>
+  <li>Mitchell và cộng sự (2019), <em>Model Cards for Model Reporting</em>, arXiv:1810.03993.</li>
+</ol>
+<p class="meta">Mình trích tên bài và số arXiv theo trí nhớ; hãy tìm bằng tên bài để xác nhận trước khi dẫn lại.</p>
+
+</main>
+<aside class="toc" id="toc" aria-label="Mục lục"></aside>
+</div>
+<div id="site-footer"></div>
+</body>
+</html>

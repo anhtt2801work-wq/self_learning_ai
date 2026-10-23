@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Computer Vision · Tự học AI</title>
+<meta name="description" content="Thị giác máy tính: tích chập, CNN, trường nhìn, transfer learning, Vision Transformer, CLIP, phát hiện vật thể (IoU, NMS), phân đoạn và đánh giá.">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/search-index.js"></script>
+<script defer src="assets/js/site.js"></script>
+<script defer src="assets/js/viz-cv.js"></script>
+</head>
+<body data-page="cv">
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div id="site-header"></div>
+<div class="page">
+<main class="content" id="main">
+
+<h1>Computer Vision</h1>
+<p class="lead">Thị giác máy tính dạy máy “hiểu” ảnh và video: phân loại, phát hiện vật thể, phân đoạn, đọc chữ, tạo ảnh. Trang này đi từ phép tích chập đến CNN, Vision Transformer, các mô hình ảnh–văn bản, và những chi tiết thực hành hay bị bỏ qua khi đánh giá.</p>
+<div class="callout note"><span class="callout-title">Cần biết trước</span>Trang Deep Learning (backprop, huấn luyện bằng PyTorch). Trang LLM sẽ giúp hiểu phần Vision Transformer và mô hình đa phương thức.</div>
+
+<h2 id="anh-la-gi">Ảnh dưới góc nhìn của máy</h2>
+<p>Một ảnh là tensor số: \(H\times W\times C\) (chiều cao, chiều rộng, số kênh). Ảnh màu RGB có \(C=3\), mỗi giá trị thường là số nguyên 0–255 (<code>uint8</code>). Trước khi vào mạng, ảnh được đổi sang số thực và <strong>chuẩn hóa</strong> theo từng kênh: \(x'=(x/255-\mu_c)/\sigma_c\). Các framework khác nhau sắp xếp chiều khác nhau (PyTorch dùng \(C\times H\times W\), nhiều thư viện ảnh dùng \(H\times W\times C\)), nên nhầm thứ tự chiều là lỗi rất hay gặp.</p>
+<p>Vì sao không dùng mạng kết nối đầy đủ? Ảnh \(224\times224\times3\) có 150,528 giá trị; một lớp ẩn 1,000 nơ-ron đã cần hơn 150 triệu trọng số, và nó cũng không tận dụng hai tính chất của ảnh: <strong>tính cục bộ</strong> (điểm ảnh gần nhau liên quan chặt) và <strong>bất biến tịnh tiến</strong> (một con mèo vẫn là mèo dù nằm ở góc nào). Tích chập đưa hai giả định này vào kiến trúc.</p>
+
+<h2 id="tich-chap">Phép tích chập</h2>
+<p>Một bộ lọc (kernel) nhỏ, ví dụ \(3\times3\), trượt trên ảnh; tại mỗi vị trí ta lấy tổng tích từng cặp phần tử. Chính xác hơn, các thư viện học sâu cài đặt <em>tương quan chéo</em> (không lật kernel), nhưng vẫn gọi là “convolution”:</p>
+$$y_{i,j}=\sum_{a=0}^{k-1}\sum_{b=0}^{k-1}K_{a,b}\;x_{\,si+a-p,\;sj+b-p}$$
+<p>với \(s\) là stride (bước trượt) và \(p\) là padding (số hàng/cột 0 thêm vào viền). Kích thước đầu ra theo một chiều là \(\lfloor (n+2p-k)/s\rfloor+1\). Hãy thử các bộ lọc kinh điển: Sobel bắt cạnh, trung bình làm mờ, Laplace làm nổi các thay đổi đột ngột:</p>
+<div class="viz" data-viz="conv1" data-title="Tích chập trên ảnh 8×8">
+  <p class="viz-help">Bấm vào ảnh vào để vẽ lại. Rê chuột lên một ô kết quả để thấy ô đó dùng 3×3 điểm ảnh nào. Thử tăng stride và padding rồi quan sát kích thước đầu ra.</p>
+</div>
+<p>Trong CNN, kernel <strong>không do con người thiết kế mà được học</strong> bằng backprop. Một lớp tích chập có \(C_{in}\) kênh vào và \(C_{out}\) kênh ra gồm \(C_{out}\) bộ lọc, mỗi bộ cỡ \(k\times k\times C_{in}\), nên số tham số là \((k^2C_{in}+1)\,C_{out}\), không phụ thuộc kích thước ảnh. Đó là lý do tích chập tiết kiệm tham số hơn rất nhiều so với kết nối đầy đủ.</p>
+
+<h2 id="cnn">Kiến trúc CNN</h2>
+<p>Khối cơ bản thường là <strong>Conv → chuẩn hóa (BatchNorm) → ReLU</strong>, xen kẽ với giảm kích thước không gian (pooling hoặc stride 2) và tăng dần số kênh. Các tầng đầu học đặc trưng đơn giản (cạnh, màu, họa tiết), các tầng sau ghép chúng thành bộ phận rồi vật thể. Cuối mạng, gộp trung bình toàn cục (global average pooling) rồi một lớp tuyến tính ra logit.</p>
+<h3 id="truong-nhin">Trường nhìn (receptive field)</h3>
+<p>Mỗi ô ở tầng sâu “nhìn” vào một vùng ảnh gốc gọi là trường nhìn. Với lớp có nhân \(k\) và stride \(s\), đặt \(j\) là bước nhảy tích lũy (khoảng cách giữa hai ô liền kề tính theo điểm ảnh gốc):</p>
+$$r_l=r_{l-1}+(k_l-1)\,j_{l-1},\qquad j_l=j_{l-1}\,s_l,\qquad r_0=1,\ j_0=1$$
+<p>Hai lớp \(3\times3\) xếp chồng có trường nhìn \(5\times5\), giống một lớp \(5\times5\), nhưng chỉ cần \(2\cdot9=18\) trọng số mỗi cặp kênh thay vì 25, lại có thêm một phi tuyến ở giữa. Đó là lý do mạng hiện đại ưa kernel nhỏ.</p>
+<div class="viz" data-viz="rf1" data-title="Máy tính trường nhìn">
+  <p class="viz-help">Sửa danh sách lớp để xem trường nhìn tăng thế nào. Pooling và stride lớn làm bước nhảy j tăng nhanh nên các lớp sau “nhìn” rất rộng.</p>
+</div>
+<h3 id="moc">Các cột mốc kiến trúc</h3>
+<ul>
+  <li><strong>LeNet</strong> (LeCun và cộng sự, thập niên 1990): CNN đầu tiên thành công với nhận dạng chữ số.</li>
+  <li><strong>AlexNet</strong> (2012) thắng cuộc thi ImageNet, mở ra làn sóng học sâu nhờ GPU, ReLU và dropout.</li>
+  <li><strong>VGG</strong> (2014): chồng thật nhiều conv \(3\times3\).</li>
+  <li><strong>ResNet</strong> (He và cộng sự, 2015): kết nối tắt \(\mathbf{y}=F(\mathbf{x})+\mathbf{x}\) giúp huấn luyện mạng rất sâu vì gradient chảy thẳng qua đường tắt.</li>
+  <li><strong>EfficientNet</strong> và họ ConvNeXt: cân đối độ sâu, độ rộng, độ phân giải và hiện đại hóa chi tiết huấn luyện.</li>
+</ul>
+
+<h2 id="transfer">Transfer learning: cách làm thực tế nhất</h2>
+<p>Hiếm khi bạn nên huấn luyện từ đầu. Mạng tiền huấn luyện trên tập ảnh lớn (như ImageNet) đã học các đặc trưng thị giác tổng quát; bạn thay lớp cuối bằng lớp mới cho bài toán của mình rồi tinh chỉnh. Quy trình thường dùng:</p>
+<ol>
+  <li><strong>Đóng băng</strong> toàn bộ mạng, chỉ huấn luyện lớp cuối mới (nhanh, cần ít dữ liệu).</li>
+  <li>Nếu cần, <strong>mở dần</strong> các tầng sau với tốc độ học nhỏ hơn nhiều (tinh chỉnh).</li>
+</ol>
+<pre><code class="language-python"># pip install torch torchvision
+import torch
+from torch import nn
+from torchvision import models, transforms
+
+weights = models.ResNet18_Weights.DEFAULT           # trọng số tiền huấn luyện trên ImageNet
+model = models.resnet18(weights=weights)
+
+for p in model.parameters():                        # 1) đóng băng toàn bộ
+    p.requires_grad = False
+num_classes = 5
+model.fc = nn.Linear(model.fc.in_features, num_classes)   # 2) lớp cuối mới (mặc định có requires_grad=True)
+
+train_tf = transforms.Compose([
+    transforms.RandomResizedCrop(224),              # tăng cường dữ liệu
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),  # thống kê ImageNet
+])
+
+params = [p for p in model.parameters() if p.requires_grad]
+opt = torch.optim.AdamW(params, lr=1e-3)
+# ... vòng lặp huấn luyện như trang Deep Learning ...</code></pre>
+<div class="callout warn"><span class="callout-title">Chuẩn hóa phải khớp mô hình</span>Mỗi mô hình tiền huấn luyện mong đợi một cách chuẩn hóa và kích thước ảnh riêng. Dùng sai (ví dụ quên <code>Normalize</code>) có thể làm độ chính xác tụt mạnh mà không báo lỗi. Hãy đọc tài liệu của trọng số bạn dùng.</div>
+<h3 id="tang-cuong">Tăng cường dữ liệu (data augmentation)</h3>
+<p>Biến đổi ngẫu nhiên nhưng giữ nguyên nhãn: lật, cắt, xoay nhẹ, đổi độ sáng, thêm nhiễu. Chọn phép biến đổi phải hợp bài toán: lật ngang hợp lý với ảnh mèo nhưng <em>không</em> hợp với nhận dạng chữ số hay chữ cái, và xoay 180° sai nghĩa với ảnh X-quang có hướng quy ước.</p>
+
+<h2 id="vit">Vision Transformer và mô hình ảnh–văn bản</h2>
+<p><strong>ViT</strong> (Dosovitskiy và cộng sự, 2020) coi ảnh như chuỗi: cắt ảnh thành các mảnh \(16\times16\), trải phẳng, chiếu tuyến tính thành vector, thêm mã hóa vị trí rồi đưa vào Transformer chuẩn (xem trang LLM). Một ảnh \(224\times224\) cho \((224/16)^2=196\) mảnh. Do thiếu các giả định tích chập, ViT thường cần nhiều dữ liệu hoặc tiền huấn luyện lớn để thắng CNN, nhưng mở rộng rất tốt.</p>
+<p><strong>CLIP</strong> (Radford và cộng sự, 2021) huấn luyện song song một bộ mã hóa ảnh và một bộ mã hóa văn bản trên hàng trăm triệu cặp (ảnh, chú thích) bằng mất mát đối sánh (contrastive): kéo embedding của cặp đúng lại gần nhau (cosine cao), đẩy cặp sai ra xa. Nhờ vậy ta phân loại “zero-shot” bằng cách so embedding ảnh với embedding của các câu như “một bức ảnh chụp con chó”. Cùng ý tưởng nền tảng cho nhiều mô hình đa phương thức hiện nay, trong đó LLM nhận thêm token ảnh. Các mô hình “phân đoạn mọi thứ” như SAM theo hướng tương tự: mô hình lớn tiền huấn luyện dùng được cho nhiều tác vụ có gợi ý (prompt).</p>
+
+<h2 id="phat-hien">Phát hiện vật thể</h2>
+<p>Bài toán: với mỗi vật thể, dự đoán hộp bao và nhãn. Hai họ chính: <em>hai giai đoạn</em> (đề xuất vùng rồi phân loại, như Faster R-CNN) và <em>một giai đoạn</em> (dự đoán trực tiếp, như họ YOLO); gần đây có các mô hình dựa trên Transformer như DETR, dự đoán tập hộp mà không cần NMS.</p>
+<h3 id="iou-nms">IoU và NMS</h3>
+<p>Độ chồng lấn giữa hai hộp đo bằng <strong>Intersection over Union</strong>:</p>
+$$\text{IoU}(A,B)=\frac{|A\cap B|}{|A\cup B|}$$
+<p>Mạng thường đưa ra nhiều hộp quanh cùng một vật thể. <strong>Non-Maximum Suppression</strong> loại bớt: sắp xếp hộp theo điểm tin cậy, giữ hộp cao nhất, loại mọi hộp có IoU với nó vượt ngưỡng, lặp lại. Hãy thử cảnh “hai vật chồng lấn nhiều” và hạ ngưỡng IoU để thấy NMS xóa nhầm vật thật:</p>
+<div class="viz" data-viz="nms1" data-title="NMS: giữ hộp tốt nhất, loại hộp trùng">
+  <p class="viz-help">Nhãn trên hộp là điểm tin cậy. Đường liền xanh lá là hộp được giữ; đứt cam là hộp bị loại; đứt xám là hộp bị loại vì điểm thấp.</p>
+</div>
+<h3 id="map">Đánh giá: mAP</h3>
+<p>Một dự đoán được tính là đúng nếu đúng lớp và IoU với hộp thật vượt ngưỡng (ví dụ 0.5). Với mỗi lớp, vẽ đường precision–recall khi thay đổi ngưỡng điểm tin cậy, <strong>AP</strong> là diện tích dưới đường đó, <strong>mAP</strong> là trung bình các lớp. Nhiều benchmark còn lấy trung bình trên nhiều ngưỡng IoU. Cách tính cụ thể khác nhau giữa các bộ dữ liệu (ví dụ PASCAL VOC và COCO), nên chỉ so sánh số mAP khi cùng quy ước.</p>
+
+<h2 id="phan-doan">Phân đoạn ảnh</h2>
+<ul>
+  <li><strong>Semantic segmentation</strong>: gán nhãn lớp cho từng điểm ảnh (mọi “xe” cùng một lớp).</li>
+  <li><strong>Instance segmentation</strong>: tách riêng từng vật thể (xe 1, xe 2).</li>
+  <li><strong>Panoptic</strong>: kết hợp cả hai.</li>
+</ul>
+<p>Kiến trúc kinh điển là <strong>U-Net</strong> (Ronneberger và cộng sự, 2015): nhánh mã hóa thu nhỏ ảnh, nhánh giải mã phóng to lại, có các kết nối tắt nối đặc trưng cùng kích thước để giữ chi tiết biên. Với vùng cần phân đoạn nhỏ so với toàn ảnh (khối u, vết nứt), mất mát cross-entropy theo từng điểm ảnh bị lớp nền áp đảo; người ta thường dùng thêm mất mát dựa trên <strong>Dice</strong>:</p>
+$$\text{Dice}=\frac{2\,|A\cap B|}{|A|+|B|},\qquad L_{\text{Dice}}=1-\text{Dice}$$
+
+<h2 id="thuc-hanh">Thực hành đánh giá và những cái bẫy</h2>
+<ul>
+  <li><strong>Rò rỉ giữa tập huấn luyện và kiểm tra</strong>: ảnh gần giống nhau (khung hình liên tiếp của một video, nhiều ảnh cùng một bệnh nhân) mà bị chia vào cả hai tập sẽ làm điểm số ảo. Hãy chia theo <em>nhóm</em> (bệnh nhân, video, địa điểm).</li>
+  <li><strong>Dịch chuyển miền (domain shift)</strong>: mô hình học từ ảnh chụp ở một bệnh viện/camera/ánh sáng có thể tụt mạnh ở nơi khác. Kiểm tra trên dữ liệu đại diện cho môi trường triển khai.</li>
+  <li><strong>Học đường tắt (shortcut learning)</strong>: mạng bám vào tín hiệu không liên quan (nền, nhãn hiệu máy chụp, chữ trên ảnh) thay vì vật thể. Dùng bản đồ độ quan trọng (Grad-CAM và tương tự) để kiểm tra, nhưng đừng coi chúng là bằng chứng tuyệt đối.</li>
+  <li><strong>Chất lượng nhãn</strong>: nhãn sai hoặc không nhất quán giữa người gán nhãn thường là giới hạn thật sự của hệ thống.</li>
+  <li><strong>Đạo đức và pháp lý</strong>: nhận dạng khuôn mặt và phân tích sinh trắc học có rủi ro về thiên kiến, quyền riêng tư và quy định theo từng nơi. Cân nhắc kỹ trước khi triển khai.</li>
+  <li><strong>Ảnh sinh bởi AI</strong>: ngày càng khó phân biệt bằng mắt thường; hãy cẩn trọng với ảnh làm bằng chứng và với bộ dữ liệu có lẫn ảnh tổng hợp.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<details class="exercise">
+  <summary>Bài 1. Kích thước đầu ra</summary>
+  <div class="ex-body"><p>Ảnh \(224\times224\), conv \(7\times7\), stride 2, padding 3. Đầu ra có kích thước bao nhiêu? Lớp có bao nhiêu tham số nếu 3 kênh vào và 64 kênh ra (có bias)?</p>
+  <p><em>Lời giải:</em> \(\lfloor(224+6-7)/2\rfloor+1=\lfloor223/2\rfloor+1=112\), tức \(112\times112\). Tham số: \((7^2\cdot3+1)\cdot64=148\cdot64=9{,}472\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 2. IoU bằng tay</summary>
+  <div class="ex-body"><p>Hộp A có góc \((0,0)\)–\((10,10)\), hộp B có góc \((5,5)\)–\((15,15)\). Tính IoU.</p>
+  <p><em>Lời giải:</em> giao là hình vuông cạnh 5, diện tích 25; hợp \(=100+100-25=175\); IoU \(=25/175\approx0.143\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 3. Số mảnh của ViT</summary>
+  <div class="ex-body"><p>Ảnh \(384\times384\), mảnh \(16\times16\). Có bao nhiêu mảnh, và so với ảnh \(224\times224\) thì chuỗi dài hơn bao nhiêu lần? Chi phí attention (tỉ lệ với bình phương độ dài chuỗi) tăng khoảng bao nhiêu lần?</p>
+  <p><em>Lời giải:</em> \((384/16)^2=576\) mảnh so với 196, tức gấp khoảng 2.94 lần, nên chi phí attention tăng khoảng \(2.94^2\approx8.6\) lần.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 4. Thực hành transfer learning</summary>
+  <div class="ex-body"><p>Chọn một bộ ảnh nhỏ có nhãn (tự chụp hai lớp đồ vật, hoặc một bộ công khai mà bạn kiểm tra giấy phép). Làm hai thí nghiệm: (a) chỉ huấn luyện lớp cuối, (b) tinh chỉnh toàn mạng với tốc độ học nhỏ. So sánh độ chính xác kiểm tra và thời gian. Rồi thử bỏ tăng cường dữ liệu: điều gì xảy ra với khoảng cách train–test?</p></div>
+</details>
+
+<h2 id="tham-khao">Tài liệu tham khảo</h2>
+<ol class="refs">
+  <li><a href="https://cs231n.stanford.edu">Stanford CS231n</a> — Convolutional Neural Networks for Visual Recognition; ghi chú và bài giảng công khai (mình tin link đúng, bạn nên kiểm tra).</li>
+  <li><a href="https://pytorch.org/vision/stable/index.html">torchvision</a> — tài liệu mô hình, bộ dữ liệu và phép biến đổi ảnh.</li>
+  <li><a href="https://d2l.ai">Dive into Deep Learning</a> — có các chương về tích chập, CNN hiện đại, phát hiện và phân đoạn.</li>
+  <li>He và cộng sự (2015), <em>Deep Residual Learning for Image Recognition</em>, arXiv:1512.03385.</li>
+  <li>Simonyan và Zisserman (2014), <em>Very Deep Convolutional Networks for Large-Scale Image Recognition</em>, arXiv:1409.1556.</li>
+  <li>Dosovitskiy và cộng sự (2020), <em>An Image is Worth 16x16 Words</em>, arXiv:2010.11929.</li>
+  <li>Radford và cộng sự (2021), <em>Learning Transferable Visual Models From Natural Language Supervision</em> (CLIP), arXiv:2103.00020.</li>
+  <li>Redmon và cộng sự (2015), <em>You Only Look Once</em>, arXiv:1506.02640. Ren và cộng sự (2015), <em>Faster R-CNN</em>, arXiv:1506.01497. Carion và cộng sự (2020), <em>End-to-End Object Detection with Transformers</em>, arXiv:2005.12872.</li>
+  <li>Ronneberger, Fischer, Brox (2015), <em>U-Net</em>, arXiv:1505.04597. Kirillov và cộng sự (2023), <em>Segment Anything</em>, arXiv:2304.02643.</li>
+</ol>
+<p class="meta">Mình trích tên bài và số arXiv theo trí nhớ; hãy tìm bằng tên bài trên arxiv.org để xác nhận trước khi dẫn lại.</p>
+
+</main>
+<aside class="toc" id="toc" aria-label="Mục lục"></aside>
+</div>
+<div id="site-footer"></div>
+</body>
+</html>

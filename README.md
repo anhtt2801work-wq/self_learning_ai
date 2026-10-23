@@ -1,6 +1,6 @@
 # Tự học AI
 
-Website tự học AI bằng tiếng Việt: từ công cụ làm việc (Git và GitHub) đến Machine Learning, Deep Learning, NLP, mô hình ngôn ngữ lớn (LLM) và Agentic AI. Mỗi bài có công thức, code chạy được, minh họa tương tác trong trình duyệt và bài tập có lời giải ẩn.
+Website tự học AI bằng tiếng Việt: từ công cụ làm việc (Git và GitHub) đến Machine Learning, Deep Learning, Computer Vision, NLP, mô hình ngôn ngữ lớn (LLM), Agentic AI và MLOps. Mỗi bài có công thức, code chạy được, minh họa tương tác trong trình duyệt và bài tập có lời giải ẩn.
 
 | Tab | File | Nội dung chính |
 | --- | --- | --- |
@@ -8,20 +8,23 @@ Website tự học AI bằng tiếng Việt: từ công cụ làm việc (Git v�
 | GitHub | `github.html` | Git cơ bản, nhánh/merge, PR, Actions, Pages, Git cho dự án AI |
 | Machine Learning | `machine-learning.html` | Hồi quy, gradient descent, overfitting, đánh giá, k-NN, cây, k-means |
 | Deep Learning | `deep-learning.html` | Backprop, Adam, điều chuẩn, CNN/RNN, PyTorch, sân chơi mạng nơ-ron |
+| Computer Vision | `computer-vision.html` | Tích chập, CNN, transfer learning, ViT/CLIP, phát hiện (IoU, NMS), phân đoạn |
 | NLP | `nlp.html` | TF-IDF, n-gram, BPE, embedding, BERT, đặc thù tiếng Việt |
 | LLM | `llm.html` | Transformer, attention, scaling, SFT/RLHF/DPO, giải mã, RAG, LoRA |
 | Agentic AI | `agentic-ai.html` | Vòng lặp ReAct, tool use, MCP, workflow, độ tin cậy, an toàn |
+| MLOps | `mlops.html` | Tái lập, MLflow/DVC, kiểm thử, FastAPI/Docker, rollout, giám sát drift, LLMOps |
+| Cách dùng | `huong-dan.html` | Hướng dẫn dùng website: chạy, phím tắt, minh họa, thêm nội dung, xuất bản |
 
 ## Chạy trên máy
 
-Website là HTML/CSS/JavaScript thuần, không cần bước build.
+Website là HTML/CSS/JavaScript thuần, không cần bước build. Cách khuyên dùng:
 
 ```bash
 python3 -m http.server 8000
 # mở http://localhost:8000
 ```
 
-Không mở bằng `file://`, một số trình duyệt chặn tải script theo cách đó.
+Mở thẳng `index.html` bằng trình duyệt cũng chạy được (đã thử với Chromium); nút “Sao chép” code có thể không hoạt động ở cách này. Hướng dẫn đầy đủ: trang **Cách dùng** (`huong-dan.html`).
 
 ## Cấu trúc
 
@@ -29,7 +32,7 @@ Không mở bằng `file://`, một số trình duyệt chặn tải script theo
 index.html, *.html          các trang nội dung
 assets/css/style.css        giao diện (sáng/tối)
 assets/js/site.js           header, tìm kiếm, mục lục, tô màu code, render công thức, khung minh họa
-assets/js/viz-*.js          minh họa tương tác theo từng chủ đề
+assets/js/viz-*.js          minh họa tương tác theo từng chủ đề (git, ml, dl, cv, nlp, llm, agent, mlops)
 assets/js/search-index.js   chỉ mục tìm kiếm (được sinh tự động, đừng sửa tay)
 assets/vendor/katex/        KaTeX (MIT) để hiển thị công thức, đã đóng gói sẵn
 tools/                      script kiểm tra và sinh chỉ mục

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cách dùng website · Tự học AI</title>
+<meta name="description" content="Hướng dẫn dùng website Tự học AI: mở và chạy trên máy, điều hướng và phím tắt, dùng minh họa, chạy code trong bài, thêm nội dung mới và xuất bản lên GitHub Pages.">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/search-index.js"></script>
+<script defer src="assets/js/site.js"></script>
+</head>
+<body data-page="guide">
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div id="site-header"></div>
+<div class="page">
+<main class="content" id="main">
+
+<h1>Cách dùng website này</h1>
+<p class="lead">Trang này hướng dẫn từ việc mở website, đọc và tương tác với bài học, chạy code trong bài, đến chỉnh sửa, thêm bài mới và xuất bản lên mạng. Nếu bạn chỉ muốn học, đọc hai mục đầu là đủ.</p>
+
+<h2 id="mo-website">1. Mở website</h2>
+<p>Website là tập hợp file HTML, CSS và JavaScript thuần, không cần cài đặt hay bước build. Có ba cách mở:</p>
+<table>
+  <thead><tr><th>Cách</th><th>Làm thế nào</th><th>Khi nào dùng</th></tr></thead>
+  <tbody>
+    <tr><td><strong>A. Mở trực tiếp file</strong></td><td>Tải hoặc <code>git clone</code> repo, nhấp đúp <code>index.html</code> để mở bằng trình duyệt.</td><td>Nhanh nhất để đọc offline. Mình đã thử với Chromium: bài học, công thức, tìm kiếm và minh họa đều hoạt động khi mở kiểu này. Với trình duyệt khác mình chưa kiểm tra. Nút “Sao chép” code cần ngữ cảnh an toàn của trình duyệt nên có thể không hoạt động ở cách này.</td></tr>
+    <tr><td><strong>B. Server cục bộ</strong></td><td>Trong thư mục dự án chạy <code>python3 -m http.server 8000</code> rồi mở <code>http://localhost:8000</code>.</td><td>Cách khuyên dùng khi bạn sửa bài (giống môi trường thật hơn, nút sao chép hoạt động). Dừng bằng <code>Ctrl+C</code>.</td></tr>
+    <tr><td><strong>C. Trên mạng (GitHub Pages)</strong></td><td>Sau khi bật Pages (xem mục 8), mở địa chỉ <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/</code>.</td><td>Để chia sẻ cho người khác hoặc học trên nhiều máy.</td></tr>
+  </tbody>
+</table>
+<p>Cần một trình duyệt hiện đại (Chrome, Edge, Firefox, Safari bản gần đây). Website <strong>không gọi bất kỳ máy chủ bên ngoài nào</strong> khi chạy (KaTeX để hiển thị công thức đã được đóng gói sẵn trong thư mục <code>assets/vendor</code>), nên dùng được khi không có mạng.</p>
+
+<h2 id="dieu-huong">2. Điều hướng và phím tắt</h2>
+<ul>
+  <li><strong>Thanh tab</strong> ở đầu trang chuyển giữa các chủ đề. Trên điện thoại, thanh này cuộn ngang được.</li>
+  <li><strong>Mục lục</strong> nằm bên phải mỗi bài (trên màn hình rộng) và tô sáng mục bạn đang đọc. Rê chuột vào tiêu đề để thấy dấu <code>#</code>, bấm vào để lấy liên kết trực tiếp tới mục đó.</li>
+  <li>Cuối mỗi bài có nút <strong>Trước / Tiếp theo</strong> theo thứ tự lộ trình.</li>
+</ul>
+<table>
+  <thead><tr><th>Phím / thao tác</th><th>Tác dụng</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>/</kbd> hoặc <kbd>Ctrl</kbd>+<kbd>K</kbd> (macOS: <kbd>⌘</kbd>+<kbd>K</kbd>)</td><td>Mở hộp tìm kiếm.</td></tr>
+    <tr><td>Gõ từ khóa</td><td>Tìm trong tất cả bài, <strong>không cần gõ dấu tiếng Việt</strong> (gõ “gradient”, “tich chap” đều được). Nhiều từ nghĩa là kết quả phải chứa tất cả các từ.</td></tr>
+    <tr><td><kbd>↑</kbd> <kbd>↓</kbd> rồi <kbd>Enter</kbd></td><td>Chọn và mở kết quả; mở thẳng đến đúng mục.</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Đóng hộp tìm kiếm.</td></tr>
+    <tr><td>Nút ☾ / ☀ ở góc phải</td><td>Đổi giao diện sáng/tối. Mặc định theo cài đặt hệ điều hành; lựa chọn của bạn được nhớ trong trình duyệt.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="doc-bai">3. Cách đọc một bài</h2>
+<p>Mỗi bài có cùng cấu trúc để bạn biết tìm gì ở đâu:</p>
+<ol>
+  <li><strong>Phần mở đầu và khung “Cần biết trước”</strong>: cho biết bài này dựa vào kiến thức nào.</li>
+  <li><strong>Nội dung chính</strong> với công thức, giải thích và đoạn code.</li>
+  <li><strong>Khung màu</strong>: xanh dương là ghi chú, xanh lá là mẹo, cam là cảnh báo (những bẫy hay gặp hoặc điều cần kiểm chứng).</li>
+  <li><strong>Minh họa tương tác</strong> (huy hiệu “Tương tác”) ngay trong dòng chảy bài đọc.</li>
+  <li><strong>Bài tập</strong>: bấm vào tiêu đề để mở lời giải. Hãy tự làm trước khi mở.</li>
+  <li><strong>Tài liệu tham khảo</strong>: nguồn gốc để bạn kiểm chứng và đọc sâu.</li>
+</ol>
+<div class="callout warn"><span class="callout-title">Hãy kiểm chứng</span>Nội dung được soạn với sự hỗ trợ của AI. Phần tham khảo (tên bài, số arXiv, liên kết) được viết theo trí nhớ và chưa được kiểm tra trực tuyến; mình đã ghi chú ở những chỗ không chắc. Hãy tra lại nguồn trước khi trích dẫn, và với LLM/Agentic AI hãy ưu tiên tài liệu chính thức mới nhất.</div>
+<p>Một cách học hiệu quả với website này: đọc một mục, <strong>đoán trước</strong> điều gì sẽ xảy ra khi đổi một tham số trong minh họa, thử, rồi giải thích vì sao đoán đúng hoặc sai.</p>
+
+<h2 id="minh-hoa">4. Dùng các minh họa tương tác</h2>
+<p>Tất cả minh họa chạy trong trình duyệt bằng dữ liệu đồ chơi nhỏ, không gửi gì ra ngoài. Quy ước chung: thanh trượt và ô chọn cập nhật kết quả ngay; nút “Đặt lại” đưa về trạng thái đầu; ô kết quả (nền xám) ở dưới cùng ghi các con số chính; nhiều khung vẽ cho phép <strong>bấm vào để thêm điểm</strong> hoặc <strong>kéo</strong>. Bảng dưới liệt kê từng minh họa và gợi ý việc nên thử:</p>
+<table>
+  <thead><tr><th>Minh họa</th><th>Ở đâu</th><th>Nên thử</th></tr></thead>
+  <tbody>
+    <tr><td>Mô phỏng commit/merge</td><td><a href="github.html#mo-phong">GitHub</a></td><td>Gõ <code>git branch</code>, <code>git switch</code>, <code>git merge</code>; so sánh fast-forward với merge commit.</td></tr>
+    <tr><td>Gradient descent 1D</td><td><a href="machine-learning.html#gd-1d">Machine Learning</a></td><td>Tăng η vượt 1 trên parabol; chuyển sang hàm hai đáy và đổi điểm xuất phát.</td></tr>
+    <tr><td>Hồi quy tuyến tính</td><td><a href="machine-learning.html#gd-hoi-quy">Machine Learning</a></td><td>Đặt η khoảng 0.04 khi chưa chuẩn hóa, rồi bật “Chuẩn hóa x”.</td></tr>
+    <tr><td>Overfitting và L2</td><td><a href="machine-learning.html#tong-quat-hoa">Machine Learning</a></td><td>Bậc 12 với λ = 0, rồi tăng λ; so sai số huấn luyện với kiểm tra.</td></tr>
+    <tr><td>k-NN</td><td><a href="machine-learning.html#knn">Machine Learning</a></td><td>So k = 1 và k = 15 trên dữ liệu XOR.</td></tr>
+    <tr><td>Hàm kích hoạt</td><td><a href="deep-learning.html#no-ron">Deep Learning</a></td><td>Bật đạo hàm và so sigmoid với ReLU.</td></tr>
+    <tr><td>Sân chơi mạng nơ-ron</td><td><a href="deep-learning.html#playground">Deep Learning</a></td><td>Xoắn ốc với 3 lớp × 12 nơ-ron; thêm nhiễu rồi bật L2.</td></tr>
+    <tr><td>Tích chập</td><td><a href="computer-vision.html#tich-chap">Computer Vision</a></td><td>Sobel trên chữ T; đổi stride và padding.</td></tr>
+    <tr><td>Máy tính trường nhìn</td><td><a href="computer-vision.html#truong-nhin">Computer Vision</a></td><td>So hai lớp 3×3 với hai lớp 5×5.</td></tr>
+    <tr><td>IoU và NMS</td><td><a href="computer-vision.html#iou-nms">Computer Vision</a></td><td>Cảnh “chồng lấn nhiều” với ngưỡng IoU thấp.</td></tr>
+    <tr><td>BPE</td><td><a href="nlp.html#subword">NLP</a></td><td>Gộp từng bước, rồi mã hóa từ chưa từng thấy.</td></tr>
+    <tr><td>Cosine similarity</td><td><a href="nlp.html#bow-tfidf">NLP</a></td><td>Kéo hai vector, nhân đôi độ dài v.</td></tr>
+    <tr><td>Self-attention</td><td><a href="llm.html#attention">LLM</a></td><td>Tắt chia √d_k rồi tăng d_k.</td></tr>
+    <tr><td>Giải mã</td><td><a href="llm.html#giai-ma">LLM</a></td><td>T thấp so với T cao; kết hợp top-p.</td></tr>
+    <tr><td>Vòng lặp ReAct</td><td><a href="agentic-ai.html#vong-lap">Agentic AI</a></td><td>Kịch bản công cụ bị lỗi; để ý số message gửi lại mỗi lượt.</td></tr>
+    <tr><td>Sai số tích lũy</td><td><a href="agentic-ai.html#do-tin-cay">Agentic AI</a></td><td>p = 0.95 với 10 và 30 bước.</td></tr>
+    <tr><td>Phát hiện drift</td><td><a href="mlops.html#drift">MLOps</a></td><td>Giảm số mẫu để thấy cảnh báo giả của PSI.</td></tr>
+    <tr><td>Batching động</td><td><a href="mlops.html#batching">MLOps</a></td><td>Đổi “chờ tối đa” ở tải thấp và tải cao.</td></tr>
+  </tbody>
+</table>
+<div class="callout note"><span class="callout-title">Minh họa là mô hình đồ chơi</span>Chúng giúp thấy cơ chế, không đại diện cho hiệu năng hệ thống thật. Chẳng hạn bảng logit trong minh họa giải mã do mình tự đặt, và trọng số attention dùng vector ngẫu nhiên nên không mang nghĩa ngôn ngữ. Phần mô tả của từng minh họa luôn nói rõ điều này.</div>
+
+<h2 id="chay-code">5. Chạy code trong bài</h2>
+<p>Các đoạn code trong bài được kiểm chứng bằng cách chạy thật khi viết (trừ những đoạn có ghi chú trong bài, ví dụ gọi API dịch vụ ngoài hoặc tải mô hình lớn). Để tự chạy, tạo môi trường ảo và cài thư viện tùy bài:</p>
+<pre><code class="language-bash">python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install numpy scikit-learn     # bài Machine Learning, NLP (TF-IDF)
+pip install torch torchvision      # bài Deep Learning, Computer Vision (xem pytorch.org để chọn bản phù hợp)
+pip install transformers           # bài NLP, LLM
+pip install mlflow fastapi uvicorn joblib pytest scipy   # bài MLOps</code></pre>
+<ul>
+  <li>Bài Machine Learning, NLP và MLOps chạy tốt trên CPU. Huấn luyện mô hình lớn (LLM, CNN trên ảnh thật) nên dùng GPU; nếu máy bạn không có, các nền tảng notebook đám mây như Google Colab là một lựa chọn (hãy xem điều khoản và giới hạn hiện hành).</li>
+  <li>Chép đoạn code bằng nút <strong>Sao chép</strong> ở góc khối code, dán vào file <code>.py</code> hoặc ô notebook. Đừng chạy code từ nguồn bạn không tin cậy với quyền cao; đoạn nào đọc khóa API thì đặt khóa trong biến môi trường, không dán vào code.</li>
+  <li>Gặp lỗi thư viện không tìm thấy hoặc khác phiên bản: các API thay đổi theo phiên bản, hãy xem tài liệu của đúng bản bạn cài.</li>
+</ul>
+
+<h2 id="lo-trinh">6. Gợi ý lộ trình học</h2>
+<p>Thứ tự trên thanh tab đi từ công cụ đến nền tảng, rồi các ứng dụng. Bạn đã vững Python, NumPy và toán nền nên có thể lướt phần giới thiệu và tập trung vào các mục có minh họa và bài tập. Bảng dưới là <strong>gợi ý</strong>, hãy điều chỉnh theo thời gian của bạn:</p>
+<table>
+  <thead><tr><th>Giai đoạn</th><th>Nội dung</th><th>Sản phẩm nên làm</th></tr></thead>
+  <tbody>
+    <tr><td>1. Nền tảng</td><td>GitHub (lướt nếu đã biết), Machine Learning</td><td>Repo cá nhân + một baseline scikit-learn có kiểm định chéo.</td></tr>
+    <tr><td>2. Học sâu</td><td>Deep Learning, rồi Computer Vision <em>hoặc</em> NLP (chọn một nhánh trước)</td><td>Tự cài backprop NumPy; transfer learning cho một bộ ảnh nhỏ, hoặc bộ phân loại văn bản.</td></tr>
+    <tr><td>3. Mô hình lớn</td><td>NLP (nếu chưa), LLM</td><td>Một ứng dụng RAG nhỏ có bộ đánh giá riêng.</td></tr>
+    <tr><td>4. Hệ thống</td><td>Agentic AI, MLOps</td><td>Một agent chỉ đọc có phê duyệt của con người; dịch vụ FastAPI + Docker + CI + giám sát drift.</td></tr>
+  </tbody>
+</table>
+<p>Quan trọng hơn thứ tự là vòng lặp: <strong>đọc → thử minh họa → làm bài tập → dựng dự án nhỏ và đưa lên GitHub</strong>.</p>
+
+<h2 id="chinh-sua">7. Chỉnh sửa và thêm nội dung</h2>
+<h3 id="cau-truc">Cấu trúc thư mục</h3>
+<pre><code class="language-text">index.html, huong-dan.html, ... *.html   các trang
+assets/css/style.css                     giao diện sáng/tối
+assets/js/site.js                        header, tab, tìm kiếm, mục lục, tô màu code, công thức, khung minh họa
+assets/js/viz-*.js                       minh họa tương tác, mỗi chủ đề một file
+assets/js/search-index.js                chỉ mục tìm kiếm (SINH TỰ ĐỘNG, đừng sửa tay)
+assets/vendor/katex/                     thư viện công thức (đóng gói sẵn)
+tools/check_site.py                      kiểm tra liên kết, id trùng, minh họa thiếu
+tools/build_search_index.py              sinh lại chỉ mục tìm kiếm</code></pre>
+<h3 id="sua-bai">Sửa một bài có sẵn</h3>
+<ol>
+  <li>Mở file <code>.html</code> bằng trình soạn thảo, sửa nội dung. Mỗi thẻ <code>h2</code>/<code>h3</code> phải có <code>id</code> duy nhất (dùng cho mục lục và tìm kiếm).</li>
+  <li>Chạy lại hai lệnh: <code>python3 tools/build_search_index.py</code> rồi <code>python3 tools/check_site.py</code>. Quên bước đầu thì tìm kiếm không thấy nội dung mới (và CI sẽ báo đỏ).</li>
+  <li>Tải lại trang trong trình duyệt (<kbd>Ctrl</kbd>+<kbd>F5</kbd> nếu trình duyệt giữ bản cũ).</li>
+</ol>
+<h3 id="cu-phap">Cú pháp nội dung</h3>
+<table>
+  <thead><tr><th>Cần viết</th><th>Cách viết</th></tr></thead>
+  <tbody>
+    <tr><td>Công thức inline</td><td><code>\( x^2 \)</code></td></tr>
+    <tr><td>Công thức khối</td><td><code>$$ \sum_i x_i $$</code></td></tr>
+    <tr><td>Code</td><td><code>&lt;pre&gt;&lt;code class="language-python"&gt;...&lt;/code&gt;&lt;/pre&gt;</code>. Hỗ trợ tô màu: <code>python</code>, <code>js</code>, <code>json</code>, <code>bash</code>, <code>yaml</code>; ngôn ngữ khác dùng <code>text</code>.</td></tr>
+    <tr><td>Khung nhấn mạnh</td><td><code>&lt;div class="callout note|tip|warn"&gt;&lt;span class="callout-title"&gt;Tiêu đề&lt;/span&gt;...&lt;/div&gt;</code></td></tr>
+    <tr><td>Bài tập có lời giải ẩn</td><td><code>&lt;details class="exercise"&gt;&lt;summary&gt;...&lt;/summary&gt;&lt;div class="ex-body"&gt;...&lt;/div&gt;&lt;/details&gt;</code></td></tr>
+  </tbody>
+</table>
+<div class="callout tip"><span class="callout-title">Ba bẫy khi viết công thức trong HTML</span>
+<ul>
+  <li>Trong công thức, dùng <code>\lt</code> thay cho dấu <code>&lt;</code> (trình duyệt coi <code>&lt;t</code> là thẻ HTML và làm vỡ trang). Trong code, viết <code>&amp;lt;</code> và <code>&amp;gt;</code>.</li>
+  <li>Đừng đặt chữ có dấu tiếng Việt trong <code>\text{...}</code>; KaTeX không có phông cho chúng và sẽ cảnh báo. Hãy viết phần giải thích ngoài công thức.</li>
+  <li>Đừng đặt thẻ HTML (<code>&lt;em&gt;</code>, <code>&lt;code&gt;</code>) bên trong cặp dấu công thức.</li>
+</ul></div>
+<h3 id="them-minh-hoa">Thêm một minh họa tương tác</h3>
+<ol>
+  <li>Trong bài, đặt <code>&lt;div class="viz" data-viz="ten-moi" data-title="Tiêu đề"&gt;&lt;p class="viz-help"&gt;Gợi ý cách dùng&lt;/p&gt;&lt;/div&gt;</code>.</li>
+  <li>Trong một file <code>assets/js/viz-*.js</code>, đăng ký: <code>Viz.register('ten-moi', function (root) { ... })</code>. Hàm nhận phần tử <code>root</code> để bạn thêm giao diện vào. Có sẵn các hàm trợ giúp: <code>Viz.mount</code> (canvas tự co giãn, hỗ trợ giao diện tối), <code>Viz.ui.slider / button / select / check / out</code>, <code>Viz.rng</code> (số ngẫu nhiên có seed). Hãy xem các minh họa có sẵn làm mẫu.</li>
+  <li>Nạp file đó ở cuối trang bằng thẻ <code>&lt;script defer src="assets/js/viz-....js"&gt;&lt;/script&gt;</code>, sau <code>site.js</code>.</li>
+  <li>Khởi tạo dữ liệu <em>trước</em> khi gọi <code>Viz.mount</code>, vì khung vẽ gọi hàm vẽ ngay lúc tạo.</li>
+</ol>
+<h3 id="them-tab">Thêm một tab (chủ đề) mới</h3>
+<ol>
+  <li>Sao chép một trang có sẵn (ví dụ <code>mlops.html</code>) làm mẫu, đổi <code>&lt;title&gt;</code>, nội dung và <code>data-page="id-moi"</code> ở thẻ <code>&lt;body&gt;</code>.</li>
+  <li>Thêm một dòng vào mảng <code>NAV</code> đầu file <code>assets/js/site.js</code>: <code>{ id: 'id-moi', href: 'trang-moi.html', label: 'Tên tab', lesson: true }</code>. Thứ tự trong mảng là thứ tự tab và thứ tự nút Trước/Tiếp theo.</li>
+  <li>Thêm trang vào danh sách <code>PAGES</code> trong <code>tools/build_search_index.py</code>.</li>
+  <li>Chạy <code>build_search_index.py</code> và <code>check_site.py</code> như trên.</li>
+</ol>
+
+<h2 id="xuat-ban">8. Xuất bản lên GitHub Pages</h2>
+<ol>
+  <li>Merge nhánh làm việc vào <code>main</code> (hoặc nhánh mặc định của bạn).</li>
+  <li>Trên GitHub: <strong>Settings → Pages → Source: GitHub Actions</strong>. (Tên menu có thể đổi theo thời gian, xem tài liệu GitHub nếu khác.)</li>
+  <li>Workflow <code>.github/workflows/pages.yml</code> trong repo sẽ tự chạy kiểm tra, đóng gói và triển khai mỗi lần bạn đẩy lên <code>main</code>. Theo dõi ở tab <strong>Actions</strong>; xong sẽ có địa chỉ <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/</code>.</li>
+</ol>
+<p>Mọi liên kết trong website là liên kết tương đối nên chạy được dưới đường dẫn con <code>/&lt;repo&gt;/</code> mà không cần cấu hình. Gói Pages cho repo private và tên miền riêng phụ thuộc loại tài khoản GitHub của bạn; hãy xem tài liệu GitHub Pages.</p>
+
+<h2 id="su-co">9. Xử lý sự cố</h2>
+<table>
+  <thead><tr><th>Hiện tượng</th><th>Nguyên nhân thường gặp và cách xử lý</th></tr></thead>
+  <tbody>
+    <tr><td>Công thức hiện nguyên mã <code>\(...\)</code> hoặc <code>$$</code></td><td>Thư mục <code>assets/vendor/katex</code> bị thiếu hoặc không tải được; hoặc có thẻ HTML/ dấu <code>&lt;</code> thô nằm trong công thức. Mở Console của trình duyệt (<kbd>F12</kbd>) xem lỗi.</td></tr>
+    <tr><td>Minh họa trống hoặc có dòng “Không tải được minh họa”</td><td>Thiếu thẻ <code>&lt;script&gt;</code> nạp file <code>viz-*.js</code> của trang, hoặc tên trong <code>data-viz</code> khác tên trong <code>Viz.register</code>. <code>check_site.py</code> bắt lỗi này.</td></tr>
+    <tr><td>Tìm kiếm không thấy bài vừa viết</td><td>Chưa chạy <code>python3 tools/build_search_index.py</code>.</td></tr>
+    <tr><td>Nút “Sao chép” không có tác dụng</td><td>Trình duyệt chỉ cho phép ghi clipboard trong ngữ cảnh an toàn (https hoặc localhost). Dùng cách B hoặc C ở mục 1.</td></tr>
+    <tr><td>Giao diện không đổi sau khi sửa</td><td>Trình duyệt giữ bản cũ trong bộ nhớ đệm; nhấn <kbd>Ctrl</kbd>+<kbd>F5</kbd>.</td></tr>
+    <tr><td>CI đỏ khi mở pull request</td><td>Xem tab Actions: thường là lỗi cú pháp JS, liên kết hỏng, id trùng hoặc chỉ mục tìm kiếm chưa cập nhật. Chạy hai lệnh ở mục 7 trên máy trước khi đẩy.</td></tr>
+    <tr><td>Trang chủ trên GitHub Pages trả về 404</td><td>Chưa chọn Source: GitHub Actions, hoặc workflow chưa chạy xong, hoặc chưa merge vào <code>main</code>.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="rieng-tu">10. Quyền riêng tư và giấy phép</h2>
+<ul>
+  <li><strong>Không theo dõi</strong>: website không có phân tích, quảng cáo hay lời gọi tới máy chủ bên ngoài. Dữ liệu duy nhất được lưu trong trình duyệt của bạn là lựa chọn giao diện sáng/tối (<code>localStorage</code>).</li>
+  <li><strong>Thư viện bên thứ ba</strong>: KaTeX (giấy phép MIT, kèm file <code>LICENSE</code> trong <code>assets/vendor/katex</code>).</li>
+  <li><strong>Giấy phép nội dung</strong>: repo hiện chưa khai báo giấy phép cho nội dung và mã của website. Nếu bạn định chia sẻ công khai, hãy chọn và thêm một file <code>LICENSE</code> phù hợp (xem <a href="https://choosealicense.com">choosealicense.com</a>, mình tin link đúng, bạn nên kiểm tra).</li>
+</ul>
+
+</main>
+<aside class="toc" id="toc" aria-label="Mục lục"></aside>
+</div>
+<div id="site-footer"></div>
+</body>
+</html>
