@@ -56,7 +56,7 @@
 <p>Mỗi bài có cùng cấu trúc để bạn biết tìm gì ở đâu:</p>
 <ol>
   <li><strong>Phần mở đầu và khung “Cần biết trước”</strong>: cho biết bài này dựa vào kiến thức nào.</li>
-  <li><strong>Nội dung chính</strong> với công thức, giải thích và đoạn code.</li>
+  <li><strong>Nội dung chính</strong> với công thức, giải thích và đoạn code. Các mục sâu hơn có <em>suy dẫn từng bước</em>, ví dụ số có thể kiểm tra bằng tay hoặc bằng code, sơ đồ SVG, và phần “Đọc nhanh các bài báo/tài liệu nền tảng” tóm tắt ý chính và so sánh phương pháp.</li>
   <li><strong>Khung màu</strong>: xanh dương là ghi chú, xanh lá là mẹo, cam là cảnh báo (những bẫy hay gặp hoặc điều cần kiểm chứng).</li>
   <li><strong>Minh họa tương tác</strong> (huy hiệu “Tương tác”) ngay trong dòng chảy bài đọc.</li>
   <li><strong>Bài tập</strong>: bấm vào tiêu đề để mở lời giải. Hãy tự làm trước khi mở.</li>
@@ -71,29 +71,64 @@
   <thead><tr><th>Minh họa</th><th>Ở đâu</th><th>Nên thử</th></tr></thead>
   <tbody>
     <tr><td>Mô phỏng commit/merge</td><td><a href="github.html#mo-phong">GitHub</a></td><td>Gõ <code>git branch</code>, <code>git switch</code>, <code>git merge</code>; so sánh fast-forward với merge commit.</td></tr>
+    <tr><td>SHA-1 của một đối tượng blob</td><td><a href="github.html#noi-bo">GitHub</a></td><td>Gõ <code>hello</code> kèm xuống dòng và đối chiếu với <code>ce01362…</code>; đổi một ký tự và đếm số bit đổi theo.</td></tr>
+    <tr><td>Chuỗi commit và mã băm</td><td><a href="github.html#noi-bo">GitHub</a></td><td>Sửa thông điệp commit 2 và xem commit 2–4 đổi mã băm còn commit 1 thì không.</td></tr>
+    <tr><td>Gộp ba chiều</td><td><a href="github.html#merge-3-chieu">GitHub</a></td><td>So tình huống “liền kề” với “xa nhau”; thử xóa một dòng ở một bên và sửa chính dòng đó ở bên kia.</td></tr>
+    <tr><td>Mô phỏng nâng cao (rebase, reset…)</td><td><a href="github.html#rebase-vs-merge">GitHub</a></td><td>Chạy kịch bản “reset --hard rồi cứu bằng reflog”, rồi tự thử cherry-pick và revert.</td></tr>
     <tr><td>Gradient descent 1D</td><td><a href="machine-learning.html#gd-1d">Machine Learning</a></td><td>Tăng η vượt 1 trên parabol; chuyển sang hàm hai đáy và đổi điểm xuất phát.</td></tr>
     <tr><td>Hồi quy tuyến tính</td><td><a href="machine-learning.html#gd-hoi-quy">Machine Learning</a></td><td>Đặt η khoảng 0.04 khi chưa chuẩn hóa, rồi bật “Chuẩn hóa x”.</td></tr>
     <tr><td>Overfitting và L2</td><td><a href="machine-learning.html#tong-quat-hoa">Machine Learning</a></td><td>Bậc 12 với λ = 0, rồi tăng λ; so sai số huấn luyện với kiểm tra.</td></tr>
+    <tr><td>Bias và phương sai</td><td><a href="machine-learning.html#phan-ra-bv">Machine Learning</a></td><td>Tăng bậc đa thức rồi tăng λ; xem độ chệch và phương sai đổi ngược chiều thế nào.</td></tr>
     <tr><td>k-NN</td><td><a href="machine-learning.html#knn">Machine Learning</a></td><td>So k = 1 và k = 15 trên dữ liệu XOR.</td></tr>
+    <tr><td>Cây quyết định</td><td><a href="machine-learning.html#cay">Machine Learning</a></td><td>Tăng độ sâu tối đa trên dữ liệu nhiễu và quan sát biên quyết định “bám” vào nhiễu.</td></tr>
+    <tr><td>k-means từng bước</td><td><a href="machine-learning.html#kmeans">Machine Learning</a></td><td>Đổi cách khởi tạo và chạy lại: các lần khác nhau có thể hội tụ về nghiệm khác nhau.</td></tr>
+    <tr><td>PCA</td><td><a href="machine-learning.html#pca-suy-dan">Machine Learning</a></td><td>Xoay đám mây, thêm điểm ngoại lai, xem thành phần chính 1 phản ứng ra sao.</td></tr>
+    <tr><td>Bốn mô hình, một bộ dữ liệu</td><td><a href="machine-learning.html#so-sanh">Machine Learning</a></td><td>So logistic, k-NN, cây và rừng trên dữ liệu có nhiễu; đổi siêu tham số từng mô hình.</td></tr>
     <tr><td>Hàm kích hoạt</td><td><a href="deep-learning.html#no-ron">Deep Learning</a></td><td>Bật đạo hàm và so sigmoid với ReLU.</td></tr>
+    <tr><td>Backprop từng bước</td><td><a href="deep-learning.html#backprop-tung-buoc">Deep Learning</a></td><td>Bước qua từng phép tính của mạng 2–2–1 và đối chiếu với công thức ma trận.</td></tr>
+    <tr><td>So sánh bộ tối ưu</td><td><a href="deep-learning.html#opt-viz">Deep Learning</a></td><td>Chọn bề mặt “thung lũng hẹp” rồi chạy bốn bộ tối ưu; đổi η từng bộ và so số bước.</td></tr>
     <tr><td>Sân chơi mạng nơ-ron</td><td><a href="deep-learning.html#playground">Deep Learning</a></td><td>Xoắn ốc với 3 lớp × 12 nơ-ron; thêm nhiễu rồi bật L2.</td></tr>
+    <tr><td>Khởi tạo trọng số</td><td><a href="deep-learning.html#khoi-tao">Deep Learning</a></td><td>Tăng số lớp và so các cách khởi tạo: cách nào làm tín hiệu và hệ số đạo hàm biến mất hoặc bùng nổ?</td></tr>
+    <tr><td>Chẩn đoán đường cong mất mát</td><td><a href="deep-learning.html#doc-duong-cong">Deep Learning</a></td><td>Chuyển giữa các tình huống (tốc độ học quá lớn, overfitting, underfitting…) và đọc dấu hiệu trên hai đường huấn luyện/kiểm tra.</td></tr>
     <tr><td>Tích chập</td><td><a href="computer-vision.html#tich-chap">Computer Vision</a></td><td>Sobel trên chữ T; đổi stride và padding.</td></tr>
+    <tr><td>So sánh chi phí conv</td><td><a href="computer-vision.html#chi-phi-conv">Computer Vision</a></td><td>Đặt k = 3 và nhiều kênh; kiểm tra tỉ lệ 1/C_out + 1/k² của kiểu tách theo chiều sâu.</td></tr>
     <tr><td>Máy tính trường nhìn</td><td><a href="computer-vision.html#truong-nhin">Computer Vision</a></td><td>So hai lớp 3×3 với hai lớp 5×5.</td></tr>
+    <tr><td>ResNet-18 theo giai đoạn</td><td><a href="computer-vision.html#resnet-chi-tiet">Computer Vision</a></td><td>Tăng kích thước ảnh và xem MAC tăng theo bình phương, còn tham số không đổi.</td></tr>
+    <tr><td>Tăng cường dữ liệu</td><td><a href="computer-vision.html#tang-cuong">Computer Vision</a></td><td>Bật lật ngang và để ý chữ R: phép biến đổi nào làm sai nhãn?</td></tr>
+    <tr><td>ViT: cắt ảnh thành mảnh</td><td><a href="computer-vision.html#vit-chi-tiet">Computer Vision</a></td><td>Giảm cạnh mảnh từ 16 xuống 8 và xem ma trận attention tăng ~16 lần.</td></tr>
+    <tr><td>Mất mát đối sánh CLIP</td><td><a href="computer-vision.html#clip-chi-tiet">Computer Vision</a></td><td>Kéo nhiệt độ τ từ lớn đến nhỏ: mất mát có cực tiểu ở mức vừa phải.</td></tr>
     <tr><td>IoU và NMS</td><td><a href="computer-vision.html#iou-nms">Computer Vision</a></td><td>Cảnh “chồng lấn nhiều” với ngưỡng IoU thấp.</td></tr>
-    <tr><td>BPE</td><td><a href="nlp.html#subword">NLP</a></td><td>Gộp từng bước, rồi mã hóa từ chưa từng thấy.</td></tr>
+    <tr><td>Precision–recall và AP</td><td><a href="computer-vision.html#ap-chi-tiet">Computer Vision</a></td><td>Đổi ngưỡng IoU từ 0.5 lên 0.75 và so hai cách tính AP.</td></tr>
     <tr><td>Cosine similarity</td><td><a href="nlp.html#bow-tfidf">NLP</a></td><td>Kéo hai vector, nhân đôi độ dài v.</td></tr>
+    <tr><td>n-gram tự dựng</td><td><a href="nlp.html#ngram-vi-du">NLP</a></td><td>Đổi bậc n và làm trơn add-k; thử câu có bigram chưa từng thấy.</td></tr>
+    <tr><td>BPE</td><td><a href="nlp.html#subword">NLP</a></td><td>Gộp từng bước, rồi mã hóa từ chưa từng thấy.</td></tr>
+    <tr><td>word2vec đồ chơi</td><td><a href="nlp.html#w2v-pmi">NLP</a></td><td>Huấn luyện thêm 30 epoch hai lần và xem láng giềng của một từ thay đổi.</td></tr>
+    <tr><td>BLEU và ROUGE</td><td><a href="nlp.html#bleu-chi-tiet">NLP</a></td><td>Bật làm trơn và xem điểm thay đổi với câu ngắn.</td></tr>
     <tr><td>Self-attention</td><td><a href="llm.html#attention">LLM</a></td><td>Tắt chia √d_k rồi tăng d_k.</td></tr>
+    <tr><td>Self-attention từng ma trận</td><td><a href="llm.html#attention-tung-buoc">LLM</a></td><td>Sửa X, W_Q, W_K, W_V; tắt mặt nạ nhân quả hoặc phép chia √d_k.</td></tr>
+    <tr><td>Mã hóa vị trí và RoPE</td><td><a href="llm.html#vi-tri-chi-tiet">LLM</a></td><td>Kiểm tra hai đường tích vô hướng RoPE trùng nhau dù vị trí tuyệt đối khác.</td></tr>
+    <tr><td>KV cache và tốc độ giải mã</td><td><a href="llm.html#kv-may-tinh">LLM</a></td><td>So “7B đầy đủ” với “7B dùng GQA”; tăng độ dài ngữ cảnh và kích thước lô.</td></tr>
+    <tr><td>Quy luật mở rộng</td><td><a href="llm.html#scaling-suy-dan">LLM</a></td><td>Kéo N lệch khỏi tối ưu và đo phần thua thiệt; tăng ngân sách tính toán.</td></tr>
     <tr><td>Giải mã</td><td><a href="llm.html#giai-ma">LLM</a></td><td>T thấp so với T cao; kết hợp top-p.</td></tr>
     <tr><td>Vòng lặp ReAct</td><td><a href="agentic-ai.html#vong-lap">Agentic AI</a></td><td>Kịch bản công cụ bị lỗi; để ý số message gửi lại mỗi lượt.</td></tr>
+    <tr><td>Chi phí ngữ cảnh của agent</td><td><a href="agentic-ai.html#chi-phi-ngu-canh">Agentic AI</a></td><td>Tăng số bước và đặt hệ số cache = 1 (không cache) để thấy chi phí bậc hai.</td></tr>
+    <tr><td>Nhiều agent: Amdahl và token</td><td><a href="agentic-ai.html#da-agent-chi-phi">Agentic AI</a></td><td>Hạ P và tăng ngữ cảnh chung: thêm worker gần như chỉ tốn token.</td></tr>
     <tr><td>Sai số tích lũy</td><td><a href="agentic-ai.html#do-tin-cay">Agentic AI</a></td><td>p = 0.95 với 10 và 30 bước.</td></tr>
-    <tr><td>Phát hiện drift</td><td><a href="mlops.html#drift">MLOps</a></td><td>Giảm số mẫu để thấy cảnh báo giả của PSI.</td></tr>
+    <tr><td>Kiểm chứng và thử lại</td><td><a href="agentic-ai.html#kiem-chung-thu-lai">Agentic AI</a></td><td>Đặt d = 0 rồi d = 0.9; tăng số lần thử lại và xem lợi ích giảm dần.</td></tr>
+    <tr><td>Ba yếu tố của prompt injection</td><td><a href="agentic-ai.html#prompt-injection">Agentic AI</a></td><td>Tắt lần lượt từng yếu tố và xem rủi ro thay đổi.</td></tr>
     <tr><td>Batching động</td><td><a href="mlops.html#batching">MLOps</a></td><td>Đổi “chờ tối đa” ở tải thấp và tải cao.</td></tr>
+    <tr><td>Độ trễ và hàng đợi</td><td><a href="mlops.html#hang-doi">MLOps</a></td><td>Kéo ρ từ 0.5 lên 0.95; rồi tăng số bản sao ở cùng ρ.</td></tr>
+    <tr><td>Cỡ mẫu A/B test</td><td><a href="mlops.html#ab-suy-dan">MLOps</a></td><td>Giảm hiệu ứng cần phát hiện một nửa và xem cỡ mẫu gấp 4.</td></tr>
+    <tr><td>Bằng chứng cho canary</td><td><a href="mlops.html#canary-toan">MLOps</a></td><td>Kéo p₁ sát p₀ rồi kéo xa: số yêu cầu cần thiết thay đổi hàng nghìn lần.</td></tr>
+    <tr><td>Phát hiện drift</td><td><a href="mlops.html#drift">MLOps</a></td><td>Giảm số mẫu để thấy cảnh báo giả của PSI.</td></tr>
+    <tr><td>PSI theo khoảng và sàn nhiễu</td><td><a href="mlops.html#psi-suy-dan">MLOps</a></td><td>Đặt μ = 0, σ = 1, giảm n: PSI vẫn dương do nhiễu lấy mẫu.</td></tr>
+    <tr><td>Chu kỳ huấn luyện lại</td><td><a href="mlops.html#chu-ky-huan-luyen">MLOps</a></td><td>Tăng chi phí huấn luyện lại C và xem T* dài ra.</td></tr>
   </tbody>
 </table>
 <div class="callout note"><span class="callout-title">Minh họa là mô hình đồ chơi</span>Chúng giúp thấy cơ chế, không đại diện cho hiệu năng hệ thống thật. Chẳng hạn bảng logit trong minh họa giải mã do mình tự đặt, và trọng số attention dùng vector ngẫu nhiên nên không mang nghĩa ngôn ngữ. Phần mô tả của từng minh họa luôn nói rõ điều này.</div>
 
 <h2 id="chay-code">5. Chạy code trong bài</h2>
-<p>Các đoạn code trong bài được kiểm chứng bằng cách chạy thật khi viết (trừ những đoạn có ghi chú trong bài, ví dụ gọi API dịch vụ ngoài hoặc tải mô hình lớn). Để tự chạy, tạo môi trường ảo và cài thư viện tùy bài:</p>
+<p>Các đoạn code dùng thư viện chuẩn của Python, NumPy, SciPy, scikit-learn, pandas, MLflow, FastAPI hay pytest được chạy thật khi soạn, và các con số in ra được đối chiếu với phần giải thích. <strong>Ngoại lệ</strong>: đoạn dùng PyTorch, torchvision, transformers hoặc gọi API dịch vụ ngoài chỉ được kiểm tra cú pháp (môi trường soạn bài không cài được hoặc không gọi được chúng), nên hãy chạy thử và đối chiếu với tài liệu của phiên bản bạn cài. Để tự chạy, tạo môi trường ảo và cài thư viện tùy bài:</p>
 <pre><code class="language-bash">python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install numpy scikit-learn     # bài Machine Learning, NLP (TF-IDF)
