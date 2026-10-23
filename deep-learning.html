@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep Learning · Tự học AI</title>
+<meta name="description" content="Deep Learning từ nơ-ron đến mạng sâu: hàm kích hoạt, lan truyền ngược, bộ tối ưu Adam, điều chuẩn, CNN, RNN và vòng lặp huấn luyện PyTorch.">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/search-index.js"></script>
+<script defer src="assets/js/site.js"></script>
+<script defer src="assets/js/viz-dl.js"></script>
+</head>
+<body data-page="dl">
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div id="site-header"></div>
+<div class="page">
+<main class="content" id="main">
+
+<h1>Deep Learning</h1>
+<p class="lead">Deep Learning (học sâu) dùng mạng nơ-ron nhiều lớp để tự học biểu diễn từ dữ liệu thô như ảnh, âm thanh, văn bản. Mọi mô hình ngôn ngữ lớn ở các trang sau đều được huấn luyện bằng chính những cơ chế bạn học ở đây: lan truyền xuôi, mất mát, lan truyền ngược và bộ tối ưu.</p>
+<div class="callout note"><span class="callout-title">Cần biết trước</span>Trang Machine Learning (hồi quy, gradient descent, cross-entropy) và quy tắc chuỗi (chain rule) trong giải tích.</div>
+
+<h2 id="no-ron">Nơ-ron và hàm kích hoạt</h2>
+<p>Một nơ-ron nhân từng đầu vào với trọng số, cộng độ lệch, rồi đưa qua hàm phi tuyến \(\phi\):</p>
+$$a = \phi\big(\mathbf{w}^\top\mathbf{x} + b\big)$$
+<p>Nếu bỏ \(\phi\), xếp chồng bao nhiêu lớp tuyến tính cũng chỉ cho một phép biến đổi tuyến tính; hàm kích hoạt phi tuyến là thứ khiến mạng sâu có sức biểu diễn mạnh. Hãy so sánh các hàm phổ biến và đạo hàm của chúng:</p>
+<div class="viz" data-viz="act1" data-title="Các hàm kích hoạt và đạo hàm">
+  <p class="viz-help">Bật “Vẽ đạo hàm” để thấy vì sao sigmoid và tanh bị bão hòa (đạo hàm ≈ 0 ở hai đầu) còn ReLU thì không ở phía dương.</p>
+</div>
+<table>
+  <thead><tr><th>Hàm</th><th>Công thức</th><th>Ghi chú</th></tr></thead>
+  <tbody>
+    <tr><td>Sigmoid</td><td>\(1/(1+e^{-x})\)</td><td>Đầu ra trong (0,1); đạo hàm tối đa 0.25, dễ gây triệt tiêu gradient. Dùng ở đầu ra nhị phân.</td></tr>
+    <tr><td>tanh</td><td>\(\tanh x\)</td><td>Đầu ra trong (−1,1), tâm tại 0; vẫn bão hòa ở hai đầu.</td></tr>
+    <tr><td>ReLU</td><td>\(\max(0,x)\)</td><td>Rẻ, gradient không bão hòa phía dương; nơ-ron có thể “chết” nếu luôn âm.</td></tr>
+    <tr><td>GELU, SiLU</td><td>\(x\,\Phi(x)\), \(x\,\sigma(x)\)</td><td>Phiên bản trơn của ReLU, phổ biến trong Transformer và các kiến trúc hiện đại.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="mlp">Mạng nhiều lớp (MLP) dưới dạng ma trận</h2>
+<p>Xếp nhiều nơ-ron thành một lớp và nhiều lớp nối tiếp. Với lớp thứ \(l\):</p>
+$$\mathbf{h}^{(l)} = \phi\big(W^{(l)}\mathbf{h}^{(l-1)} + \mathbf{b}^{(l)}\big), \qquad \mathbf{h}^{(0)}=\mathbf{x}$$
+<p>Trên một lô \(B\) mẫu, ta xếp các mẫu thành ma trận \(H\in\mathbb{R}^{B\times d}\) và tính \(H W^\top\) một lần, đó là lý do GPU (giỏi nhân ma trận) làm học sâu khả thi. Số tham số của lớp kết nối đầy đủ từ \(n_{in}\) đến \(n_{out}\) nơ-ron là \(n_{in}n_{out}+n_{out}\).</p>
+<p>Về lý thuyết, mạng chỉ một lớp ẩn đủ rộng đã xấp xỉ được nhiều lớp hàm liên tục (định lý xấp xỉ phổ quát), nhưng định lý không nói mạng đó <em>học được dễ dàng</em> hay cần bao nhiêu nơ-ron. Thực nghiệm cho thấy mạng sâu thường hiệu quả hơn mạng nông và rộng.</p>
+
+<h2 id="mat-mat">Hàm mất mát và softmax</h2>
+<p>Với phân loại \(C\) lớp, mạng xuất ra vector <em>logit</em> \(\mathbf{z}\), softmax đổi thành phân phối xác suất:</p>
+$$p_k = \frac{e^{z_k}}{\sum_{j=1}^{C} e^{z_j}}, \qquad L = -\log p_y$$
+<p>\(L\) là cross-entropy với nhãn thật \(y\). Gradient theo logit rất gọn: \(\partial L/\partial z_k = p_k - \mathbf{1}[k=y]\). Một phép kiểm tra thực dụng: lúc mới khởi tạo, mạng gần như đoán đều nên mất mát ban đầu phải xấp xỉ \(\ln C\) (ví dụ 10 lớp thì \(\ln 10\approx 2.30\)). Nếu khác xa, có lỗi ở code hoặc khởi tạo.</p>
+<div class="callout tip"><span class="callout-title">Ổn định số học</span>Đừng tự tính softmax rồi log. Dùng hàm gộp như <code>CrossEntropyLoss</code> (nhận logit) hoặc <code>BCEWithLogitsLoss</code> trong PyTorch, chúng dùng thủ thuật log-sum-exp để tránh tràn số.</div>
+
+<h2 id="backprop">Lan truyền ngược (backpropagation)</h2>
+<p>Backprop là quy tắc chuỗi áp dụng có hệ thống từ đầu ra về đầu vào, tái sử dụng kết quả trung gian để chi phí tính toàn bộ gradient chỉ cỡ vài lần chi phí lan truyền xuôi. Đặt \(\mathbf{z}^{(l)}=W^{(l)}\mathbf{h}^{(l-1)}+\mathbf{b}^{(l)}\) và \(\boldsymbol\delta^{(l)}=\partial L/\partial\mathbf{z}^{(l)}\):</p>
+$$\boldsymbol\delta^{(l)} = \Big(W^{(l+1)\top}\boldsymbol\delta^{(l+1)}\Big)\odot\phi'\big(\mathbf{z}^{(l)}\big),\qquad \frac{\partial L}{\partial W^{(l)}}=\boldsymbol\delta^{(l)}\mathbf{h}^{(l-1)\top},\qquad \frac{\partial L}{\partial \mathbf{b}^{(l)}}=\boldsymbol\delta^{(l)}$$
+<h3 id="vi-du-so">Ví dụ số cho một nơ-ron</h3>
+<p>Lấy \(z=wx+b\), \(a=\sigma(z)\), \(L=\tfrac12(a-y)^2\) với \(x=2,\;w=0.5,\;b=0,\;y=1\). Lan truyền xuôi: \(z=1\), \(a\approx0.7311\). Lan truyền ngược:</p>
+$$\frac{\partial L}{\partial w}=\underbrace{(a-y)}_{-0.2689}\cdot\underbrace{a(1-a)}_{0.1966}\cdot\underbrace{x}_{2}\approx -0.1057$$
+<p>Dấu âm nghĩa là tăng \(w\) sẽ làm \(L\) giảm, và bước gradient descent \(w\leftarrow w-\eta\cdot(-0.1057)\) sẽ tăng \(w\).</p>
+<div class="callout warn"><span class="callout-title">Triệt tiêu và bùng nổ gradient</span>Gradient là tích của nhiều thừa số qua các lớp. Nếu mỗi thừa số nhỏ hơn 1 (ví dụ \(\sigma'\le 0.25\)), qua 10 lớp còn \(0.25^{10}\approx10^{-6}\): các lớp đầu gần như không học. Nếu lớn hơn 1, gradient bùng nổ. Cách xử lý: ReLU/GELU, khởi tạo đúng, chuẩn hóa (BatchNorm/LayerNorm), kết nối tắt (residual) và cắt gradient (gradient clipping).</div>
+<h3 id="numpy-mlp">Cài đặt backprop thuần NumPy</h3>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+X = rng.normal(size=(400, 2))
+y = ((X[:, 0] * X[:, 1]) > 0).astype(float)[:, None]      # bài toán dạng XOR
+
+H = 16
+W1 = rng.normal(0, np.sqrt(1 / 2), (2, H));  b1 = np.zeros(H)
+W2 = rng.normal(0, np.sqrt(1 / H), (H, 1));  b2 = np.zeros(1)
+lr = 0.5
+
+for step in range(3000):
+    # --- lan truyền xuôi ---
+    z1 = X @ W1 + b1
+    h = np.tanh(z1)
+    z2 = h @ W2 + b2
+    p = 1 / (1 + np.exp(-z2))
+    loss = -np.mean(y * np.log(p + 1e-12) + (1 - y) * np.log(1 - p + 1e-12))
+
+    # --- lan truyền ngược ---
+    dz2 = (p - y) / len(X)            # dL/dz2 cho sigmoid + cross-entropy
+    dW2 = h.T @ dz2;  db2 = dz2.sum(0)
+    dh = dz2 @ W2.T
+    dz1 = dh * (1 - h ** 2)           # đạo hàm của tanh
+    dW1 = X.T @ dz1;  db1 = dz1.sum(0)
+
+    for P, G in ((W1, dW1), (b1, db1), (W2, dW2), (b2, db2)):
+        P -= lr * G                   # cập nhật tại chỗ
+
+print("loss:", loss, "acc:", ((p > 0.5) == y).mean())</code></pre>
+<p>Hãy tự kiểm tra gradient bằng sai phân hữu hạn: \(\frac{J(\theta+\epsilon)-J(\theta-\epsilon)}{2\epsilon}\) với \(\epsilon\sim10^{-5}\) rồi so với kết quả backprop. Đây là cách phát hiện lỗi đạo hàm kinh điển (PyTorch có <code>torch.autograd.gradcheck</code> cho việc này).</p>
+
+<h2 id="toi-uu">Bộ tối ưu: SGD, momentum, Adam</h2>
+<p>Với gradient \(\mathbf{g}_t\) tính trên một lô nhỏ:</p>
+<ul>
+  <li><strong>SGD</strong>: \(\theta\leftarrow\theta-\eta\,\mathbf{g}_t\).</li>
+  <li><strong>Momentum</strong>: tích lũy vận tốc \(\mathbf{v}\leftarrow\beta\mathbf{v}+\mathbf{g}_t\), \(\theta\leftarrow\theta-\eta\mathbf{v}\). Giảm dao động theo hướng dốc, tăng tốc theo hướng nhất quán.</li>
+  <li><strong>Adam</strong>: giữ trung bình trượt của gradient và của bình phương gradient để chuẩn hóa bước cho từng tham số.</li>
+</ul>
+$$\begin{aligned}\mathbf{m}_t&=\beta_1\mathbf{m}_{t-1}+(1-\beta_1)\mathbf{g}_t, & \mathbf{v}_t&=\beta_2\mathbf{v}_{t-1}+(1-\beta_2)\mathbf{g}_t^{2}\\ \hat{\mathbf{m}}_t&=\frac{\mathbf{m}_t}{1-\beta_1^t}, & \hat{\mathbf{v}}_t&=\frac{\mathbf{v}_t}{1-\beta_2^t}\\ \theta&\leftarrow\theta-\eta\,\frac{\hat{\mathbf{m}}_t}{\sqrt{\hat{\mathbf{v}}_t}+\epsilon}\end{aligned}$$
+<p>Tác giả Adam đề xuất mặc định \(\beta_1=0.9,\;\beta_2=0.999,\;\epsilon=10^{-8}\). <strong>AdamW</strong> tách riêng weight decay khỏi cập nhật thích nghi và thường được ưu tiên khi huấn luyện Transformer. Tốc độ học thường được thay đổi theo lịch (warm-up tăng dần lúc đầu rồi giảm theo cosine hoặc tuyến tính); các giá trị cụ thể phụ thuộc bài toán, đừng sao chép máy móc.</p>
+
+<h2 id="playground">Sân chơi: tự huấn luyện một mạng nơ-ron</h2>
+<p>Mạng dưới đây chạy hoàn toàn trong trình duyệt của bạn, dùng đúng các công thức ở trên (backprop + Adam, đầu ra sigmoid, cross-entropy). Thí nghiệm gợi ý:</p>
+<ol>
+  <li>Dữ liệu “Hai cụm”: một nơ-ron hầu như đã đủ. Mạng nhỏ nhất hoạt động thế nào?</li>
+  <li>Dữ liệu “Tâm và vành” hoặc XOR: cần bao nhiêu nơ-ron ẩn? Thử 2 nơ-ron rồi 6 nơ-ron.</li>
+  <li>“Xoắn ốc” khó hơn nhiều: thử tăng số lớp, hoặc bật thêm đặc trưng tự thiết kế để xem “kỹ thuật đặc trưng” thay thế độ sâu thế nào.</li>
+  <li>Tăng nhiễu và số nơ-ron, theo dõi khoảng cách giữa mất mát train và test. Bật điều chuẩn L2 có thu hẹp khoảng cách không?</li>
+</ol>
+<div class="viz" data-viz="mlp1" data-title="Sân chơi mạng nơ-ron (backprop + Adam)">
+  <p class="viz-help">Nền màu là xác suất mạng dự đoán thuộc lớp cam. Điểm đặc dùng để huấn luyện, vòng rỗng dùng để kiểm tra.</p>
+</div>
+
+<h2 id="dieu-chuan">Điều chuẩn, khởi tạo và chuẩn hóa</h2>
+<ul>
+  <li><strong>Weight decay / L2</strong>: phạt độ lớn trọng số, kiềm chế overfitting.</li>
+  <li><strong>Dropout</strong>: khi huấn luyện, tắt ngẫu nhiên mỗi nơ-ron với xác suất \(p\) (và nhân phần còn lại với \(1/(1-p)\) trong cài đặt “inverted dropout”); khi suy luận dùng toàn mạng.</li>
+  <li><strong>Early stopping</strong>: dừng khi mất mát validation ngừng cải thiện.</li>
+  <li><strong>Tăng cường dữ liệu (data augmentation)</strong>: lật, cắt, thêm nhiễu... tạo biến thể có nhãn giữ nguyên.</li>
+  <li><strong>Khởi tạo</strong>: nếu mọi trọng số bằng nhau thì các nơ-ron học y hệt nhau (đối xứng). Xavier/Glorot dùng phương sai \(2/(n_{in}+n_{out})\) cho tanh/sigmoid; He dùng \(2/n_{in}\) cho ReLU, nhằm giữ độ lớn tín hiệu ổn định qua các lớp.</li>
+  <li><strong>BatchNorm</strong> chuẩn hóa theo lô (phổ biến ở CNN); <strong>LayerNorm</strong> chuẩn hóa theo các đặc trưng của từng mẫu (chuẩn trong Transformer vì không phụ thuộc kích thước lô).</li>
+</ul>
+
+<h2 id="kien-truc">Các họ kiến trúc chính</h2>
+<h3 id="cnn">Mạng tích chập (CNN)</h3>
+<p>Dùng bộ lọc nhỏ trượt trên ảnh, chia sẻ trọng số theo vị trí. Hai ưu điểm: ít tham số hơn kết nối đầy đủ rất nhiều và tận dụng tính cục bộ của ảnh. Số tham số của một lớp tích chập kích thước \(k\times k\) với \(C_{in}\) kênh vào, \(C_{out}\) kênh ra là \((k^2C_{in}+1)C_{out}\); ví dụ \(3\times3\), 64→128 kênh có \((9\cdot64+1)\cdot128=73{,}856\) tham số. Kích thước đầu ra theo một chiều: \(\lfloor (n+2p-k)/s\rfloor+1\) với đệm \(p\), bước \(s\).</p>
+<h3 id="rnn">Mạng hồi quy (RNN, LSTM)</h3>
+<p>Xử lý chuỗi bằng trạng thái ẩn lan truyền theo thời gian \(\mathbf{h}_t=\phi(W_h\mathbf{h}_{t-1}+W_x\mathbf{x}_t+\mathbf{b})\). Hạn chế: phải xử lý tuần tự (khó song song hóa) và khó nhớ phụ thuộc xa do gradient triệt tiêu theo thời gian; LSTM/GRU giảm bớt bằng cơ chế cổng. Đây chính là động lực dẫn tới attention và Transformer, nội dung của trang NLP và LLM.</p>
+
+<h2 id="pytorch">Vòng lặp huấn luyện trong PyTorch</h2>
+<pre><code class="language-python">import torch
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
+
+torch.manual_seed(0)
+X = torch.randn(1000, 2)
+y = ((X[:, 0] ** 2 + X[:, 1] ** 2) &gt; 1.0).float().unsqueeze(1)   # phân loại trong/ngoài đường tròn
+
+ds = TensorDataset(X, y)
+loader = DataLoader(ds, batch_size=64, shuffle=True)
+
+model = nn.Sequential(
+    nn.Linear(2, 16), nn.ReLU(),
+    nn.Linear(16, 16), nn.ReLU(),
+    nn.Linear(16, 1),                  # trả về logit, chưa qua sigmoid
+)
+loss_fn = nn.BCEWithLogitsLoss()       # gộp sigmoid + cross-entropy nhị phân
+opt = torch.optim.AdamW(model.parameters(), lr=1e-2, weight_decay=1e-4)
+
+for epoch in range(30):
+    model.train()
+    total = 0.0
+    for xb, yb in loader:
+        opt.zero_grad()                # xóa gradient của bước trước
+        loss = loss_fn(model(xb), yb)
+        loss.backward()                # lan truyền ngược (autograd)
+        opt.step()                     # cập nhật tham số
+        total += loss.item() * len(xb)
+    print(epoch, total / len(ds))</code></pre>
+<p>Năm dòng trong vòng lặp trong cùng (<code>zero_grad</code>, forward, <code>backward</code>, <code>step</code>, ghi nhận) là khung của hầu hết mọi chương trình huấn luyện, từ bài toán đồ chơi đến mô hình hàng tỷ tham số. Khi đánh giá, nhớ gọi <code>model.eval()</code> và bọc trong <code>torch.no_grad()</code>.</p>
+
+<h2 id="debug">Danh sách kiểm tra khi mạng không học</h2>
+<ol>
+  <li><strong>Overfit một lô nhỏ</strong> (8 mẫu): mất mát phải về gần 0. Nếu không, có lỗi trong mô hình, mất mát hoặc dữ liệu.</li>
+  <li>Mất mát ban đầu có xấp xỉ \(\ln C\) không?</li>
+  <li>Nhãn và dữ liệu có khớp nhau sau khi xáo trộn và chia tập không? Kích thước tensor đúng chưa (đặc biệt chiều lô)?</li>
+  <li>Thử giảm tốc độ học 3–10 lần; thử bỏ điều chuẩn để chắc mô hình có khả năng khớp.</li>
+  <li>Đầu vào đã được chuẩn hóa chưa? Có <code>NaN</code> trong dữ liệu không?</li>
+  <li>Đừng quên <code>model.train()</code> / <code>model.eval()</code> khi dùng dropout và BatchNorm.</li>
+</ol>
+
+<h2 id="bai-tap">Bài tập</h2>
+<details class="exercise">
+  <summary>Bài 1. Triệt tiêu gradient</summary>
+  <div class="ex-body"><p>Một mạng 20 lớp sigmoid, giả sử mỗi lớp nhân gradient với tối đa 0.25. Gradient ở lớp đầu giảm cỡ bao nhiêu lần so với lớp cuối?</p>
+  <p><em>Lời giải:</em> khoảng \(0.25^{20}=4^{-20}\approx 9\times10^{-13}\). Vì thế các mạng sâu thời kỳ đầu rất khó huấn luyện.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 2. Gradient của softmax + cross-entropy</summary>
+  <div class="ex-body"><p>Chứng minh \(\partial L/\partial z_k=p_k-\mathbf{1}[k=y]\) với \(L=-\log p_y\).</p>
+  <p><em>Gợi ý:</em> \(L=-z_y+\log\sum_j e^{z_j}\). Đạo hàm theo \(z_k\): \(-\mathbf{1}[k=y]+e^{z_k}/\sum_j e^{z_j}\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 3. Đếm tham số</summary>
+  <div class="ex-body"><p>Một MLP 784→256→128→10 có bao nhiêu tham số?</p>
+  <p><em>Lời giải:</em> \((784\cdot256+256)+(256\cdot128+128)+(128\cdot10+10)=200{,}960+32{,}896+1{,}290=235{,}146\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 4. Thí nghiệm trên sân chơi</summary>
+  <div class="ex-body"><p>Trên dữ liệu Xoắn ốc, tìm cấu hình nhỏ nhất (số lớp × nơ-ron) mà tập test đạt trên 90%. Có phụ thuộc vào hàm kích hoạt và dữ liệu mới (“Lấy dữ liệu mới”) không? Ghi lại kết luận của bạn.</p></div>
+</details>
+
+<h2 id="tham-khao">Tài liệu tham khảo</h2>
+<ol class="refs">
+  <li><a href="https://www.deeplearningbook.org">Deep Learning</a> — Goodfellow, Bengio, Courville; sách giáo khoa miễn phí trực tuyến.</li>
+  <li><a href="https://d2l.ai">Dive into Deep Learning</a> — sách tương tác có code (PyTorch và các framework khác).</li>
+  <li><a href="http://neuralnetworksanddeeplearning.com">Neural Networks and Deep Learning</a> — Michael Nielsen; giải thích backprop rất rõ.</li>
+  <li><a href="https://pytorch.org/tutorials/">PyTorch Tutorials</a> — tài liệu chính thức.</li>
+  <li><a href="https://karpathy.ai/zero-to-hero.html">Neural Networks: Zero to Hero</a> — loạt video của Andrej Karpathy xây dựng mạng từ đầu (mình tin link đúng, bạn nên kiểm tra).</li>
+  <li><a href="https://www.3blue1brown.com/topics/neural-networks">Neural networks</a> — loạt video trực quan của 3Blue1Brown (mình tin link đúng, bạn nên kiểm tra).</li>
+  <li>Rumelhart, Hinton, Williams (1986), <em>Learning representations by back-propagating errors</em>, Nature.</li>
+  <li>Kingma và Ba (2014), <em>Adam: A Method for Stochastic Optimization</em>, arXiv:1412.6980. Loshchilov và Hutter, <em>Decoupled Weight Decay Regularization</em>, arXiv:1711.05101.</li>
+  <li>Ioffe và Szegedy (2015), <em>Batch Normalization</em>, arXiv:1502.03167. He và cộng sự (2015), <em>Delving Deep into Rectifiers</em>, arXiv:1502.01852. Srivastava và cộng sự (2014), <em>Dropout</em>, JMLR.</li>
+</ol>
+
+</main>
+<aside class="toc" id="toc" aria-label="Mục lục"></aside>
+</div>
+<div id="site-footer"></div>
+</body>
+</html>
