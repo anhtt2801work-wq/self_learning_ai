@@ -212,6 +212,27 @@ details.exercise .ex-body { padding: 0 16px 12px; }
 .viz-split { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 12px; }
 @media (max-width: 640px) { .viz-split, .viz-split.even { grid-template-columns: minmax(0, 1fr); } }
 
+/* static SVG diagrams */
+.diagram { margin: 24px 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 12px 12px 8px; box-shadow: var(--shadow); overflow-x: auto; }
+.diagram svg { display: block; margin: 0 auto; max-width: 100%; height: auto; font: 13px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.diagram figcaption { font-size: .88rem; color: var(--muted); text-align: center; padding: 6px 8px 4px; max-width: none; }
+.diagram text { fill: var(--text); }
+.diagram .muted { fill: var(--muted); }
+.diagram .small { font-size: 11.5px; }
+.diagram .bold { font-weight: 700; }
+.diagram .box { fill: var(--surface-2); stroke: var(--border); stroke-width: 1.5; }
+.diagram .box.c1 { fill: color-mix(in srgb, var(--c1) 16%, var(--surface)); stroke: var(--c1); }
+.diagram .box.c2 { fill: color-mix(in srgb, var(--c2) 16%, var(--surface)); stroke: var(--c2); }
+.diagram .box.c3 { fill: color-mix(in srgb, var(--c3) 16%, var(--surface)); stroke: var(--c3); }
+.diagram .box.c4 { fill: color-mix(in srgb, var(--c4) 16%, var(--surface)); stroke: var(--c4); }
+.diagram .line { stroke: var(--muted); stroke-width: 1.8; fill: none; }
+.diagram .line.c1 { stroke: var(--c1); } .diagram .line.c2 { stroke: var(--c2); } .diagram .line.c3 { stroke: var(--c3); } .diagram .line.c4 { stroke: var(--c4); }
+.diagram .line.dash { stroke-dasharray: 5 4; }
+.diagram .arrow { stroke: var(--muted); stroke-width: 1.8; fill: none; marker-end: url(#arr); }
+.diagram .arrow.c1 { stroke: var(--c1); } .diagram .arrow.c2 { stroke: var(--c2); } .diagram .arrow.c3 { stroke: var(--c3); }
+.diagram .mk { fill: var(--muted); }
+.diagram .fill1 { fill: var(--c1); } .diagram .fill2 { fill: var(--c2); } .diagram .fill3 { fill: var(--c3); } .diagram .fill4 { fill: var(--c4); }
+
 /* heatmap table, token chips, bars */
 .heat { border-collapse: separate; border-spacing: 2px; font-size: .8rem; font-variant-numeric: tabular-nums; display: table !important; width: auto !important; margin: 8px 0 !important; }
 .heat th, .heat td { border: 0 !important; padding: 4px 6px !important; text-align: center !important; background: none; min-width: 44px; }

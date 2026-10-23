@@ -5,14 +5,14 @@ Website tự học AI bằng tiếng Việt: từ công cụ làm việc (Git v�
 | Tab | File | Nội dung chính |
 | --- | --- | --- |
 | Trang chủ | `index.html` | Lộ trình học, cách học, lưu ý về độ tin cậy |
-| GitHub | `github.html` | Git cơ bản, nhánh/merge, PR, Actions, Pages, Git cho dự án AI |
-| Machine Learning | `machine-learning.html` | Hồi quy, gradient descent, overfitting, đánh giá, k-NN, cây, k-means |
-| Deep Learning | `deep-learning.html` | Backprop, Adam, điều chuẩn, CNN/RNN, PyTorch, sân chơi mạng nơ-ron |
-| Computer Vision | `computer-vision.html` | Tích chập, CNN, transfer learning, ViT/CLIP, phát hiện (IoU, NMS), phân đoạn |
-| NLP | `nlp.html` | TF-IDF, n-gram, BPE, embedding, BERT, đặc thù tiếng Việt |
-| LLM | `llm.html` | Transformer, attention, scaling, SFT/RLHF/DPO, giải mã, RAG, LoRA |
-| Agentic AI | `agentic-ai.html` | Vòng lặp ReAct, tool use, MCP, workflow, độ tin cậy, an toàn |
-| MLOps | `mlops.html` | Tái lập, MLflow/DVC, kiểm thử, FastAPI/Docker, rollout, giám sát drift, LLMOps |
+| GitHub | `github.html` | Git cơ bản, mô hình đối tượng và mã băm, merge ba chiều, rebase/reset/bisect, chiến lược nhánh, Actions, Pages, Git cho dự án AI |
+| Machine Learning | `machine-learning.html` | Suy dẫn OLS/logistic, bias–variance, PCA, SVM, cây, boosting, đánh giá và so sánh mô hình |
+| Deep Learning | `deep-learning.html` | Backprop ma trận, bộ tối ưu, khởi tạo, BatchNorm, LSTM/BPTT, PyTorch, sân chơi mạng nơ-ron |
+| Computer Vision | `computer-vision.html` | Đạo hàm tích chập, chi phí, ResNet, ViT/CLIP, phát hiện (IoU, NMS, AP), U-Net, Grad-CAM |
+| NLP | `nlp.html` | TF-IDF, Naive Bayes, n-gram/Kneser–Ney, BPE, skip-gram/PMI, BERT, BLEU, đặc thù tiếng Việt |
+| LLM | `llm.html` | Attention từng bước, RoPE, GQA, FlashAttention, KV cache, scaling, DPO, giải mã, RAG, LoRA, đánh giá |
+| Agentic AI | `agentic-ai.html` | Vòng lặp, tool use, MCP, chi phí ngữ cảnh, workflow, đa agent, kiểm chứng/thử lại, đánh giá, an toàn |
+| MLOps | `mlops.html` | Tái lập, MLflow/DVC, kiểm thử, FastAPI/Docker, hàng đợi, A/B test, canary, PSI/drift, huấn luyện lại, LLMOps |
 | Cách dùng | `huong-dan.html` | Hướng dẫn dùng website: chạy, phím tắt, minh họa, thêm nội dung, xuất bản |
 
 ## Chạy trên máy

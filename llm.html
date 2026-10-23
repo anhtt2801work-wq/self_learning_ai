@@ -14,6 +14,7 @@
 <script defer src="assets/js/search-index.js"></script>
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-llm.js"></script>
+<script defer src="assets/js/viz-llm2.js"></script>
 </head>
 <body data-page="llm">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -53,6 +54,122 @@ $$\text{Attention}(Q,K,V)=\text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}+M\rig
 $$\mathbf{x}\leftarrow\mathbf{x}+\text{MHA}\big(\text{LN}(\mathbf{x})\big),\qquad \mathbf{x}\leftarrow\mathbf{x}+\text{FFN}\big(\text{LN}(\mathbf{x})\big),\qquad \text{FFN}(\mathbf{x})=W_2\,\phi(W_1\mathbf{x})$$
 <p>FFN thường mở rộng \(d\to 4d\to d\). Kết nối tắt giúp gradient chảy thẳng qua nhiều lớp, là điều kiện để xếp chồng hàng chục, hàng trăm khối.</p>
 
+<h3 id="attention-tung-buoc">Attention từng bước với số nhỏ</h3>
+<p>Trước khi đi tiếp, hãy tự tính cả đường đi của attention trên ví dụ đủ nhỏ để thấy từng ma trận: 3 token, mỗi token 2 chiều. Bạn có thể sửa mọi số trong \(X\), \(W_Q\), \(W_K\), \(W_V\). Hình dạng: \(X\in\mathbb{R}^{n\times d}\), \(W_Q,W_K\in\mathbb{R}^{d\times d_k}\), \(W_V\in\mathbb{R}^{d\times d_v}\), nên \(Q,K\in\mathbb{R}^{n\times d_k}\), \(S=QK^\top\in\mathbb{R}^{n\times n}\) và đầu ra \(O=AV\in\mathbb{R}^{n\times d_v}\). Ma trận \(S\) có \(n^2\) phần tử, đó là gốc của chi phí bậc hai theo độ dài chuỗi.</p>
+<div class="viz" data-viz="attnstep1" data-title="Self-attention: mọi ma trận trong một lượt">
+  <p class="viz-help">Thử: (1) tắt mặt nạ nhân quả và so ma trận A; (2) đổi W_K để một token “chú ý” mạnh vào token khác; (3) thêm một số rất lớn vào X và xem softmax trở nên nhọn thế nào.</p>
+</div>
+<h3 id="attention-backward">Gradient đi qua attention</h3>
+<p>Với \(\mathbf{p}=\mathrm{softmax}(\mathbf{s})\), Jacobian là \(\partial p_i/\partial s_j=p_i(\delta_{ij}-p_j)\), tức \(J=\mathrm{diag}(\mathbf{p})-\mathbf{p}\mathbf{p}^\top\) (đối xứng, mỗi hàng tổng bằng 0 vì softmax không đổi khi cộng hằng số vào \(\mathbf{s}\)). Nhân với gradient từ phía sau \(\mathbf{g}=\partial L/\partial\mathbf{p}\):</p>
+$$\frac{\partial L}{\partial\mathbf{s}}=J\,\mathbf{g}=\mathbf{p}\odot\big(\mathbf{g}-(\mathbf{g}\cdot\mathbf{p})\mathbf{1}\big)$$
+<p>Áp dụng cho attention một đầu \(O=AV\), \(A=\mathrm{softmax}_{\text{row}}(QK^\top/\sqrt{d_k}+M)\), với \(dO=\partial L/\partial O\) cho trước:</p>
+$$dV=A^\top dO,\qquad dA=dO\,V^\top,\qquad dS=\frac{1}{\sqrt{d_k}}\,A\odot\big(dA-\mathrm{rowsum}(dA\odot A)\big),\qquad dQ=dS\,K,\qquad dK=dS^\top Q$$
+<p>Vị trí bị che có \(A=0\) nên \(dS=0\) ở đó: gradient không chảy qua phần tương lai. Hãy kiểm tra các công thức này bằng đạo hàm số (cách làm này áp dụng được cho mọi lớp bạn tự cài):</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+n, d = 5, 4
+X = rng.normal(size=(n, d)); Wq, Wk, Wv = (rng.normal(size=(d, d)) for _ in range(3))
+mask = np.triu(np.full((n, n), -np.inf), 1)                 # mặt nạ nhân quả
+target = rng.normal(size=(n, d))
+
+def forward(Wq, Wk, Wv):
+    Q, K, V = X @ Wq, X @ Wk, X @ Wv
+    S = Q @ K.T / np.sqrt(d) + mask
+    A = np.exp(S - S.max(1, keepdims=True)); A /= A.sum(1, keepdims=True)
+    return A @ V, (Q, K, V, A)
+
+loss = lambda *W: 0.5 * ((forward(*W)[0] - target) ** 2).sum()
+
+O, (Q, K, V, A) = forward(Wq, Wk, Wv)
+dO = O - target
+dV = A.T @ dO
+dA = dO @ V.T
+dS = A * (dA - (dA * A).sum(1, keepdims=True)) / np.sqrt(d)  # backward của softmax và hệ số 1/√d
+dQ, dK = dS @ K, dS.T @ Q
+grads = {"Wq": X.T @ dQ, "Wk": X.T @ dK, "Wv": X.T @ dV}
+
+def numeric(idx, eps=1e-6):
+    W = [Wq.copy(), Wk.copy(), Wv.copy()]; g = np.zeros_like(W[idx])
+    for pos in np.ndindex(g.shape):
+        W[idx][pos] += eps; hi = loss(*W); W[idx][pos] -= 2 * eps; lo = loss(*W); W[idx][pos] += eps
+        g[pos] = (hi - lo) / (2 * eps)
+    return g
+
+for i, name in enumerate(grads):
+    print(name, np.abs(grads[name] - numeric(i)).max())      # cỡ 1e-9 hoặc nhỏ hơn</code></pre>
+<figure class="diagram">
+<svg viewBox="0 0 560 520" role="img" aria-label="Một khối Transformer dạng decoder với chuẩn hóa trước, attention nhân quả và FFN">
+  <text x="170" y="22" class="bold" text-anchor="middle">Mô hình decoder-only (GPT-style)</text>
+  <rect class="box" x="90" y="470" width="160" height="30" rx="6"/><text x="170" y="490" text-anchor="middle" class="small">id token (n)</text>
+  <path class="arrow" d="M170 470 V450"/>
+  <rect class="box c1" x="90" y="415" width="160" height="34" rx="6"/><text x="170" y="436" text-anchor="middle" class="small">Embedding + vị trí</text>
+  <text x="262" y="436" class="muted small">n × d</text>
+  <path class="arrow" d="M170 415 V395"/>
+  <rect class="box" x="40" y="80" width="260" height="315" rx="10" style="fill:none;stroke-dasharray:6 4"/><text x="52" y="96" class="muted small bold">Khối × L</text>
+  <rect class="box c4" x="110" y="350" width="120" height="28" rx="6"/><text x="170" y="369" text-anchor="middle" class="small">LayerNorm / RMSNorm</text>
+  <path class="arrow" d="M170 350 V330"/>
+  <rect class="box c2" x="90" y="285" width="160" height="44" rx="6"/><text x="170" y="304" text-anchor="middle" class="small">Multi-head attention</text><text x="170" y="320" text-anchor="middle" class="muted small">(mặt nạ nhân quả)</text>
+  <circle class="box c3" cx="170" cy="255" r="12"/><text x="170" y="260" text-anchor="middle" class="bold">+</text>
+  <path class="arrow" d="M170 285 V267"/>
+  <path class="line c3" d="M170 395 H60 V255 H146"/><path class="arrow c3" d="M130 255 H156"/>
+  <rect class="box c4" x="110" y="205" width="120" height="28" rx="6"/><text x="170" y="224" text-anchor="middle" class="small">LayerNorm / RMSNorm</text>
+  <path class="arrow" d="M170 243 V233"/>
+  <path class="arrow" d="M170 205 V185"/>
+  <rect class="box c2" x="90" y="140" width="160" height="44" rx="6"/><text x="170" y="159" text-anchor="middle" class="small">FFN: d → d_ff → d</text><text x="170" y="175" text-anchor="middle" class="muted small">(GELU hoặc SwiGLU)</text>
+  <circle class="box c3" cx="170" cy="110" r="12"/><text x="170" y="115" text-anchor="middle" class="bold">+</text>
+  <path class="arrow" d="M170 140 V122"/>
+  <path class="line c3" d="M170 246 H48 V110 H146"/><path class="arrow c3" d="M130 110 H156"/>
+  <path class="arrow" d="M170 98 V74"/>
+  <rect class="box c4" x="110" y="44" width="120" height="28" rx="6"/><text x="170" y="63" text-anchor="middle" class="small">Chuẩn hóa cuối</text>
+  <text x="320" y="190" class="muted small">mỗi đường vòng (xanh lá) là kết nối tắt:</text><text x="320" y="206" class="muted small">x ← x + F(x), cho gradient chảy thẳng</text>
+  <text x="320" y="400" class="muted small">n token, mỗi token d chiều;</text><text x="320" y="416" class="muted small">attention mix thông tin giữa các token,</text><text x="320" y="432" class="muted small">FFN xử lý từng token độc lập</text>
+  <rect class="box c1" x="330" y="44" width="200" height="28" rx="6"/><text x="430" y="63" text-anchor="middle" class="small">Logit: (n × d)·(d × V) → softmax</text>
+  <path class="arrow" d="M230 58 H330"/>
+</svg>
+<figcaption>Một khối gồm hai “nhánh phần dư”: attention (trộn thông tin giữa các token) và FFN (biến đổi từng token). Chồng \(L\) khối rồi chiếu ra phân phối trên từ vựng.</figcaption>
+</figure>
+<h3 id="vi-tri-chi-tiet">Mã hóa vị trí: sin/cos và RoPE</h3>
+<p>Attention không có khái niệm thứ tự: hoán vị các token chỉ hoán vị các hàng của \(O\). Do đó thông tin vị trí phải được đưa vào. Dạng sin/cos cộng vào embedding: \(PE_{(p,2i)}=\sin\big(p/10000^{2i/d}\big)\), \(PE_{(p,2i+1)}=\cos\big(p/10000^{2i/d}\big)\), mỗi cặp chiều có tần số khác nhau (từ 1 rad/vị trí giảm dần), giống như các chữ số của đồng hồ quay với tốc độ khác nhau.</p>
+<p><strong>RoPE</strong> (rotary embedding, Su và cộng sự, 2021) thay vì cộng, <em>quay</em> từng cặp chiều của \(q\) và \(k\) một góc tỉ lệ với vị trí: \(R_m\) là ma trận quay góc \(m\theta_i\) cho cặp thứ \(i\), với \(\theta_i=10000^{-2i/d}\). Vì ma trận quay thỏa \(R_m^\top R_n=R_{n-m}\):</p>
+$$\big\langle R_m\mathbf{q},\,R_n\mathbf{k}\big\rangle=\mathbf{q}^\top R_m^\top R_n\,\mathbf{k}=\mathbf{q}^\top R_{n-m}\,\mathbf{k}$$
+<p>Điểm attention giữa vị trí \(m\) và \(n\) chỉ phụ thuộc <em>khoảng cách</em> \(n-m\) (và nội dung), không phụ thuộc vị trí tuyệt đối. Hãy kiểm chứng bằng hai đường cong ở bên phải của minh họa: hai vị trí \(m\) khác nhau cho cùng một đường.</p>
+<div class="viz" data-viz="pos1" data-title="Mã hóa vị trí: bản đồ sin/cos và tính tương đối của RoPE">
+  <p class="viz-help">Trái: mỗi hàng là vector vị trí; cột bên trái dao động nhanh, cột bên phải rất chậm. Phải: đổi hai vị trí m và kéo các góc: hai đường luôn trùng.</p>
+</div>
+<pre><code class="language-python">import numpy as np
+
+def rope(x, pos, base=10000):
+    """x: vector độ dài chẵn d; quay từng cặp (x[2i], x[2i+1]) góc pos * base**(-2i/d)."""
+    d = len(x); i = np.arange(d // 2); ang = pos * base ** (-2 * i / d)
+    c, s = np.cos(ang), np.sin(ang); out = np.empty_like(x)
+    out[0::2] = c * x[0::2] - s * x[1::2]
+    out[1::2] = s * x[0::2] + c * x[1::2]
+    return out
+
+rng = np.random.default_rng(0); q, k = rng.normal(size=8), rng.normal(size=8)
+print(rope(q, 3) @ rope(k, 10), rope(q, 53) @ rope(k, 60))     # cùng khoảng cách 7 nên bằng nhau</code></pre>
+<h3 id="mqa-gqa">MQA, GQA và FlashAttention</h3>
+<p>Ở giai đoạn giải mã, chi phí chính là đọc KV cache. <strong>Multi-query attention</strong> (MQA; Shazeer, 2019) dùng một cặp K/V chung cho mọi đầu Q; <strong>grouped-query attention</strong> (GQA; Ainslie và cộng sự, 2023) là bước trung gian: \(h\) đầu Q chia thành \(g\) nhóm, mỗi nhóm dùng chung một cặp K/V, nên KV cache nhỏ đi \(h/g\) lần (ví dụ 32 đầu Q và 8 nhóm KV: nhỏ hơn 4 lần, chất lượng thường gần với đầy đủ). Hãy thử trong máy tính bộ nhớ bên dưới.</p>
+<p><strong>FlashAttention</strong> (Dao và cộng sự, 2022) tính <em>chính xác cùng kết quả</em> nhưng không bao giờ tạo ma trận \(n\times n\) trong bộ nhớ chậm: chia \(Q,K,V\) thành khối và dùng <em>softmax trực tuyến</em>. Với các điểm số đến theo khối, duy trì giá trị lớn nhất hiện thời \(m\), tổng mũ \(\ell\) và tổng có trọng số \(\mathbf{a}\); khi gặp khối mới có điểm số \(\mathbf{s}\) và giá trị \(V_b\):</p>
+$$m'=\max(m,\max\mathbf{s}),\quad \ell'=\ell\,e^{m-m'}+\sum_je^{s_j-m'},\quad \mathbf{a}'=\mathbf{a}\,e^{m-m'}+\sum_je^{s_j-m'}\mathbf{v}_j,\qquad \text{out}=\mathbf{a}/\ell$$
+<p>Nhờ vậy bộ nhớ phụ chỉ \(O(n)\) và ít phải truy cập bộ nhớ chậm (HBM), trong khi số phép tính vẫn \(O(n^2d)\). Kiểm tra tính đúng đắn:</p>
+<pre><code class="language-python">import numpy as np
+
+def online_attention_row(scores, values, block=3):
+    m, l, acc = -np.inf, 0.0, np.zeros(values.shape[1])
+    for i in range(0, len(scores), block):
+        s, v = scores[i:i + block], values[i:i + block]
+        m_new = max(m, s.max())
+        scale = np.exp(m - m_new)                        # co lại phần đã tích lũy theo giá trị lớn nhất mới
+        p = np.exp(s - m_new)
+        l, acc, m = l * scale + p.sum(), acc * scale + p @ v, m_new
+    return acc / l
+
+rng = np.random.default_rng(1); s = rng.normal(size=10) * 5; V = rng.normal(size=(10, 4))
+ref = (np.exp(s - s.max()) / np.exp(s - s.max()).sum()) @ V
+print(np.abs(online_attention_row(s, V) - ref).max())     # cỡ 1e-16: trùng với softmax thông thường</code></pre>
+
 <h2 id="tham-so">Đếm tham số, bộ nhớ và chi phí</h2>
 <p>Mỗi khối có khoảng \(4d^2\) tham số cho attention (bốn ma trận \(d\times d\): \(W_Q,W_K,W_V,W_O\)) và \(8d^2\) cho FFN (hai ma trận \(d\times4d\) và \(4d\times d\)). Vậy</p>
 $$N_{\text{blocks}}\approx 12\,L\,d^2,\qquad N_{\text{total}}\approx 12Ld^2+V\,d$$
@@ -62,10 +179,49 @@ $$N_{\text{blocks}}\approx 12\,L\,d^2,\qquad N_{\text{total}}\approx 12Ld^2+V\,d
   <li><strong>KV cache</strong>: khi sinh, ta lưu lại key và value của các token cũ để khỏi tính lại. Với cấu hình giả định \(L=32,\;d=4096\), lưu số thực 16-bit, mỗi token cần \(2\cdot32\cdot4096\cdot2\) byte \(=512\) KiB; 4096 token là khoảng 2 GiB cho mỗi chuỗi. (Nhiều mô hình giảm con số này bằng grouped-query attention.)</li>
 </ul>
 
+<h3 id="tham-so-chi-tiet">Đếm tham số chính xác hơn và bộ nhớ khi huấn luyện</h3>
+<p>Công thức \(12Ld^2\) là xấp xỉ cho kiến trúc cổ điển. Các mô hình gần đây thường có (a) GQA, (b) FFN dạng cổng (SwiGLU) với ba ma trận \(d\times d_{ff}\), (c) embedding đầu vào và đầu ra tách rời. Với \(n_{kv}\) đầu K/V và \(d_h=d/h\):</p>
+$$N\approx L\Big[\underbrace{2d^2}_{W_Q,\,W_O}+\underbrace{2\,d\,n_{kv}d_h}_{W_K,\,W_V}+\underbrace{3\,d\,d_{ff}}_{\text{gated FFN}}\Big]+\underbrace{2Vd}_{\text{embedding vào, ra}}$$
+<p>(bỏ qua chuẩn hóa và bias, chiếm phần rất nhỏ). Với cấu hình \(L=32,\ d=4096,\ h=n_{kv}=32,\ d_{ff}=11008,\ V=32000\): mỗi lớp có \(4\cdot4096^2\approx67\) triệu tham số attention và \(3\cdot4096\cdot11008\approx135\) triệu FFN, tổng \(32\times202.4\text{ M}+262\text{ M}\approx6.74\) tỷ, khớp với cỡ “7B” quen thuộc. Với cấu hình cỡ 70B (\(L=80,\ d=8192,\ h=64,\ n_{kv}=8,\ d_{ff}=28672\)) công thức cho khoảng 69 tỷ. (Đây là cấu hình giả định gần với các cỡ phổ biến, không phải đặc tả chính thức.)</p>
+<p><strong>Vì sao \(C\approx6ND\)?</strong> Mỗi tham số trong một phép nhân ma trận tham gia một phép nhân và một phép cộng (2 FLOP) cho mỗi token ở lượt xuôi: \(2N\) FLOP mỗi token. Lượt ngược cần hai phép nhân ma trận tương ứng (gradient theo kích hoạt và theo trọng số): \(4N\). Tổng \(6N\) mỗi token, nhân \(D\) token cho \(6ND\). Phép xấp xỉ bỏ qua số hạng attention \(\propto n\cdot d\) mỗi token mỗi lớp, đáng kể khi ngữ cảnh rất dài.</p>
+<p><strong>Bộ nhớ huấn luyện.</strong> Với huấn luyện độ chính xác hỗn hợp dùng Adam, một cách tính phổ biến cho trạng thái mỗi tham số: trọng số 16-bit (2 byte) + gradient 16-bit (2 byte) + bản sao 32-bit của trọng số, động lượng và phương sai (4+4+4 byte) = <strong>16 byte mỗi tham số</strong>. Một mô hình 7 tỷ tham số cần khoảng \(7\times10^9\times16\approx112\) GB chỉ cho trọng số và trạng thái tối ưu, <em>chưa kể kích hoạt</em>; vì thế cần chia nhỏ trạng thái qua nhiều GPU (như họ kỹ thuật ZeRO/FSDP) và tính lại kích hoạt khi cần. Chi tiết cụ thể thay đổi theo thư viện và cấu hình, hãy coi đây là bậc độ lớn.</p>
+<h3 id="kv-may-tinh">KV cache, bộ nhớ và tốc độ giải mã</h3>
+<p>Giải mã tự hồi quy sinh từng token; để tránh tính lại, ta lưu \(K,V\) của mọi token trước ở mỗi lớp. Kích thước cho một chuỗi dài \(n\):</p>
+$$\text{KV}=2\cdot L\cdot n_{kv}\cdot d_h\cdot n\cdot b\ \text{(byte)}$$
+<p>(hệ số 2 cho K và V; \(b\) là số byte mỗi phần tử). Mỗi bước giải mã phải đọc toàn bộ trọng số và KV cache từ bộ nhớ nhưng chỉ làm lượng phép tính nhỏ cho một token, nên giải mã thường <em>bị chặn bởi băng thông bộ nhớ</em>, không phải sức mạnh tính toán. Cận trên thô cho tốc độ mỗi chuỗi:</p>
+$$\text{tokens/s}\lesssim\frac{\text{bandwidth}}{W+B\cdot\text{KV}_{\text{seq}}}$$
+<p>với \(W\) là kích thước trọng số, \(B\) là số chuỗi đồng thời. Gộp nhiều chuỗi vào một lô chia sẻ chi phí đọc trọng số nên tăng tổng thông lượng, nhưng KV cache tăng tuyến tính theo \(B\) và theo độ dài ngữ cảnh, cuối cùng chiếm hết bộ nhớ GPU. Hãy chơi với máy tính dưới đây: so GQA và attention đầy đủ, 16-bit và 8-bit, ngữ cảnh 4k và 128k.</p>
+<div class="viz" data-viz="kv1" data-title="Máy tính KV cache và tốc độ giải mã">
+  <p class="viz-help">Gợi ý: chọn “cỡ 7B, attention đầy đủ” rồi tăng ngữ cảnh lên 32k–128k và quan sát KV cache của một chuỗi so với trọng số. Rồi chuyển sang GQA. Mặc định băng thông 2000 GB/s là giá trị tượng trưng cho GPU cao cấp; hãy nhập số từ datasheet của phần cứng bạn dùng.</p>
+</div>
+<pre><code class="language-python">def model_memory(L, d, h, n_kv, d_ff, V, ctx, batch, w_bytes=2, kv_bytes=2):
+    d_h = d // h
+    params = L * (2 * d * d + 2 * d * n_kv * d_h + 3 * d * d_ff) + 2 * V * d
+    kv_per_token = 2 * L * n_kv * d_h * kv_bytes
+    return params, params * w_bytes, kv_per_token * ctx * batch
+
+p, w, kv = model_memory(L=32, d=4096, h=32, n_kv=32, d_ff=11008, V=32000, ctx=4096, batch=1)
+print(f"{p / 1e9:.2f} tỷ tham số, trọng số {w / 2**30:.1f} GiB, KV cache {kv / 2**30:.1f} GiB")   # 6.74, 12.6, 2.0
+p, w, kv = model_memory(L=32, d=4096, h=32, n_kv=8, d_ff=11008, V=32000, ctx=4096, batch=1)
+print(f"GQA 8 nhóm: KV cache {kv / 2**30:.2f} GiB")                                                # nhỏ hơn 4 lần</code></pre>
+
 <h2 id="pretraining">Tiền huấn luyện và quy luật mở rộng</h2>
 <p>Công sức chủ yếu nằm ở giai đoạn <strong>tiền huấn luyện</strong>: thu thập, làm sạch, khử trùng lặp dữ liệu; huấn luyện trên cụm GPU/TPU lớn trong thời gian dài. Hai con số quy mô: số tham số \(N\) và số token huấn luyện \(D\). Một ước lượng thường dùng cho tổng số phép tính khi huấn luyện:</p>
 $$C\approx 6\,N\,D\ \text{FLOPs}$$
 <p>Nghiên cứu về <strong>scaling laws</strong> (Kaplan và cộng sự, 2020) cho thấy mất mát giảm theo luật lũy thừa khi tăng \(N\), \(D\) và tính toán. Công trình Chinchilla (Hoffmann và cộng sự, 2022) kết luận nhiều mô hình lúc đó được huấn luyện thiếu dữ liệu so với kích thước, và với một ngân sách tính toán cố định thì nên tăng \(N\) và \(D\) gần như tỉ lệ với nhau; quy tắc ngón tay cái thường được trích là cỡ 20 token cho mỗi tham số. Đây là con số xấp xỉ phụ thuộc cách ước lượng, và thực tế các nhóm còn huấn luyện lâu hơn mức đó để mô hình nhỏ rẻ hơn khi triển khai. Hãy đọc bài gốc trước khi dùng con số này cho việc quan trọng.</p>
+
+<h3 id="scaling-suy-dan">Phân bổ tối ưu giữa kích thước mô hình và dữ liệu</h3>
+<p>Hoffmann và cộng sự (2022) mô hình hóa mất mát bằng một hàm tham số theo số tham số \(N\) và số token \(D\):</p>
+$$L(N,D)=E+\frac{A}{N^{\alpha}}+\frac{B}{D^{\beta}}$$
+<p>\(E\) là mất mát không thể giảm của chính dữ liệu; hai số hạng còn lại là phần sai số do mô hình nhỏ và do dữ liệu ít. Với ngân sách cố định \(C=6ND\), thay \(D=C/(6N)\) và đạo hàm theo \(N\):</p>
+$$\frac{dL}{dN}=-\alpha A N^{-\alpha-1}+\beta B\Big(\frac{C}{6}\Big)^{-\beta}N^{\beta-1}=0\ \Longrightarrow\ \alpha A N^{-\alpha}=\beta B D^{-\beta}$$
+<p>tức tại điểm tối ưu, hai nguồn sai số có “giá trị biên” cân bằng. Giải ra:</p>
+$$N^\star=G\Big(\frac C6\Big)^{\frac{\beta}{\alpha+\beta}},\qquad D^\star=\frac1G\Big(\frac C6\Big)^{\frac{\alpha}{\alpha+\beta}},\qquad G=\Big(\frac{\alpha A}{\beta B}\Big)^{\frac1{\alpha+\beta}}$$
+<p>Khi \(\alpha\approx\beta\), \(N^\star\) và \(D^\star\) tăng gần như cùng tốc độ theo \(C\): nên mở rộng mô hình và dữ liệu <em>song song</em>, khác với kết luận trước đó (Kaplan và cộng sự, 2020) thiên về tăng mô hình nhanh hơn. Minh họa dưới đây dùng các hằng số mình nhớ từ bài gốc; bạn có thể sửa chúng.</p>
+<div class="viz" data-viz="scaling1" data-title="Mất mát theo kích thước mô hình khi giữ cố định ngân sách tính toán">
+  <p class="viz-help">Mỗi đường là một ngân sách; điểm trên đường là tối ưu. Đường quanh đáy khá phẳng: chọn N lệch một chút so với tối ưu chỉ mất ít. Kéo N của bạn rất xa tối ưu để thấy phần thua thiệt.</p>
+</div>
+<div class="callout warn"><span class="callout-title">Đừng coi một tỉ lệ cố định là quy luật</span>Với các hằng số trên, tỉ lệ tối ưu \(D^\star/N^\star\) mình tính được <em>tăng</em> theo ngân sách (khoảng 32 ở \(C=10^{19}\), khoảng 59 ở \(C\approx6\times10^{21}\), khoảng 120 ở \(C=10^{25}\)), vì \(\alpha\ne\beta\). Con số “khoảng 20 token cho mỗi tham số” thường được trích là kết luận tóm tắt từ các cách ước lượng khác trong cùng bài. Thực tế thì kết quả phụ thuộc cách ước lượng; một nghiên cứu sau (Besiroglu và cộng sự, 2024, mình nhớ tên “Chinchilla Scaling: A replication attempt”) cho rằng ước lượng gốc có sai lệch. Thêm nữa, mục tiêu “tối ưu mất mát tại thời điểm huấn luyện” khác mục tiêu “tối ưu tổng chi phí khi triển khai”: mô hình nhỏ huấn luyện lâu hơn mức tối ưu huấn luyện thường rẻ hơn khi phục vụ hàng tỷ yêu cầu.</div>
 
 <h2 id="post-training">Hậu huấn luyện: biến “bộ đoán chữ” thành trợ lý</h2>
 <p>Mô hình sau tiền huấn luyện chỉ tiếp nối văn bản. Để nó hữu ích và an toàn hơn, thường có các bước:</p>
@@ -79,6 +235,32 @@ $$C\approx 6\,N\,D\ \text{FLOPs}$$
 </ol>
 <p>Lưu ý: căn chỉnh theo ưu tiên của người đánh giá có thể đẩy mô hình tới hành vi “chiều lòng” (sycophancy) hoặc trả lời dài dòng, vì những đặc điểm đó đôi khi được chấm điểm cao.</p>
 
+<h3 id="dpo-suy-dan">Suy dẫn DPO từ bài toán RL có ràng buộc KL</h3>
+<p>Bước 1 (<strong>mô hình phần thưởng</strong>): giả sử xác suất người chọn \(y_w\) hơn \(y_l\) theo mô hình Bradley–Terry, \(P(y_w\succ y_l\mid x)=\sigma\big(r(x,y_w)-r(x,y_l)\big)\). Cực đại hóa log-likelihood trên các cặp ưu tiên cho mất mát \(L_{RM}=-\mathbb{E}\ln\sigma\big(r(x,y_w)-r(x,y_l)\big)\).</p>
+<p>Bước 2 (<strong>bài toán RLHF</strong>): với \(x\) cố định, tìm chính sách \(\pi(\cdot\mid x)\) cực đại hóa \(\mathbb{E}_{y\sim\pi}[r(x,y)]-\beta\,\mathrm{KL}(\pi\Vert\pi_{\text{ref}})\). Viết lại:</p>
+$$\sum_y\pi(y)\,r(y)-\beta\sum_y\pi(y)\ln\frac{\pi(y)}{\pi_{\text{ref}}(y)}=-\beta\,\mathrm{KL}\big(\pi\,\Vert\,\pi^\star\big)+\beta\ln Z,\qquad \pi^\star(y)=\frac{\pi_{\text{ref}}(y)\,e^{r(y)/\beta}}{Z},\quad Z=\sum_y\pi_{\text{ref}}(y)\,e^{r(y)/\beta}$$
+<p>Vì \(\mathrm{KL}\ge0\) và bằng 0 khi \(\pi=\pi^\star\), nghiệm tối ưu chính là \(\pi^\star\) (mình đã kiểm tra bằng mô phỏng: nghiệm đóng cho mục tiêu cao hơn mọi chính sách ngẫu nhiên thử qua).</p>
+<p>Bước 3 (<strong>đảo ngược</strong>): từ \(\pi^\star\) suy ra phần thưởng theo chính sách:</p>
+$$r(x,y)=\beta\ln\frac{\pi^\star(y\mid x)}{\pi_{\text{ref}}(y\mid x)}+\beta\ln Z(x)$$
+<p>Thế vào Bradley–Terry: hằng số \(\beta\ln Z(x)\) triệt tiêu khi lấy hiệu hai phần thưởng, và thay \(\pi^\star\) bằng chính sách đang huấn luyện \(\pi_\theta\):</p>
+$$L_{\text{DPO}}=-\mathbb{E}\,\ln\sigma\Big(\beta\ln\frac{\pi_\theta(y_w\mid x)}{\pi_{\text{ref}}(y_w\mid x)}-\beta\ln\frac{\pi_\theta(y_l\mid x)}{\pi_{\text{ref}}(y_l\mid x)}\Big)$$
+<p>Như vậy DPO là hồi quy logistic trên các cặp ưu tiên, với “phần thưởng ngầm” \(\beta\ln(\pi_\theta/\pi_{\text{ref}})\), không cần mô hình phần thưởng riêng hay vòng lặp RL. Ví dụ số: \(\pi_\theta(y_w)=0.4,\ \pi_\theta(y_l)=0.1,\ \pi_{\text{ref}}(y_w)=0.3,\ \pi_{\text{ref}}(y_l)=0.2,\ \beta=0.1\) cho hiệu \(=0.1(\ln\tfrac43-\ln\tfrac12)\approx0.098\), mất mát \(=-\ln\sigma(0.098)\approx0.645\). Với PPO (cách thường dùng trong RLHF cổ điển), mục tiêu cắt tỉ số xác suất \(\rho_t=\pi_\theta/\pi_{\text{old}}\) để bước cập nhật không đi quá xa:</p>
+$$L^{\text{CLIP}}=\mathbb{E}\Big[\min\big(\rho_tA_t,\ \mathrm{clip}(\rho_t,1-\epsilon,1+\epsilon)A_t\big)\Big]$$
+<pre><code class="language-python">import numpy as np
+
+def dpo_loss(logp_w, logp_l, ref_logp_w, ref_logp_l, beta=0.1):
+    """Mỗi đối số là log-xác suất của cả câu trả lời (tổng log-xác suất các token)."""
+    margin = beta * ((logp_w - ref_logp_w) - (logp_l - ref_logp_l))
+    return np.log1p(np.exp(-margin))                 # = -log(sigmoid(margin)), ổn định số học hơn khi margin lớn
+
+print(dpo_loss(np.log(0.4), np.log(0.1), np.log(0.3), np.log(0.2)))     # xấp xỉ 0.645
+
+# Kiểm tra nghiệm đóng của bài toán KL-regularized trên một phân phối rời rạc nhỏ
+rng = np.random.default_rng(0); ref = rng.dirichlet(np.ones(5)); r = rng.normal(size=5); beta = 0.7
+pi_star = ref * np.exp(r / beta); pi_star /= pi_star.sum()
+J = lambda pi: (pi * r).sum() - beta * (pi * np.log(pi / ref)).sum()
+print(J(pi_star) >= max(J(rng.dirichlet(np.ones(5))) for _ in range(20000)))       # True</code></pre>
+
 <h2 id="giai-ma">Giải mã: từ phân phối xác suất ra chữ</h2>
 <p>Mô hình cho logit \(z_i\) trên từng token. Cách chọn token quyết định phong cách đầu ra:</p>
 <ul>
@@ -90,6 +272,28 @@ $$C\approx 6\,N\,D\ \text{FLOPs}$$
   <p class="viz-help">Thử T rất thấp, T = 2, rồi kết hợp top-p thấp. Lấy mẫu 500 lần để thấy phân phối thực tế. Thứ tự áp dụng các bộ lọc có thể khác giữa các thư viện, hãy xem tài liệu của thư viện bạn dùng.</p>
 </div>
 <p>Ngay cả với \(T=0\), kết quả của dịch vụ LLM có thể không hoàn toàn lặp lại giữa các lần gọi do tính toán số thực song song và việc phân lô; đừng giả định tính xác định tuyệt đối.</p>
+
+<h3 id="giai-ma-sau">Nhiệt độ, beam search và giải mã suy đoán</h3>
+<p><strong>Nhiệt độ.</strong> Với \(p_i\propto e^{z_i/T}\): khi \(T\to0\) toàn bộ khối lượng dồn vào token có logit lớn nhất (greedy), khi \(T\to\infty\) phân phối tiến tới đều; entropy tăng đơn điệu theo \(T\). Ví dụ logit \((2,1,0)\): \(T=1\) cho \((0.665,0.245,0.090)\), \(T=0.5\) cho \((0.867,0.117,0.016)\). Nhớ rằng \(T\) không làm mô hình “sáng tạo hơn” theo nghĩa thông thường, nó chỉ trải khối lượng xác suất ra các token ít khả dĩ hơn, kể cả các token sai.</p>
+<p><strong>Beam search</strong> giữ \(B\) chuỗi ứng viên có tổng log-xác suất lớn nhất ở mỗi bước (thường chia cho \(\text{len}^{\alpha}\) để không thiên vị câu ngắn). Rất hợp với dịch máy và tác vụ có đáp án ít biến thiên; với sinh văn bản mở nó hay cho văn bản lặp và chung chung (Holtzman và cộng sự, 2019), vì chuỗi có xác suất cao nhất thường không phải chuỗi tự nhiên nhất.</p>
+<p><strong>Giải mã suy đoán</strong> (speculative decoding; Leviathan và cộng sự, 2022; Chen và cộng sự, 2023) tăng tốc mà <em>không đổi phân phối đầu ra</em>: một mô hình nhỏ (nháp) có phân phối \(q\) đề xuất token \(x\sim q\), mô hình lớn \(p\) kiểm tra nhiều token trong một lượt xuôi. Chấp nhận \(x\) với xác suất \(\min\big(1,p(x)/q(x)\big)\); nếu bị loại, lấy mẫu lại từ phần dư chuẩn hóa \(\propto\max(0,p-q)\). Xác suất cuối cùng ra \(x\):</p>
+$$\min(q_x,p_x)+\Big(1-\sum_y\min(q_y,p_y)\Big)\frac{\max(0,p_x-q_x)}{\sum_y\max(0,p_y-q_y)}=\min(q_x,p_x)+\max(0,p_x-q_x)=p_x$$
+<p>(vì \(\sum_y\max(0,p_y-q_y)=1-\sum_y\min(p_y,q_y)\)). Hiệu quả phụ thuộc tỉ lệ chấp nhận trung bình \(\sum_y\min(p_y,q_y)\): với \(p=(0.5,0.3,0.2)\), \(q=(0.6,0.3,0.1)\) là \(0.9\).</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+p = np.array([0.5, 0.3, 0.2])          # mô hình lớn (đích)
+q = np.array([0.6, 0.3, 0.1])          # mô hình nháp
+
+def speculative_sample():
+    x = rng.choice(3, p=q)
+    if rng.random() &lt; min(1.0, p[x] / q[x]):
+        return x                                   # chấp nhận token của mô hình nháp
+    resid = np.maximum(0, p - q); resid /= resid.sum()
+    return rng.choice(3, p=resid)                  # loại: lấy mẫu từ phần dư
+
+samples = [speculative_sample() for _ in range(200_000)]
+print(np.bincount(samples) / len(samples))         # xấp xỉ [0.5 0.3 0.2] = p, dù lấy mẫu từ q</code></pre>
 
 <h2 id="prompting">Prompting và học trong ngữ cảnh</h2>
 <p>Ở quy mô đủ lớn, LLM có thể học một tác vụ chỉ từ ví dụ ngay trong prompt mà không đổi trọng số (<em>in-context learning</em>; Brown và cộng sự, 2020). Một số thực hành đã được kiểm chứng rộng rãi:</p>
@@ -142,6 +346,60 @@ def build_prompt(query: str) -&gt; str:
 $$W'=W+\frac{\alpha}{r}BA,\qquad B\in\mathbb{R}^{d\times r},\;A\in\mathbb{R}^{r\times k},\;r\ll\min(d,k)$$
 <p>Với \(d=k=4096\) và \(r=8\): \(2\cdot4096\cdot8=65{,}536\) tham số huấn luyện, chỉ khoảng 0.39% so với \(4096^2=16{,}777{,}216\) của ma trận gốc. Do đó có thể tinh chỉnh mô hình lớn trên phần cứng khiêm tốn hơn nhiều.</p>
 
+<h3 id="lora-chi-tiet">LoRA chi tiết</h3>
+<p>Với ma trận \(W\in\mathbb{R}^{d_{out}\times d_{in}}\) và hạng \(r\), LoRA học \(B\in\mathbb{R}^{d_{out}\times r}\), \(A\in\mathbb{R}^{r\times d_{in}}\). Khởi tạo \(A\) ngẫu nhiên nhỏ và \(B=0\) nên \(\Delta W=\frac\alpha rBA=0\) lúc đầu: mô hình bắt đầu đúng tại mô hình gốc. Số tham số huấn luyện cho mỗi ma trận là \(r(d_{in}+d_{out})\); với \(d=4096\), \(r=8\): 65,536. Nếu chỉ áp dụng cho \(W_Q\) và \(W_V\) của mô hình 32 lớp ở trên: \(32\times2\times65{,}536\approx4.2\) triệu tham số, khoảng 0.06% của 6.7 tỷ. Khi suy luận có thể <strong>gộp</strong> \(W'=W+\frac\alpha rBA\) nên không tăng độ trễ. QLoRA (Dettmers và cộng sự, 2023) lượng tử hóa mô hình gốc xuống 4-bit và chỉ huấn luyện LoRA, cho phép tinh chỉnh mô hình lớn trên một GPU đơn.</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+d_out, d_in, r, alpha = 64, 48, 4, 8
+W = rng.normal(size=(d_out, d_in))
+A = rng.normal(0, 0.02, size=(r, d_in)); B = np.zeros((d_out, r))      # B = 0: ΔW = 0 lúc đầu
+x = rng.normal(size=d_in)
+
+y0 = W @ x + (alpha / r) * B @ (A @ x)
+print(np.allclose(y0, W @ x))                                       # True: khởi đầu đúng mô hình gốc
+
+B = rng.normal(0, 0.1, size=(d_out, r))                              # giả sử sau huấn luyện
+y_lora = W @ x + (alpha / r) * B @ (A @ x)
+W_merged = W + (alpha / r) * B @ A
+print(np.allclose(y_lora, W_merged @ x))                            # True: gộp trọng số cho cùng kết quả
+print(r * (d_in + d_out), "so với", d_in * d_out)                    # số tham số LoRA so với ma trận đầy đủ</code></pre>
+<h3 id="bm25">Truy hồi: BM25, kết hợp và xếp hạng lại</h3>
+<p><strong>BM25</strong> là tiêu chuẩn từ khóa trong truy hồi thông tin (Robertson và Zaragoza, 2009). So với TF-IDF thô, nó (1) bão hòa theo tần suất từ (xuất hiện lần thứ 10 ít giá trị hơn lần thứ 2) và (2) chuẩn hóa theo độ dài văn bản:</p>
+$$\mathrm{score}(D,Q)=\sum_{q\in Q}\mathrm{IDF}(q)\cdot\frac{f(q,D)\,(k_1+1)}{f(q,D)+k_1\big(1-b+b\,\tfrac{|D|}{\mathrm{avgdl}}\big)},\qquad \mathrm{IDF}(q)=\ln\Big(\frac{N-n_q+0.5}{n_q+0.5}+1\Big)$$
+<p>với \(f(q,D)\) là số lần \(q\) xuất hiện trong \(D\), \(n_q\) là số văn bản chứa \(q\), thường \(k_1\in[1.2,2]\), \(b=0.75\). Truy hồi từ khóa giỏi khớp chính xác (tên riêng, mã lỗi) nhưng không hiểu đồng nghĩa; <strong>truy hồi dày đặc</strong> (embedding, ví dụ DPR của Karpukhin và cộng sự, 2020) hiểu ngữ nghĩa nhưng có thể bỏ sót khớp chính xác. Thực tế thường dùng <strong>cả hai</strong> rồi trộn xếp hạng bằng <em>Reciprocal Rank Fusion</em> (Cormack và cộng sự, 2009): \(\mathrm{RRF}(d)=\sum_{r}\frac{1}{k+\mathrm{rank}_r(d)}\) với \(k\approx60\), rồi dùng mô hình <em>xếp hạng lại</em> (cross-encoder, đọc cùng lúc truy vấn và đoạn văn) trên top vài chục kết quả.</p>
+<pre><code class="language-python">import math
+
+docs = ["con mèo ngồi trên thảm", "con chó ngồi trên ghế", "mèo và chó là thú cưng"]
+tok = [d.split() for d in docs]
+N, avgdl = len(docs), sum(map(len, tok)) / len(docs)
+df = {}
+for t in tok:
+    for w in set(t):
+        df[w] = df.get(w, 0) + 1
+
+def bm25(query, t, k1=1.5, b=0.75):
+    s = 0.0
+    for w in query.split():
+        if w not in df:
+            continue
+        idf = math.log((N - df[w] + 0.5) / (df[w] + 0.5) + 1)
+        f = t.count(w)
+        s += idf * f * (k1 + 1) / (f + k1 * (1 - b + b * len(t) / avgdl))
+    return s
+
+print([round(bm25("mèo thảm", t), 3) for t in tok])     # [1.493, 0.0, 0.445]: văn bản 1 khớp cả hai từ
+
+def rrf(rankings, k=60):                                  # rankings: danh sách các danh sách id đã xếp hạng
+    score = {}
+    for ranking in rankings:
+        for pos, d in enumerate(ranking, start=1):
+            score[d] = score.get(d, 0) + 1 / (k + pos)
+    return sorted(score, key=score.get, reverse=True)
+
+print(rrf([[0, 2, 1], [2, 0, 1]]))                        # [0, 2, 1]: các văn bản được cả hai danh sách ưa thích lên đầu</code></pre>
+<p><strong>Đánh giá truy hồi</strong> cần tách khỏi đánh giá sinh: recall@k (đoạn đúng có nằm trong top-k không), MRR \(=\frac1{|Q|}\sum1/\mathrm{rank}\) của đoạn đúng đầu tiên, nDCG khi có nhiều mức độ liên quan. Phần lớn lỗi “RAG trả lời sai” thực ra là lỗi truy hồi (đoạn đúng không được lấy ra), và sinh trả lời sai khi đoạn đúng đã có trong ngữ cảnh là lỗi khác hẳn; đo riêng mới biết sửa ở đâu. Chia đoạn quá ngắn mất ngữ cảnh, quá dài làm nhiễu và tốn token; hãy thử vài cỡ (ví dụ vài trăm token, có chồng lấn nhỏ) trên bộ câu hỏi của chính bạn.</p>
+
 <h2 id="goi-code">Gọi LLM trong code</h2>
 <p>Hai mẫu thường gặp: gọi API của nhà cung cấp, hoặc chạy mô hình mở cục bộ. Ví dụ dùng SDK Python của Anthropic (tên mô hình hãy lấy từ tài liệu hiện hành):</p>
 <pre><code class="language-python"># pip install anthropic
@@ -177,6 +435,51 @@ print(tok.decode(out[0], skip_special_tokens=True))</code></pre>
   <li><strong>Đánh giá khó</strong>: điểm benchmark công khai có thể bị rò rỉ vào dữ liệu huấn luyện và không phản ánh bài toán của bạn. Hãy xây bộ đánh giá riêng. Dùng “LLM làm giám khảo” thì phải kiểm tra độ nhất quán với đánh giá của người.</li>
 </ul>
 
+<h2 id="danh-gia-llm">Đánh giá LLM cho đúng</h2>
+<h3 id="nhieu-thong-ke">Điểm số có sai số thống kê</h3>
+<p>Độ chính xác đo trên \(n\) câu hỏi là một ước lượng với sai số chuẩn \(\sqrt{p(1-p)/n}\). Với \(n=200\), \(p=0.7\): sai số chuẩn \(\approx0.032\), khoảng tin cậy 95% khoảng \(\pm6.4\) điểm phần trăm. Hai mô hình cách nhau 3 điểm trên 200 câu hỏi <em>không</em> phân biệt được. Hãy dùng đủ câu hỏi, báo cáo khoảng tin cậy, và với so sánh cặp hãy dùng kiểm định ghép cặp trên cùng bộ câu hỏi (các lỗi của hai mô hình thường tương quan, nên so sánh ghép cặp mạnh hơn so sánh hai khoảng tin cậy riêng).</p>
+<h3 id="pass-at-k">pass@k cho sinh mã và bài toán có đáp án kiểm chứng</h3>
+<p>Khi mỗi bài có thể kiểm tra đúng/sai tự động (chạy kiểm thử), người ta sinh \(n\) lời giải cho mỗi bài, đếm \(c\) lời giải đúng, rồi ước lượng xác suất “ít nhất một trong \(k\) lời giải được chọn ngẫu nhiên là đúng” (Chen và cộng sự, 2021):</p>
+$$\text{pass@}k=1-\frac{\binom{n-c}{k}}{\binom{n}{k}}$$
+<p>Lý do: xác suất một tập \(k\) lời giải chọn ngẫu nhiên từ \(n\) lời giải <em>không</em> chứa lời giải đúng nào là \(\binom{n-c}{k}/\binom nk\). Ví dụ \(n=20,\ c=3\): pass@1 \(=0.15\), pass@5 \(\approx0.601\), pass@10 \(\approx0.895\). Ước lượng này không chệch, khác với cách ngây thơ “sinh đúng \(k\) lời giải rồi xem có đúng không” có phương sai cao.</p>
+<pre><code class="language-python">from math import comb
+
+def pass_at_k(n, c, k):
+    if n - c &lt; k:
+        return 1.0                      # không thể chọn k lời giải mà toàn sai
+    return 1.0 - comb(n - c, k) / comb(n, k)
+
+print([round(pass_at_k(20, 3, k), 3) for k in (1, 5, 10)])     # [0.15, 0.601, 0.895]</code></pre>
+<h3 id="bay-danh-gia">Những cái bẫy khi đánh giá</h3>
+<ul>
+  <li><strong>Ô nhiễm dữ liệu (contamination)</strong>: câu hỏi benchmark có thể đã nằm trong dữ liệu huấn luyện nên điểm cao không đồng nghĩa với năng lực. Ưu tiên bộ kiểm tra riêng, mới, hoặc đổi biểu diễn câu hỏi.</li>
+  <li><strong>Perplexity không so sánh được giữa các bộ tách token</strong>: số token khác nhau cho cùng văn bản. Dùng <em>bits per byte</em> (tổng mất mát bằng bit chia cho số byte của văn bản) để so công bằng hơn.</li>
+  <li><strong>Mô hình làm giám khảo</strong> (Zheng và cộng sự, 2023) tiện và rẻ nhưng có thiên kiến đã được ghi nhận: ưu ái câu trả lời dài hơn, đứng ở vị trí đầu, hoặc do chính họ mô hình đó sinh ra. Hãy kiểm tra độ nhất quán với người chấm trên một mẫu, đảo thứ tự các đáp án, và dùng tiêu chí chấm cụ thể.</li>
+  <li><strong>Nhạy với prompt và cấu hình</strong>: thay đổi nhỏ về định dạng, ví dụ mẫu hay nhiệt độ có thể đổi điểm đáng kể; báo cáo cấu hình đầy đủ và chạy lặp.</li>
+  <li><strong>Đánh giá phải gắn với việc dùng thật</strong>: xây bộ ca kiểm tra từ dữ liệu và rủi ro của sản phẩm bạn, bao gồm cả ca khó và ca “nên từ chối”.</li>
+</ul>
+
+<h2 id="doc-paper">Đọc nhanh các bài báo nền tảng</h2>
+<p>Ý chính theo hiểu biết của mình; hãy đối chiếu bản gốc và tra tên bài để lấy thông tin xuất bản chính xác.</p>
+<table>
+  <thead><tr><th>Công trình</th><th>Ý chính đáng nhớ</th></tr></thead>
+  <tbody>
+    <tr><td>Bahdanau, Cho, Bengio (2014), <em>Neural Machine Translation by Jointly Learning to Align and Translate</em>, arXiv:1409.0473</td><td>Attention đầu tiên cho dịch máy: decoder học cách nhìn vào các phần khác nhau của câu nguồn.</td></tr>
+    <tr><td>Vaswani và cộng sự (2017), arXiv:1706.03762</td><td>Bỏ hồi quy, chỉ dùng attention và FFN; mở khả năng song song hóa và mở rộng quy mô.</td></tr>
+    <tr><td>Su và cộng sự (2021), <em>RoFormer: Enhanced Transformer with Rotary Position Embedding</em>, arXiv:2104.09864</td><td>RoPE: quay q, k theo vị trí để attention phụ thuộc khoảng cách tương đối.</td></tr>
+    <tr><td>Shazeer (2019), <em>Fast Transformer Decoding: One Write-Head is All You Need</em>, arXiv:1911.02150; Ainslie và cộng sự (2023), <em>GQA</em>, arXiv:2305.13245</td><td>Chia sẻ K/V giữa các đầu Q để giảm KV cache và tăng tốc giải mã.</td></tr>
+    <tr><td>Dao và cộng sự (2022), <em>FlashAttention</em>, arXiv:2205.14135</td><td>Attention chính xác, nhận biết phân cấp bộ nhớ, softmax trực tuyến theo khối.</td></tr>
+    <tr><td>Shazeer (2020), <em>GLU Variants Improve Transformer</em>, arXiv:2002.05202; Zhang và Sennrich (2019), <em>Root Mean Square Layer Normalization</em>, arXiv:1910.07467</td><td>SwiGLU và RMSNorm: hai chi tiết kiến trúc phổ biến trong các mô hình gần đây.</td></tr>
+    <tr><td>Kaplan và cộng sự (2020), arXiv:2001.08361; Hoffmann và cộng sự (2022), arXiv:2203.15556</td><td>Luật mũ của mất mát theo \(N\), \(D\), \(C\); nên mở rộng cả mô hình lẫn dữ liệu.</td></tr>
+    <tr><td>Christiano và cộng sự (2017), <em>Deep reinforcement learning from human preferences</em>, arXiv:1706.03741; Schulman và cộng sự (2017), <em>PPO</em>, arXiv:1707.06347; Ouyang và cộng sự (2022), arXiv:2203.02155</td><td>Học phần thưởng từ so sánh của người, tối ưu bằng PPO: nền tảng của RLHF cho mô hình ngôn ngữ.</td></tr>
+    <tr><td>Rafailov và cộng sự (2023), arXiv:2305.18290</td><td>DPO: hồi quy logistic trên cặp ưu tiên với phần thưởng ngầm \(\beta\ln(\pi/\pi_{\text{ref}})\).</td></tr>
+    <tr><td>Leviathan và cộng sự (2022), arXiv:2211.17192; Chen và cộng sự (2023), arXiv:2302.01318</td><td>Giải mã suy đoán: tăng tốc mà giữ nguyên phân phối đầu ra.</td></tr>
+    <tr><td>Hu và cộng sự (2021), arXiv:2106.09685; Dettmers và cộng sự (2023), arXiv:2305.14314</td><td>LoRA và QLoRA: tinh chỉnh hiệu quả tham số.</td></tr>
+    <tr><td>Robertson và Zaragoza (2009), <em>The Probabilistic Relevance Framework: BM25 and Beyond</em>; Karpukhin và cộng sự (2020), arXiv:2004.04906; Lewis và cộng sự (2020), arXiv:2005.11401</td><td>BM25, truy hồi dày đặc và RAG.</td></tr>
+    <tr><td>Chen và cộng sự (2021), <em>Evaluating Large Language Models Trained on Code</em>, arXiv:2107.03374; Zheng và cộng sự (2023), arXiv:2306.05685</td><td>Ước lượng pass@k và việc dùng mô hình làm giám khảo cùng các thiên kiến.</td></tr>
+  </tbody>
+</table>
+
 <h2 id="bai-tap">Bài tập</h2>
 <details class="exercise">
   <summary>Bài 1. Đếm tham số</summary>
@@ -202,6 +505,37 @@ print(tok.decode(out[0], skip_special_tokens=True))</code></pre>
   <div class="ex-body"><p>Làm theo loạt bài xây dựng GPT nhỏ từ đầu của Karpathy (xem phần tài liệu) và huấn luyện trên một tệp văn bản nhỏ. Ghi lại mất mát và cách đầu ra thay đổi khi huấn luyện lâu hơn.</p></div>
 </details>
 
+<details class="exercise">
+  <summary>Bài 6. Đếm tham số với GQA</summary>
+  <div class="ex-body"><p>Một mô hình có \(L=32,\ d=4096,\ h=32,\ n_{kv}=8,\ d_{ff}=14336,\ V=128000\) (FFN cổng, embedding vào và ra tách rời). Ước lượng số tham số.</p>
+  <p><em>Lời giải:</em> \(d_h=128\). Mỗi lớp: \(2d^2=33.55\) M; K, V: \(2\cdot4096\cdot8\cdot128=8.39\) M; FFN: \(3\cdot4096\cdot14336=176.16\) M; tổng \(218.1\) M. Nhân 32: \(6.98\) tỷ. Embedding: \(2\cdot128000\cdot4096=1.05\) tỷ. Tổng \(\approx8.03\) tỷ.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 7. KV cache với GQA</summary>
+  <div class="ex-body"><p>Với cấu hình ở Bài 6 và KV 16-bit, KV cache mỗi token và cho chuỗi 8192 token là bao nhiêu? So với trường hợp \(n_{kv}=32\).</p>
+  <p><em>Lời giải:</em> \(2\cdot32\cdot8\cdot128\cdot2=131{,}072\) byte \(=128\) KiB mỗi token; \(\times8192=1\) GiB. Với \(n_{kv}=32\) sẽ gấp 4 lần: 4 GiB.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 8. Chi phí huấn luyện</summary>
+  <div class="ex-body"><p>Huấn luyện mô hình 8 tỷ tham số trên \(1.6\times10^{12}\) token. Dùng \(C\approx6ND\); nếu mỗi GPU đạt thông lượng hiệu dụng \(4\times10^{14}\) FLOP/s, cần bao nhiêu GPU-giờ?</p>
+  <p><em>Lời giải:</em> \(C=6\cdot8\times10^9\cdot1.6\times10^{12}=7.68\times10^{22}\) FLOP; chia cho \(4\times10^{14}\) được \(1.92\times10^8\) GPU-giây \(\approx5.3\times10^4\) GPU-giờ. (Giả định đơn giản: hiệu suất sử dụng thực tế khác nhau nhiều.)</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 9. pass@k</summary>
+  <div class="ex-body"><p>Sinh \(n=10\) lời giải, có \(c=2\) lời giải đúng. Tính pass@3.</p>
+  <p><em>Lời giải:</em> \(1-\binom83/\binom{10}3=1-56/120\approx0.533\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 10. Giải mã suy đoán</summary>
+  <div class="ex-body"><p>\(p=(0.5,0.3,0.2)\), \(q=(0.6,0.3,0.1)\). Tính xác suất chấp nhận một token của mô hình nháp, và phân phối lấy mẫu lại khi bị loại.</p>
+  <p><em>Lời giải:</em> chấp nhận \(=\sum\min(p,q)=0.5+0.3+0.1=0.9\). Phần dư \(\max(0,p-q)=(0,0,0.1)\) nên phân phối lấy mẫu lại là \((0,0,1)\): khi bị loại, token thứ ba được chọn, bù đúng phần mô hình nháp đánh giá thấp.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 11. Hằng số triệt tiêu trong DPO</summary>
+  <div class="ex-body"><p>Giải thích vì sao \(\ln Z(x)\) không xuất hiện trong mất mát DPO, và ý nghĩa của điều đó với việc “phần thưởng chỉ xác định tới một hằng số theo \(x\)”.</p>
+  <p><em>Lời giải:</em> Bradley–Terry chỉ phụ thuộc <em>hiệu</em> \(r(x,y_w)-r(x,y_l)\); cộng cùng một hàm của \(x\) vào cả hai phần thưởng không đổi hiệu, nên \(\beta\ln Z(x)\) (cùng \(x\)) triệt tiêu. Do đó dữ liệu ưu tiên chỉ xác định phần thưởng tới một hằng số phụ thuộc \(x\).</p></div>
+</details>
+
 <h2 id="tham-khao">Tài liệu tham khảo</h2>
 <ol class="refs">
   <li>Vaswani và cộng sự (2017), <em>Attention Is All You Need</em>, arXiv:1706.03762.</li>
@@ -214,6 +548,10 @@ print(tok.decode(out[0], skip_special_tokens=True))</code></pre>
   <li>Lewis và cộng sự (2020), <em>Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks</em>, arXiv:2005.11401.</li>
   <li>Wei và cộng sự (2022), <em>Chain-of-Thought Prompting Elicits Reasoning in Large Language Models</em>, arXiv:2201.11903.</li>
   <li>Holtzman và cộng sự (2019), <em>The Curious Case of Neural Text Degeneration</em>, arXiv:1904.09751. Liu và cộng sự (2023), <em>Lost in the Middle</em>, arXiv:2307.03172.</li>
+  <li>Su và cộng sự (2021), <em>RoFormer</em>, arXiv:2104.09864. Ainslie và cộng sự (2023), <em>GQA</em>, arXiv:2305.13245. Dao và cộng sự (2022), <em>FlashAttention</em>, arXiv:2205.14135.</li>
+  <li>Christiano và cộng sự (2017), arXiv:1706.03741. Schulman và cộng sự (2017), <em>Proximal Policy Optimization Algorithms</em>, arXiv:1707.06347. Leviathan và cộng sự (2022), arXiv:2211.17192.</li>
+  <li>Robertson và Zaragoza (2009), <em>The Probabilistic Relevance Framework: BM25 and Beyond</em>. Karpukhin và cộng sự (2020), <em>Dense Passage Retrieval</em>, arXiv:2004.04906. Dettmers và cộng sự (2023), <em>QLoRA</em>, arXiv:2305.14314.</li>
+  <li>Chen và cộng sự (2021), <em>Evaluating Large Language Models Trained on Code</em>, arXiv:2107.03374. Zheng và cộng sự (2023), <em>Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena</em>, arXiv:2306.05685.</li>
 </ol>
 <p class="meta">Mình trích số arXiv và tên bài theo trí nhớ; hãy tìm bằng tên bài trên arxiv.org để xác nhận trước khi dẫn lại.</p>
 
