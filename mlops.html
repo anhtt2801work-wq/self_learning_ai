@@ -14,6 +14,7 @@
 <script defer src="assets/js/search-index.js"></script>
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-mlops.js"></script>
+<script defer src="assets/js/viz-mlops2.js"></script>
 </head>
 <body data-page="mlops">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -196,8 +197,73 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code></p
 </div>
 <p>Các đòn bẩy khác để giảm chi phí và độ trễ: lượng tử hóa (quantization), chưng cất (distillation), biên dịch/tối ưu đồ thị (ví dụ xuất sang ONNX), bộ nhớ đệm cho yêu cầu lặp, và mô hình nhỏ hơn cho các ca dễ. Luôn đo độ trễ theo phân vị (p50, p95, p99), không chỉ trung bình.</p>
 
+<h3 id="hang-doi">Hàng đợi: vì sao độ trễ vọt lên khi gần đầy tải</h3>
+<p>Mô hình đơn giản nhất: yêu cầu đến theo quá trình Poisson với tốc độ \(\lambda\), một máy phục vụ với thời gian xử lý mũ có tốc độ \(\mu\) (M/M/1), mức sử dụng \(\rho=\lambda/\mu<1\). Thời gian ở trong hệ thống (chờ + xử lý) có phân phối mũ với tốc độ \(\mu-\lambda\), nên</p>
+$$\bar W=\frac{1}{\mu-\lambda}=\frac{1/\mu}{1-\rho},\qquad q\text{-quantile}:\ \ t_q=\frac{-\ln(1-q)}{\mu-\lambda}$$
+<p>Với thời gian xử lý trung bình 20 ms (\(\mu=50\)/giây): \(\rho=0.5\) cho độ trễ trung bình 40 ms và p99 \(=4.605/25\approx184\) ms; \(\rho=0.9\) cho trung bình 200 ms và p99 \(\approx921\) ms, gấp 46 lần thời gian xử lý. Đường cong có dạng \(1/(1-\rho)\) nên <strong>chỉ vài phần trăm tải thêm ở vùng gần đầy tải làm độ trễ tăng gấp bội</strong>. Hệ quả vận hành: muốn p99 \(\le200\) ms với thời gian xử lý 20 ms trên một máy, cần \(\mu-\lambda\ge23.03\), tức \(\rho\le0.539\): bạn chỉ dùng được khoảng 54% công suất, nên chi phí mỗi dự đoán lớn hơn lý tưởng khoảng \(1/0.539\approx1.86\) lần. Với \(c\) bản sao dùng chung một hàng đợi (M/M/c), công thức Erlang C cho xác suất phải chờ \(C(c,a)\) với \(a=\lambda/\mu\) và thời gian chờ trung bình \(C(c,a)/(c\mu-\lambda)\); cùng mức sử dụng, nhiều bản sao chờ ít hơn.</p>
+<div class="viz" data-viz="queue1" data-title="Độ trễ theo mức sử dụng: một máy hay nhiều bản sao">
+  <p class="viz-help">Kéo ρ lên gần 1 để thấy độ trễ bùng nổ. Tăng số bản sao c ở cùng ρ: thời gian chờ giảm nhiều so với một máy.</p>
+</div>
+<pre><code class="language-python">import heapq
+import math
+import numpy as np
+
+def erlang_c(c, a):
+    """Xác suất một yêu cầu phải chờ trong hàng M/M/c; a = λ/μ (tải đề nghị, phải &lt; c)."""
+    s = sum(a**k / math.factorial(k) for k in range(c))
+    top = a**c / math.factorial(c) * c / (c - a)
+    return top / (s + top)
+
+def mmc(lmbda, mu, c):
+    a = lmbda / mu
+    pw = erlang_c(c, a)
+    wq = pw / (c * mu - lmbda)                       # thời gian chờ trung bình
+    p95 = max(0.0, math.log(pw / 0.05) / (c * mu - lmbda))   # phân vị 95% của thời gian chờ
+    return {"rho": a / c, "P(chờ)": pw, "Wq": wq, "W": wq + 1 / mu, "p95 chờ": p95}
+
+def simulate(lmbda, mu, c, n=200_000, seed=0):
+    """Mô phỏng hàng đợi FIFO M/M/c để đối chiếu công thức."""
+    rng = np.random.default_rng(seed)
+    t, free, waits = 0.0, [0.0] * c, []
+    heapq.heapify(free)
+    for _ in range(n):
+        t += rng.exponential(1 / lmbda)              # thời điểm đến
+        start = max(t, heapq.heappop(free))          # máy rảnh sớm nhất
+        waits.append(start - t)
+        heapq.heappush(free, start + rng.exponential(1 / mu))
+    w = np.array(waits[n // 10:])                    # bỏ giai đoạn khởi động
+    return w.mean(), np.quantile(w, 0.95)
+
+mu = 50.0                                            # 50 yêu cầu/giây mỗi máy → thời gian xử lý trung bình 20 ms
+for c, rho in [(1, 0.5), (1, 0.9), (10, 0.9)]:
+    lam = rho * c * mu
+    f = mmc(lam, mu, c); wq_sim, p95_sim = simulate(lam, mu, c)
+    print(f"c={c:&gt;2}, ρ={rho}: chờ TB {f['Wq']*1000:6.1f} ms (mô phỏng {wq_sim*1000:6.1f}), p95 chờ {f['p95 chờ']*1000:6.1f} ms (mô phỏng {p95_sim*1000:6.1f}), "
+          f"độ trễ TB {f['W']*1000:6.1f} ms")</code></pre>
+<p>Mô phỏng ở ρ cao dao động quanh công thức (độ lệch vài phần trăm là nhiễu mô phỏng vì các lần chờ liên tiếp tương quan mạnh). Giới hạn của mô hình: đến Poisson và xử lý mũ hiếm khi đúng; tải theo đợt, thời gian xử lý đuôi dài và khởi động nguội còn làm độ trễ tệ hơn. Đo thật, và đặt cảnh báo trên p95/p99, không phải trung bình.</p>
 <h2 id="trien-khai">Triển khai an toàn và CI/CD cho ML</h2>
 <p>Pipeline điển hình: thay đổi mã hoặc dữ liệu → CI (lint, kiểm thử đơn vị, kiểm tra dữ liệu) → huấn luyện tái lập được → đánh giá <em>so với mô hình đang chạy</em> trên cùng tập kiểm tra → đăng ký phiên bản → triển khai dần → giám sát. Điều kiện “tốt hơn” cần định nghĩa trước (chỉ số, ngưỡng, các nhóm con không được tệ đi).</p>
+<figure class="diagram">
+<svg viewBox="0 0 640 250" role="img" aria-label="Pipeline CI/CD cho ML: commit, CI, huấn luyện, cổng đánh giá, đăng ký, shadow, canary, toàn bộ, giám sát và vòng phản hồi">
+  <rect class="box" x="8" y="26" width="64" height="40" rx="6"/><text x="40" y="50" text-anchor="middle" class="small">commit</text>
+  <rect class="box c1" x="92" y="26" width="64" height="40" rx="6"/><text x="124" y="43" text-anchor="middle" class="small">CI: lint,</text><text x="124" y="57" text-anchor="middle" class="small">test, dữ liệu</text>
+  <rect class="box c1" x="176" y="26" width="64" height="40" rx="6"/><text x="208" y="43" text-anchor="middle" class="small">huấn luyện</text><text x="208" y="57" text-anchor="middle" class="small">tái lập</text>
+  <rect class="box c3" x="260" y="26" width="64" height="40" rx="6"/><text x="292" y="43" text-anchor="middle" class="small">cổng đánh</text><text x="292" y="57" text-anchor="middle" class="small">giá</text>
+  <rect class="box c1" x="344" y="26" width="64" height="40" rx="6"/><text x="376" y="43" text-anchor="middle" class="small">đăng ký</text><text x="376" y="57" text-anchor="middle" class="small">(registry)</text>
+  <rect class="box c2" x="428" y="26" width="64" height="40" rx="6"/><text x="460" y="50" text-anchor="middle" class="small">shadow</text>
+  <rect class="box c2" x="512" y="26" width="56" height="40" rx="6"/><text x="540" y="50" text-anchor="middle" class="small">canary</text>
+  <rect class="box c2" x="580" y="26" width="52" height="40" rx="6"/><text x="606" y="50" text-anchor="middle" class="small">100%</text>
+  <path class="arrow" d="M72 46 H90"/><path class="arrow" d="M156 46 H174"/><path class="arrow" d="M240 46 H258"/><path class="arrow" d="M324 46 H342"/><path class="arrow" d="M408 46 H426"/><path class="arrow" d="M492 46 H510"/><path class="arrow" d="M568 46 H578"/>
+  <rect class="box c4" x="380" y="130" width="250" height="52" rx="8"/><text x="505" y="150" text-anchor="middle" class="small bold">Giám sát: hệ thống · dữ liệu · chất lượng</text><text x="505" y="168" text-anchor="middle" class="small muted">độ trễ p95, PSI/KS, chỉ số khi có nhãn</text>
+  <path class="arrow" d="M606 68 V128"/><text x="598" y="116" text-anchor="end" class="small muted">vận hành</text>
+  <path class="arrow c3" d="M380 156 H292 V68"/><text x="296" y="118" class="small">suy giảm / drift</text><text x="296" y="132" class="small">→ huấn luyện lại</text>
+  <rect class="box" x="8" y="130" width="150" height="52" rx="8"/><text x="83" y="150" text-anchor="middle" class="small bold">Mã + dữ liệu + cấu hình</text><text x="83" y="168" text-anchor="middle" class="small muted">Git · DVC · lock file</text>
+  <path class="line dash" d="M83 130 V90"/><path class="line dash" d="M40 90 H572"/>
+  <path class="line dash" d="M40 90 V66 M124 90 V66 M208 90 V66 M292 90 V66 M376 90 V66 M460 90 V66 M540 90 V66"/><text x="104" y="106" class="small muted">cùng một phiên bản đã ghim</text>
+  <text x="320" y="224" text-anchor="middle" class="small muted">Rollback: chuyển lại phiên bản trước trong registry (kèm đặc trưng và lược đồ dữ liệu đi cùng)</text>
+</svg>
+<figcaption>Cổng đánh giá so mô hình mới với mô hình đang chạy; các bước shadow và canary giới hạn tác động; giám sát khép vòng bằng cách kích hoạt huấn luyện lại.</figcaption>
+</figure>
 <table>
   <thead><tr><th>Chiến lược</th><th>Cách làm</th><th>Dùng khi</th></tr></thead>
   <tbody>
@@ -207,6 +273,73 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code></p
     <tr><td>Blue/green</td><td>Hai môi trường song song, chuyển lưu lượng một lần; quay lui chỉ là chuyển lại.</td><td>Cần quay lui tức thì.</td></tr>
   </tbody>
 </table>
+<h3 id="ab-suy-dan">A/B test: cỡ mẫu, công suất và những cái bẫy</h3>
+<p>So sánh tỉ lệ \(p_1\) (đối chứng) với \(p_2=p_1+\delta\). Với \(n\) mẫu mỗi nhóm, hiệu \(\hat p_2-\hat p_1\) xấp xỉ chuẩn với phương sai \((p_1q_1+p_2q_2)/n\) (\(q=1-p\)). Muốn bác bỏ \(H_0\) ở mức \(\alpha\) (hai phía) và có công suất \(1-\beta\) trước hiệu ứng \(\delta\), cần \(\delta/\mathrm{SE}\ge z_{1-\alpha/2}+z_{1-\beta}\), suy ra (xấp xỉ, coi SE dưới \(H_0\) và \(H_1\) gần nhau)</p>
+$$n\;\approx\;\frac{(z_{1-\alpha/2}+z_{1-\beta})^2\,(p_1q_1+p_2q_2)}{\delta^2}$$
+<p>Ví dụ \(p_1=10\%\), \(\delta=1\) điểm phần trăm, \(\alpha=0.05\), công suất 80%: \((1.960+0.842)^2\cdot0.1879/0.0001\approx14{,}750\) mẫu mỗi nhóm (mô phỏng cho công suất \(\approx0.79\), khớp). Bốn điều đáng nhớ: (1) \(n\propto1/\delta^2\): phát hiện hiệu ứng nhỏ <em>một nửa</em> tốn gấp 4 lần mẫu. (2) Cỡ mẫu phụ thuộc tỉ lệ nền: \(5\%\to6\%\) cần khoảng 8,155 mẫu mỗi nhóm, nhưng \(5\%\to5.5\%\) cần khoảng 31,231. (3) <strong>Nhìn trộm</strong>: dừng ngay khi \(p<0.05\) ở một trong 5 lần kiểm tra giữa chừng nâng tỉ lệ dương tính giả từ 5% lên khoảng 14% (mô phỏng bên dưới); hãy cố định cỡ mẫu từ đầu hoặc dùng kiểm định tuần tự có hiệu chỉnh (alpha spending). (4) <strong>Sample ratio mismatch</strong>: nếu tỉ lệ chia nhóm quan sát lệch kế hoạch (10,200 so với 9,800 thay vì 50/50 trên 20,000, \(\chi^2=8.0\), \(p\approx0.0047\)) thì thường có lỗi gán nhóm hoặc ghi log, và kết quả không đáng tin cho đến khi tìm ra nguyên nhân.</p>
+<div class="viz" data-viz="ab1" data-title="Cỡ mẫu và công suất của A/B test">
+  <p class="viz-help">Đổi tỉ lệ nền và hiệu ứng nhỏ nhất cần phát hiện. Chấm cam là cỡ mẫu đạt công suất mục tiêu.</p>
+</div>
+<pre><code class="language-python">import numpy as np
+from scipy.stats import norm
+
+def n_per_arm(p1, p2, alpha=0.05, power=0.8):
+    """Số mẫu mỗi nhóm để phát hiện p1 → p2 (hai phía, xấp xỉ chuẩn)."""
+    za, zb = norm.ppf(1 - alpha / 2), norm.ppf(power)
+    return (za + zb)**2 * (p1 * (1 - p1) + p2 * (1 - p2)) / (p2 - p1)**2
+
+n = n_per_arm(0.10, 0.11)
+print("n mỗi nhóm:", round(n))                                   # ≈ 14,749
+
+# kiểm tra bằng mô phỏng: với n mẫu mỗi nhóm, tỉ lệ bác bỏ khi có hiệu ứng thật nên ≈ 80%
+rng = np.random.default_rng(0)
+def z_test(a, b):
+    p = (a.mean() + b.mean()) / 2
+    se = np.sqrt(p * (1 - p) * (1 / len(a) + 1 / len(b)))
+    return abs(a.mean() - b.mean()) / se &gt; 1.96
+trials = 2000
+power = np.mean([z_test(rng.random(int(n)) &lt; 0.10, rng.random(int(n)) &lt; 0.11) for _ in range(trials)])
+print("công suất mô phỏng:", round(float(power), 3))
+
+# "Nhìn trộm" (peeking): không có hiệu ứng thật, nhưng kiểm tra 5 lần và dừng ngay khi p &lt; 0.05
+def peeking_false_positive(looks=5, n_total=5000, trials=2000):
+    hit = 0
+    for _ in range(trials):
+        a, b = rng.random(n_total) &lt; 0.10, rng.random(n_total) &lt; 0.10          # cùng tỉ lệ thật
+        for k in range(1, looks + 1):
+            m = n_total * k // looks
+            if z_test(a[:m], b[:m]):
+                hit += 1; break
+    return hit / trials
+print("tỉ lệ dương tính giả khi nhìn trộm 5 lần:", round(peeking_false_positive(), 3), "(danh nghĩa 0.05)")
+
+# Kiểm tra tỉ lệ phân chia (SRM): chia 50/50 nhưng quan sát 10,200 và 9,800
+from scipy.stats import chi2
+obs, total = np.array([10200, 9800]), 20000
+stat = float(((obs - total / 2)**2 / (total / 2)).sum())
+print("SRM: χ² =", stat, ", p =", round(float(chi2.sf(stat, 1)), 4))</code></pre>
+<p>Cũng nhớ: kiểm định nhiều chỉ số hoặc nhiều biến thể mà không hiệu chỉnh làm tăng kết quả “có ý nghĩa” do ngẫu nhiên; chọn trước một chỉ số chính và các chỉ số bảo vệ (guardrail: độ trễ, tỉ lệ lỗi). Sách <em>Trustworthy Online Controlled Experiments</em> (Kohavi, Tang, Xu) là tài liệu tham khảo thực hành về chủ đề này.</p>
+<h3 id="canary-toan">Canary: cần bao nhiêu bằng chứng?</h3>
+<p>Giả sử bản hiện tại có tỉ lệ lỗi \(p_0\) đã biết chính xác từ lượng lớn lưu lượng, và bạn lo bản mới có tỉ lệ \(p_1>p_0\). Với kiểm định một phía mức \(\alpha\) và công suất \(1-\beta\), số yêu cầu qua canary cần là</p>
+$$n\approx\frac{\big(z_{1-\alpha}\sqrt{p_0q_0}+z_{1-\beta}\sqrt{p_1q_1}\big)^2}{(p_1-p_0)^2}$$
+<p>Với \(p_0=1\%\), \(p_1=1.5\%\), \(\alpha=0.05\), công suất 0.8: \(n\approx2829\) yêu cầu. Nếu tổng lưu lượng là 5000 yêu cầu/giờ thì canary 1% mất khoảng 57 giờ, 5% mất 11.3 giờ, 25% mất 2.3 giờ. Một sự cố nặng (\(p_1=10\%\)) chỉ cần khoảng 21 yêu cầu. Hai điểm hay bị hiểu nhầm: số yêu cầu bị ảnh hưởng trước khi đủ bằng chứng xấp xỉ \(n\) <em>bất kể</em> tỉ lệ canary, tỉ lệ chỉ đổi thời gian; và canary nhỏ không phát hiện nổi suy giảm nhẹ trong thời gian ngắn. Vì vậy cần cả hai lớp: canary để bắt sự cố lớn nhanh, và theo dõi dài hạn cho suy giảm nhẹ.</p>
+<div class="viz" data-viz="canary1" data-title="Bằng chứng cần thiết để phát hiện bản mới tệ hơn">
+  <p class="viz-help">Kéo p₁ lại gần p₀ (suy giảm nhẹ) và thấy số yêu cầu cần thiết tăng vọt; kéo p₁ lên cao để thấy sự cố nặng được phát hiện gần như tức thì.</p>
+</div>
+<pre><code class="language-python">from scipy.stats import norm
+
+def requests_needed(p0, p1, alpha=0.05, power=0.8):
+    """Số yêu cầu qua canary để phát hiện lỗi tăng p0 → p1 (một phía; coi tỉ lệ nền p0 đã biết chính xác từ nhóm đối chứng lớn)."""
+    za, zb = norm.ppf(1 - alpha), norm.ppf(power)
+    return (za * (p0 * (1 - p0))**0.5 + zb * (p1 * (1 - p1))**0.5)**2 / (p1 - p0)**2
+
+p0, traffic = 0.010, 5000                      # tỉ lệ lỗi nền 1%; 5000 yêu cầu/giờ tổng cộng
+print("p1     yêu cầu cần    giờ @1%    giờ @5%    giờ @25%")
+for p1 in (0.012, 0.015, 0.02, 0.05, 0.10):
+    n = requests_needed(p0, p1)
+    print(f"{p1:.3f}  {n:&gt;10,.0f}  " + "  ".join(f"{n / (traffic * f):&gt;8.1f}" for f in (0.01, 0.05, 0.25)))
+# Số yêu cầu bị ảnh hưởng trước khi đủ bằng chứng ≈ n, KHÔNG phụ thuộc tỉ lệ canary.
+# Tỉ lệ canary chỉ quyết định thời gian trôi qua (và tốc độ lan rộng nếu bản mới thực sự xấu).</code></pre>
 <p>Luôn chuẩn bị <strong>quay lui</strong> (rollback) về phiên bản trước chỉ bằng một thao tác, và nhớ rằng quay lui mô hình đôi khi cũng cần quay lui các đặc trưng hoặc lược đồ dữ liệu đi kèm.</p>
 <div class="callout tip"><span class="callout-title">Lệch giữa huấn luyện và phục vụ (training–serving skew)</span>Nguồn lỗi âm thầm phổ biến bậc nhất: đặc trưng được tính một cách khi huấn luyện (SQL/pandas hàng loạt) và một cách khác khi phục vụ (code thời gian thực). Giảm thiểu bằng cách dùng chung mã tiền xử lý, hoặc kho đặc trưng (feature store); ghi log đặc trưng thực tế lúc phục vụ và so sánh với phân phối lúc huấn luyện; kiểm thử tương đương đầu ra giữa hai đường tính.</div>
 
@@ -240,10 +373,110 @@ ref = rng.normal(0, 1, 10_000)
 cur = rng.normal(0.5, 1, 2_000)
 print("PSI:", psi(ref, cur))
 print("KS :", ks_2samp(ref, cur))        # (statistic, pvalue)</code></pre>
+<h3 id="psi-suy-dan">PSI suy dẫn: đối xứng, xấp xỉ χ² và sàn nhiễu</h3>
+<p>Công thức \((q-p)\ln(q/p)\) trông tùy tiện, nhưng nó là <strong>KL đối xứng</strong>: \(\sum_i(q_i-p_i)\ln\frac{q_i}{p_i}=\sum_iq_i\ln\frac{q_i}{p_i}+\sum_ip_i\ln\frac{p_i}{q_i}=D_{KL}(q\|p)+D_{KL}(p\|q)\). Mỗi số hạng \((q_i-p_i)\ln(q_i/p_i)\ge0\) vì hai thừa số luôn cùng dấu, nên PSI \(\ge0\) và bằng 0 khi \(q=p\). Với lệch nhỏ, \(\ln(q/p)\approx(q-p)/p\), suy ra</p>
+$$\mathrm{PSI}\approx\sum_i\frac{(q_i-p_i)^2}{p_i}$$
+<p>là thống kê χ² của Pearson (chia cho cỡ mẫu). Ví dụ ở Bài 1: PSI \(=0.1099\), xấp xỉ \(0.100\). Hệ quả quan trọng cho vận hành: nếu dữ liệu đang chạy gồm \(n\) mẫu <em>không</em> drift, \(n\cdot\sum(q_i-p_i)^2/p_i\) xấp xỉ phân phối \(\chi^2_{B-1}\), nên kỳ vọng nhiễu lấy mẫu là \((B-1)/n\); nếu tham chiếu cũng chỉ là mẫu cỡ \(n_{ref}\) thì thay \(1/n\) bằng \(1/n_{ref}+1/n\). Ngưỡng 95% của PSI khi không drift \(\approx\chi^2_{0.95,B-1}\,(1/n_{ref}+1/n)\). Với \(B=10\) (\(\chi^2_{0.95,9}=16.92\)): \(n=200\) cho ngưỡng \(\approx0.086\) (sát 0.1!), \(n=2000\) cho \(\approx0.010\), \(n=20{,}000\) cho \(\approx0.0025\). Nghĩa là <strong>ngưỡng cố định 0.1 vô nghĩa nếu bạn tính PSI trên vài trăm mẫu</strong>.</p>
+<div class="viz" data-viz="psi2" data-title="PSI theo từng khoảng và sàn nhiễu lấy mẫu">
+  <p class="viz-help">Đặt μ = 0, σ = 1 (không drift) rồi giảm n: PSI vẫn dương nhờ nhiễu. Sau đó dịch μ hoặc đổi σ để xem khoảng nào đóng góp nhiều nhất vào PSI.</p>
+</div>
+<pre><code class="language-python">import numpy as np
+from scipy.stats import chi2, norm, ks_2samp
+
+def psi_from_props(p, q, eps=1e-4):
+    p, q = np.clip(p, eps, None), np.clip(q, eps, None)
+    return float(np.sum((q - p) * np.log(q / p)))
+
+# 1) PSI = KL(q||p) + KL(p||q): đối xứng, ≥ 0
+p = np.array([0.10] * 10); q = np.array([.05, .05, .10, .10, .10, .10, .10, .10, .15, .15])
+kl = lambda a, b: float(np.sum(a * np.log(a / b)))
+print(round(psi_from_props(p, q), 4), round(kl(q, p) + kl(p, q), 4), " xấp xỉ χ²:", round(float(np.sum((q - p)**2 / p)), 4))
+
+# 2) PSI "lý thuyết" khi tham chiếu N(0,1) chia thập phân vị và dữ liệu đang chạy là N(mu, sigma)
+B = 10
+edges = norm.ppf(np.linspace(0, 1, B + 1))
+def population_psi(mu, sigma):
+    q = np.diff(norm.cdf((edges - mu) / sigma))
+    return psi_from_props(np.full(B, 1 / B), q)
+print([round(population_psi(m, 1.0), 3) for m in (0, 0.25, 0.5, 1.0)])
+
+# 3) Sàn nhiễu: khi KHÔNG có drift, PSI mẫu vẫn dương, kỳ vọng ≈ (B-1)(1/n_ref + 1/n_cur)
+rng = np.random.default_rng(0)
+def psi_sample(ref, cur):
+    e = np.quantile(ref, np.linspace(0, 1, B + 1)); e[0], e[-1] = -np.inf, np.inf
+    return psi_from_props(np.histogram(ref, e)[0] / len(ref), np.histogram(cur, e)[0] / len(cur))
+n_ref = 10_000
+for n_cur in (200, 2_000, 20_000):
+    vals = [psi_sample(rng.normal(size=n_ref), rng.normal(size=n_cur)) for _ in range(300)]
+    pred = (B - 1) * (1 / n_ref + 1 / n_cur)
+    p95 = chi2.ppf(0.95, B - 1) * (1 / n_ref + 1 / n_cur)       # n_hiệu_dụng · PSI ≈ χ²(B−1) khi không drift
+    print(f"n_cur={n_cur:&gt;6}: PSI trung bình khi không drift = {np.mean(vals):.4f} (công thức {pred:.4f}); "
+          f"phân vị 95% = {np.quantile(vals, .95):.4f} (χ²: {p95:.4f})")
+
+# 4) KS: ngưỡng bác bỏ xấp xỉ c(α)·sqrt((n+m)/(nm)), c(0.05) ≈ 1.358
+n, m = 10_000, 2_000
+print("ngưỡng KS xấp xỉ:", round(1.358 * np.sqrt((n + m) / (n * m)), 4))
+rej = np.mean([ks_2samp(rng.normal(size=n), rng.normal(size=m)).pvalue &lt; 0.05 for _ in range(400)])
+print("tỉ lệ cảnh báo giả của KS ở mức 5% khi không drift:", round(float(rej), 3))</code></pre>
+<p>Với KS, ngưỡng bác bỏ xấp xỉ \(c(\alpha)\sqrt{(n+m)/(nm)}\) với \(c(0.05)\approx1.358\); \(n=10{,}000\), \(m=2000\) cho \(\approx0.033\). Cỡ mẫu lớn làm KS rất nhạy với chênh lệch cực nhỏ: hãy cặp với một thước đo độ lớn tác động.</p>
 <p>Hai lưu ý quan trọng. (1) Với lượng dữ liệu lớn, kiểm định thống kê phát hiện cả những thay đổi nhỏ không có ý nghĩa thực tế, nên hãy xét <em>độ lớn</em> và tác động lên chỉ số mô hình chứ không chỉ p-value. (2) Drift không đồng nghĩa mô hình hỏng, và mô hình có thể hỏng khi không có drift đặc trưng nào (thay đổi quan hệ giữa đặc trưng và nhãn, gọi là concept drift). Cảnh báo cần dẫn tới một hành động đã thỏa thuận (xem xét, huấn luyện lại, quay lui), kèm sổ tay xử lý (runbook).</p>
 <h3 id="vong-phan-hoi">Vòng phản hồi và huấn luyện lại</h3>
 <p>Huấn luyện lại có thể theo lịch, theo ngưỡng giám sát hoặc theo sự kiện, nhưng mô hình mới phải qua cùng cổng đánh giá như mọi bản phát hành. Hãy cảnh giác với <em>vòng phản hồi</em>: khi dự đoán của mô hình ảnh hưởng dữ liệu tương lai (hệ thống gợi ý chỉ cho thấy những gì nó đã gợi ý), dữ liệu mới bị lệch theo chính mô hình.</p>
 
+<h3 id="chu-ky-huan-luyen">Bao lâu nên huấn luyện lại?</h3>
+<p>Một mô hình đơn giản cho quyết định này (cùng dạng bài toán lô hàng kinh tế EOQ): độ chính xác giảm tuyến tính \(r\) mỗi ngày kể từ lần huấn luyện gần nhất; mỗi đơn vị độ chính xác mất đi tốn \(V\) mỗi ngày; mỗi lần huấn luyện lại tốn \(C\). Huấn luyện lại sau mỗi \(T\) ngày: thiệt hại trung bình mỗi ngày là \(\frac1T\int_0^T Vrt\,dt=\frac{VrT}{2}\), chi phí huấn luyện trung bình là \(C/T\). Tổng \(f(T)=\frac{VrT}2+\frac CT\). Đạo hàm \(f'(T)=\frac{Vr}{2}-\frac{C}{T^2}=0\) cho</p>
+$$T^*=\sqrt{\frac{2C}{V\,r}},\qquad f(T^*)=\sqrt{2CVr}$$
+<p>Ví dụ \(C=2000\), \(V=100{,}000\), \(r=0.001\): \(T^*=\sqrt{40}\approx6.3\) ngày, chi phí \(\approx632\)/ngày, so với 2050/ngày nếu huấn luyện lại mỗi ngày và 1567/ngày nếu mỗi 30 ngày. Đáy phẳng: lệch khỏi \(T^*\) khoảng 2 lần mới tốn thêm đáng kể. Mô hình giả định suy giảm tuyến tính, đều, và đo được; thực tế suy giảm có thể đột ngột nên cần giám sát kích hoạt bên cạnh lịch.</p>
+<div class="viz" data-viz="retrain1" data-title="Chu kỳ huấn luyện lại tối ưu">
+  <p class="viz-help">Tăng chi phí mỗi lần huấn luyện C hoặc giảm tốc độ suy giảm r: chu kỳ tối ưu dài ra. Chấm là T*.</p>
+</div>
+<pre><code class="language-python">import numpy as np
+
+def total_cost_rate(T, C, V, r):
+    """Chi phí trung bình mỗi ngày nếu huấn luyện lại sau mỗi T ngày.
+    Độ chính xác giảm tuyến tính r/ngày; mỗi đơn vị độ chính xác mất đi trị giá V mỗi ngày; mỗi lần huấn luyện lại tốn C."""
+    return V * r * T / 2 + C / T
+
+C, V, r = 2000.0, 100_000.0, 0.001           # 2000 đơn vị chi phí; 0.1 điểm % độ chính xác mất mỗi ngày
+T_star = np.sqrt(2 * C / (V * r))
+print(f"T* = {T_star:.2f} ngày, chi phí/ngày = {total_cost_rate(T_star, C, V, r):.1f}")
+for T in (1, 3, 6.3, 14, 30):
+    print(f"  huấn luyện lại mỗi {T:&gt;4} ngày → {total_cost_rate(T, C, V, r):7.1f} / ngày")</code></pre>
+<h3 id="kiem-tra-du-lieu">Kiểm tra dữ liệu và lệch huấn luyện–phục vụ bằng code</h3>
+<p>Hai kiểm tra rẻ mà bắt được nhiều lỗi thực tế: xác thực lược đồ, miền giá trị và tỉ lệ thiếu ngay khi dữ liệu vào pipeline; và kiểm thử rằng cùng một hàm đặc trưng cho kết quả giống hệt khi tính hàng loạt (huấn luyện) và từng yêu cầu (phục vụ).</p>
+<pre><code class="language-python">import numpy as np
+import pandas as pd
+
+# ---- Kiểm tra dữ liệu tối thiểu (không cần thư viện ngoài pandas) ----
+SCHEMA = {"age": ("int64", 0, 120), "income": ("float64", 0, 1e7)}
+
+def validate(df, schema=SCHEMA, max_missing=0.02):
+    errors = []
+    for col, (dtype, lo, hi) in schema.items():
+        if col not in df:
+            errors.append(f"thiếu cột {col}"); continue
+        if str(df[col].dtype) != dtype:
+            errors.append(f"{col}: kiểu {df[col].dtype}, mong đợi {dtype}")
+        if df[col].isna().mean() &gt; max_missing:
+            errors.append(f"{col}: thiếu {df[col].isna().mean():.1%} &gt; {max_missing:.0%}")
+        if ((df[col] &lt; lo) | (df[col] &gt; hi)).any():
+            errors.append(f"{col}: có giá trị ngoài [{lo}, {hi}]")
+    return errors
+
+good = pd.DataFrame({"age": [25, 40], "income": [1e4, 5e4]})
+bad = pd.DataFrame({"age": [25, 400], "income": [1e4, np.nan]})
+print(validate(good), validate(bad))
+
+# ---- Kiểm tra lệch huấn luyện–phục vụ: cùng một hàm đặc trưng, hai đường tính ----
+def features(df):
+    return pd.DataFrame({"log_income": np.log1p(df["income"]), "is_senior": (df["age"] &gt;= 60).astype(int)})
+
+train_path = features(good)                                          # tính hàng loạt
+serve_path = pd.concat([features(good.iloc[[i]]) for i in range(len(good))], ignore_index=True)   # tính từng yêu cầu
+pd.testing.assert_frame_equal(train_path, serve_path)                # nếu hai đường lệch nhau, dòng này báo lỗi
+print("hai đường tính đặc trưng khớp nhau")</code></pre>
+<h3 id="chi-phi-du-doan">Chi phí mỗi dự đoán</h3>
+<p>Chi phí mỗi 1000 dự đoán \(=\dfrac{G}{3.6\,X}\), với \(G\) là giá một giờ máy và \(X\) là thông lượng hiệu dụng (yêu cầu/giây). Thông lượng hiệu dụng thấp hơn công suất đỉnh vì bạn không chạy ở \(\rho=1\) (xem phần hàng đợi) và vì tải thay đổi theo giờ. Ở ví dụ batching của bài tập 2, \(b=16\) cho 307.7 yêu cầu/giây so với 45.5 khi \(b=1\), tức rẻ hơn khoảng 6.8 lần mỗi dự đoán nếu độ trễ chấp nhận được. Hãy tính chi phí theo <em>dự đoán hữu ích</em>, không phải theo giờ máy.</p>
 <h2 id="llmops">LLMOps: điều gì khác với ML truyền thống</h2>
 <p>Ứng dụng dựa trên LLM (trang LLM, Agentic AI) giữ nguyên các nguyên tắc trên nhưng đối tượng cần quản lý đổi khác:</p>
 <ul>
@@ -264,6 +497,21 @@ print("KS :", ks_2samp(ref, cur))        # (statistic, pvalue)</code></pre>
   <li><strong>Chi phí</strong>: gắn nhãn tài nguyên theo dự án, tắt cụm huấn luyện nhàn rỗi, đo chi phí cho mỗi dự đoán, cân nhắc batch thay vì online.</li>
   <li><strong>Công bằng và tác động</strong>: kiểm tra chỉ số theo nhóm con và có đường để người dùng khiếu nại với các quyết định quan trọng.</li>
 </ul>
+
+<h2 id="doc-paper">Đọc nhanh các tài liệu nền tảng</h2>
+<p>Ý chính theo hiểu biết của mình; hãy tìm bản gốc bằng tên để xác nhận thông tin xuất bản.</p>
+<table>
+  <thead><tr><th>Tài liệu</th><th>Ý chính đáng nhớ</th></tr></thead>
+  <tbody>
+    <tr><td>Sculley và cộng sự (2015), <em>Hidden Technical Debt in Machine Learning Systems</em> (NeurIPS)</td><td>Mã mô hình chỉ là phần nhỏ; nợ kỹ thuật đặc thù của ML nằm ở dữ liệu, cấu hình, phụ thuộc ẩn và vòng phản hồi.</td></tr>
+    <tr><td>Breck và cộng sự (2017), <em>The ML Test Score</em></td><td>Danh sách kiểm tra kiểm thử dữ liệu, mô hình, hạ tầng và giám sát để đo mức sẵn sàng sản xuất.</td></tr>
+    <tr><td>Rabanser và cộng sự (2019), <em>Failing Loudly: An Empirical Study of Methods for Detecting Dataset Shift</em>, arXiv:1810.11953 (mình nhớ số này, hãy kiểm tra)</td><td>So sánh thực nghiệm các cách phát hiện dịch chuyển phân phối: giảm chiều rồi kiểm định hai mẫu.</td></tr>
+    <tr><td>Mitchell và cộng sự (2019), <em>Model Cards for Model Reporting</em>, arXiv:1810.03993; Gebru và cộng sự (2018), <em>Datasheets for Datasets</em> (mình nhớ arXiv:1803.09010, hãy kiểm tra)</td><td>Tài liệu hóa mô hình và dữ liệu: mục đích, hạn chế, chỉ số theo nhóm.</td></tr>
+    <tr><td>Kohavi, Tang, Xu (2020), <em>Trustworthy Online Controlled Experiments</em> (Cambridge University Press)</td><td>Thiết kế, phân tích và cạm bẫy của A/B test ở quy mô lớn (SRM, nhìn trộm, nhiều so sánh).</td></tr>
+    <tr><td>Harchol-Balter (2013), <em>Performance Modeling and Design of Computer Systems</em> (Cambridge University Press)</td><td>Lý thuyết hàng đợi cho thiết kế hệ thống: vì sao độ trễ bùng nổ gần đầy tải.</td></tr>
+    <tr><td>Beyer và cộng sự (2016), <em>Site Reliability Engineering</em> (O’Reilly)</td><td>SLO, ngân sách lỗi, cảnh báo theo triệu chứng, rollout an toàn: nền tảng vận hành chung cho cả ML.</td></tr>
+  </tbody>
+</table>
 
 <h2 id="bai-tap">Bài tập</h2>
 <details class="exercise">
@@ -289,6 +537,37 @@ print("KS :", ks_2samp(ref, cur))        # (statistic, pvalue)</code></pre>
   <div class="ex-body"><p>Lấy một mô hình scikit-learn nhỏ: ghi thí nghiệm bằng MLflow, đóng gói bằng FastAPI + Docker, thêm CI chạy kiểm thử trên GitHub Actions (xem trang GitHub), và viết một script mô phỏng drift rồi gọi hàm PSI để cảnh báo. Đưa tất cả lên GitHub kèm README.</p></div>
 </details>
 
+<details class="exercise">
+  <summary>Bài 6. Ngưỡng PSI theo cỡ mẫu</summary>
+  <div class="ex-body"><p>Tham chiếu 1000 mẫu, dữ liệu đang chạy 1000 mẫu, \(B=10\) khoảng. Nhiễu PSI trung bình khi không có drift là bao nhiêu và ngưỡng 95% là bao nhiêu? Ngưỡng 0.1 còn hữu ích không?</p>
+  <p><em>Lời giải:</em> kỳ vọng \(\approx(B-1)(1/1000+1/1000)=0.018\); ngưỡng 95% \(\approx16.92\cdot0.002=0.0338\). Ngưỡng 0.1 vẫn xa hơn nhiều nên còn ý nghĩa, nhưng một PSI 0.03 là bình thường ở cỡ mẫu này, không phải tín hiệu.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 7. Hàng đợi và chi phí</summary>
+  <div class="ex-body"><p>Thời gian xử lý trung bình 20 ms, một máy. Mức sử dụng tối đa để p99 độ trễ \(\le200\) ms (M/M/1) là bao nhiêu? Chi phí mỗi dự đoán lớn hơn lý tưởng bao nhiêu lần?</p>
+  <p><em>Lời giải:</em> \(\mu=50\); cần \(4.605/(\mu-\lambda)\le0.2\Rightarrow\mu-\lambda\ge23.03\Rightarrow\lambda\le26.97\), tức \(\rho\le0.539\). Chi phí mỗi dự đoán gấp \(1/0.539\approx1.86\) lần so với chạy ở \(\rho=1\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 8. Cỡ mẫu A/B</summary>
+  <div class="ex-body"><p>Tỉ lệ nền 5%, muốn phát hiện 6%. Cần bao nhiêu mẫu mỗi nhóm (\(\alpha=0.05\), công suất 80%)? Nếu chỉ muốn phát hiện 5.5%?</p>
+  <p><em>Lời giải:</em> \(7.849\cdot(0.0475+0.0564)/0.0001\approx8{,}155\). Với 5.5%: \(7.849\cdot(0.0475+0.05198)/0.000025\approx31{,}231\), gấp khoảng 3.8 lần (xấp xỉ 4 vì phương sai cũng đổi chút).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 9. Canary</summary>
+  <div class="ex-body"><p>Lỗi nền 2%, nghi ngờ bản mới lên 3%. Lưu lượng 10,000 yêu cầu/giờ, canary 2%. Cần bao nhiêu yêu cầu và bao lâu (\(\alpha=0.05\) một phía, công suất 0.8)?</p>
+  <p><em>Lời giải:</em> \(n\approx1398\) yêu cầu; canary nhận \(200\) yêu cầu/giờ nên cần khoảng \(7.0\) giờ.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 10. Chu kỳ huấn luyện lại</summary>
+  <div class="ex-body"><p>\(C=1000\), \(V=50{,}000\), \(r=0.002\). Tính \(T^*\) và chi phí trung bình mỗi ngày. Kiểm tra bằng minh họa.</p>
+  <p><em>Lời giải:</em> \(Vr=100\); \(T^*=\sqrt{2000/100}=\sqrt{20}\approx4.47\) ngày; chi phí \(=\sqrt{2CVr}=\sqrt{200000}\approx447\)/ngày (hai nửa bằng nhau: \(223.6+223.6\)).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 11. Nhìn trộm và SRM</summary>
+  <div class="ex-body"><p>(a) Vì sao xem kết quả A/B mỗi ngày và dừng khi \(p<0.05\) làm sai kiểm định? (b) Một thí nghiệm chia 50/50 cho 40,000 người dùng ra 20,500 và 19,500. Đây có phải sample ratio mismatch không?</p>
+  <p><em>Lời giải:</em> (a) mỗi lần xem là một cơ hội dương tính giả; xác suất ít nhất một lần vượt ngưỡng lớn hơn 5% (mô phỏng 5 lần xem cho \(\approx14\%\)). (b) \(\chi^2=(500^2+500^2)/20000=25\), \(p\approx6\times10^{-7}\): chắc chắn có vấn đề với việc gán nhóm hoặc ghi log; đừng diễn giải kết quả trước khi tìm ra nguyên nhân.</p></div>
+</details>
+
 <h2 id="tham-khao">Tài liệu tham khảo</h2>
 <ol class="refs">
   <li>Sculley và cộng sự (2015), <em>Hidden Technical Debt in Machine Learning Systems</em>, NeurIPS.</li>
@@ -297,6 +576,8 @@ print("KS :", ks_2samp(ref, cur))        # (statistic, pvalue)</code></pre>
   <li>Breck và cộng sự (2017), <em>The ML Test Score: A Rubric for ML Production Readiness and Technical Debt Reduction</em>.</li>
   <li><a href="https://mlflow.org/docs/latest/">Tài liệu MLflow</a>, <a href="https://dvc.org/doc">tài liệu DVC</a>, <a href="https://fastapi.tiangolo.com">tài liệu FastAPI</a> — công cụ dùng trong bài; API thay đổi theo phiên bản, hãy đối chiếu bản bạn cài.</li>
   <li>Mitchell và cộng sự (2019), <em>Model Cards for Model Reporting</em>, arXiv:1810.03993.</li>
+  <li>Kohavi, Tang, Xu (2020), <em>Trustworthy Online Controlled Experiments</em>, Cambridge University Press. Harchol-Balter (2013), <em>Performance Modeling and Design of Computer Systems</em>, Cambridge University Press. Beyer và cộng sự (2016), <em>Site Reliability Engineering</em>, O’Reilly.</li>
+  <li>Rabanser và cộng sự (2019), <em>Failing Loudly</em>, arXiv:1810.11953. Gebru và cộng sự (2018), <em>Datasheets for Datasets</em>, arXiv:1803.09010 (cả hai số arXiv mình nhớ theo trí nhớ, hãy kiểm tra).</li>
 </ol>
 <p class="meta">Mình trích tên bài và số arXiv theo trí nhớ; hãy tìm bằng tên bài để xác nhận trước khi dẫn lại.</p>
 
