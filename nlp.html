@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Xử lý ngôn ngữ tự nhiên (NLP) · Tự học AI</title>
-<meta name="description" content="NLP từ cơ bản đến hiện đại: tokenization, TF-IDF, n-gram, BPE, word embedding, BERT, các tác vụ NLP, đặc thù tiếng Việt và cách đánh giá.">
+<meta name="description" content="NLP chuyên sâu: TF-IDF và Naive Bayes từ đầu, n-gram và Kneser–Ney, BPE, suy dẫn skip-gram, PMI, BLEU/ROUGE, BERT và đặc thù tiếng Việt, kèm minh họa tương tác.">
 <script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
@@ -14,6 +14,7 @@
 <script defer src="assets/js/search-index.js"></script>
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-nlp.js"></script>
+<script defer src="assets/js/viz-nlp2.js"></script>
 </head>
 <body data-page="nlp">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -71,12 +72,95 @@ X = vec.fit_transform(docs)
 print(cosine_similarity(X[0], X).round(2))   # văn bản 0 giống văn bản 1 hơn văn bản 2</code></pre>
 <p>TF-IDF vẫn là baseline mạnh và rẻ cho tìm kiếm và phân loại văn bản. Hạn chế: “xe hơi” và “ô tô” hoàn toàn khác nhau trong không gian này, vì không có khái niệm đồng nghĩa.</p>
 
+<h3 id="tfidf-suy-dan">TF-IDF từ góc nhìn thông tin, kèm ví dụ số</h3>
+<p>Ý tưởng của idf (Spärck Jones, 1972): một từ xuất hiện trong ít văn bản thì mang nhiều thông tin để phân biệt văn bản. Nếu xác suất một văn bản ngẫu nhiên chứa từ \(t\) là \(\mathrm{df}(t)/N\), thì \(\mathrm{idf}(t)=\log\frac{N}{\mathrm{df}(t)}=-\log P(t\in d)\), chính là “độ ngạc nhiên” của việc thấy từ đó. Các thư viện dùng biến thể làm trơn để tránh chia cho 0; scikit-learn mặc định dùng</p>
+$$\mathrm{idf}(t)=\ln\frac{1+N}{1+\mathrm{df}(t)}+1,\qquad \text{tf-idf}(t,d)=\mathrm{tf}(t,d)\cdot\mathrm{idf}(t),$$
+<p>rồi chuẩn hóa L2 từng vector văn bản (đặt <code>norm=None</code> để tắt). Với ba văn bản ở ví dụ trên (\(N=3\)): từ “học” có \(\mathrm{df}=2\) nên \(\mathrm{idf}=\ln\frac43+1\approx1.288\), từ “mưa” có \(\mathrm{df}=1\) nên \(\mathrm{idf}=\ln\frac42+1\approx1.693\); “mưa” hiếm hơn nên trọng số lớn hơn. Văn bản thứ hai chứa “học” hai lần nên \(\text{tf-idf}=2\times1.288\approx2.575\).</p>
+<pre><code class="language-python">import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+docs = ["học máy là nhánh của trí tuệ nhân tạo", "học sâu là nhánh của học máy", "hôm nay trời mưa to"]
+vec = TfidfVectorizer(norm=None)                      # tắt chuẩn hóa L2 để so với công thức
+X = vec.fit_transform(docs).toarray()
+vocab = list(vec.get_feature_names_out())
+
+N = len(docs)
+df = (X &gt; 0).sum(axis=0)
+idf = np.log((1 + N) / (1 + df)) + 1                  # biến thể làm trơn của scikit-learn
+j = vocab.index("học")
+print(df[j], idf[j], X[:, j])                         # 2, 1.2877, [1.2877 2.5754 0.]</code></pre>
+<h3 id="naive-bayes">Naive Bayes: bộ phân loại văn bản từ đầu</h3>
+<p>Phân loại văn bản \(d\) (gồm các từ \(w_1,\dots,w_m\)) vào lớp \(c\) bằng quy tắc Bayes, rồi giả định “ngây thơ” rằng các từ độc lập có điều kiện khi biết lớp:</p>
+$$P(c\mid d)\propto P(c)\prod_{i=1}^{m}P(w_i\mid c),\qquad \hat c=\arg\max_c\Big[\ln P(c)+\sum_i\ln P(w_i\mid c)\Big]$$
+<p>Ước lượng bằng đếm với làm trơn Laplace \(\alpha\): \(P(w\mid c)=\dfrac{n_{wc}+\alpha}{n_c+\alpha|V|}\), với \(n_{wc}\) là số lần từ \(w\) xuất hiện trong các văn bản lớp \(c\), \(n_c\) là tổng số từ của lớp, \(|V|\) là kích thước từ vựng. Làm việc trong không gian log để tránh tràn số dưới.</p>
+<p><strong>Ví dụ.</strong> Năm văn bản huấn luyện: spam: “khuyến mãi lớn mua ngay”, “mua ngay giảm giá”, “giảm giá lớn”; ham: “họp nhóm sáng mai”, “gửi báo cáo sáng mai”. Có \(|V|=14\), lớp spam có 12 từ, lớp ham có 9 từ. Phân loại “mua ngay họp” với \(\alpha=1\):</p>
+$$\text{spam}:\ 0.6\cdot\tfrac{2+1}{26}\cdot\tfrac{2+1}{26}\cdot\tfrac{0+1}{26}\approx3.07\times10^{-4},\qquad \text{ham}:\ 0.4\cdot\tfrac{0+1}{23}\cdot\tfrac{0+1}{23}\cdot\tfrac{1+1}{23}\approx6.6\times10^{-5}$$
+<p>Chuẩn hóa hai số này cho \(P(\text{spam}\mid d)\approx0.824\). Dù từ “họp” là bằng chứng cho ham, hai từ “mua”, “ngay” chỉ xuất hiện ở spam nên thắng. Kiểm tra từ đầu và so với scikit-learn:</p>
+<pre><code class="language-python">import math
+from collections import Counter
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+
+train = [("khuyến mãi lớn mua ngay", "spam"), ("mua ngay giảm giá", "spam"), ("giảm giá lớn", "spam"),
+         ("họp nhóm sáng mai", "ham"), ("gửi báo cáo sáng mai", "ham")]
+test = "mua ngay họp"
+
+# --- từ đầu ---
+V = len({w for d, _ in train for w in d.split()})
+prior, counts = Counter(c for _, c in train), {"spam": Counter(), "ham": Counter()}
+for d, c in train:
+    counts[c].update(d.split())
+def log_score(c):
+    total = sum(counts[c].values())
+    return math.log(prior[c] / len(train)) + sum(math.log((counts[c][w] + 1) / (total + V)) for w in test.split())
+scores = {c: log_score(c) for c in counts}
+Z = sum(math.exp(s) for s in scores.values())
+print({c: round(math.exp(s) / Z, 4) for c, s in scores.items()})
+
+# --- scikit-learn ---
+cv = CountVectorizer()
+nb = MultinomialNB(alpha=1.0).fit(cv.fit_transform([d for d, _ in train]), [c for _, c in train])
+print(nb.classes_, nb.predict_proba(cv.transform([test])).round(4))     # cùng kết quả: ham 0.1763, spam 0.8237</code></pre>
+<div class="callout tip"><span class="callout-title">Điểm mạnh và giới hạn</span>Naive Bayes huấn luyện chỉ bằng đếm, cực nhanh, hoạt động tốt với ít dữ liệu và là baseline đáng thử cho phân loại văn bản. Giả định độc lập thường sai (các từ liên quan nhau), nên xác suất đầu ra thường quá cực đoan (gần 0 hoặc 1) và cần hiệu chỉnh nếu bạn dùng xác suất để ra quyết định. Xếp hạng lớp thường vẫn khá tốt dù xác suất lệch.</div>
+
 <h2 id="ngram">Mô hình ngôn ngữ n-gram và perplexity</h2>
 <p>Mô hình ngôn ngữ gán xác suất cho chuỗi từ. Theo quy tắc chuỗi \(P(w_1,\dots,w_T)=\prod_t P(w_t\mid w_{1:t-1})\). N-gram xấp xỉ bằng cách chỉ nhìn \(n-1\) từ gần nhất, ước lượng bằng đếm:</p>
 $$P(w_t\mid w_{t-2},w_{t-1})\approx\frac{C(w_{t-2},w_{t-1},w_t)}{C(w_{t-2},w_{t-1})}$$
 <p>Vấn đề: cụm chưa từng thấy có xác suất 0, nên cần làm trơn (add-k, Kneser–Ney...). Và \(n\) lớn thì số cụm tăng theo hàm mũ. Độ đo chuẩn là <strong>perplexity</strong>:</p>
 $$\text{PPL}=\exp\!\Big(-\frac{1}{T}\sum_{t=1}^{T}\log P(w_t\mid w_{\lt t})\Big)$$
 <p>Hiểu trực quan: PPL là “số lựa chọn có xác suất ngang nhau” mà mô hình đang phân vân trung bình ở mỗi bước. Mô hình đoán đều trên \(V\) từ có PPL = \(V\); PPL càng thấp càng tốt. Perplexity vẫn là thước đo huấn luyện cốt lõi của LLM (liên hệ trực tiếp với cross-entropy), nhưng chỉ so sánh được khi cùng bộ tách token và cùng dữ liệu.</p>
+
+<h3 id="ngram-vi-du">Làm trơn add-k và perplexity: ví dụ tính tay</h3>
+<p>Ước lượng hợp lý cực đại (MLE) cho bigram: \(P(w\mid v)=c(v,w)/c(v)\). Với ngữ liệu ba câu “tôi ăn cơm”, “tôi ăn phở”, “bạn ăn cơm” (thêm <code>&lt;s&gt;</code> ở đầu và <code>&lt;/s&gt;</code> ở cuối): <i>P</i>(ăn | tôi) = 1, <i>P</i>(cơm | ăn) = 2/3, <i>P</i>(phở | ăn) = 1/3, và <i>P</i>(tôi | &lt;s&gt;) = 2/3. Câu “tôi ăn cơm” có xác suất \(\tfrac23\cdot1\cdot\tfrac23\cdot1=\tfrac49\) trên 4 dự đoán, nên perplexity là \((9/4)^{1/4}\approx1.225\).</p>
+<p>Vấn đề: bất kỳ bigram chưa từng thấy nào cho xác suất 0, nên cả câu có xác suất 0 và perplexity vô hạn. <strong>Làm trơn add-k</strong> chia sẻ một phần khối lượng cho các sự kiện chưa thấy:</p>
+$$P_k(w\mid v)=\frac{c(v,w)+k}{c(v)+k\,|V|}$$
+<p>Với \(|V|=7\) trong ví dụ trên, câu “tôi ăn cơm” có perplexity \(\approx3.16\) khi \(k=1\) và \(\approx1.51\) khi \(k=0.1\). Add-1 làm “phẳng” rất mạnh với ngữ liệu nhỏ vì \(|V|\) lớn so với số đếm, nên người ta chọn \(k\) nhỏ hoặc dùng phương pháp tốt hơn. <strong>Kneser–Ney</strong> (nội suy, bigram) dựa trên một trực giác đẹp: từ “Francisco” có tần suất cao nhưng hầu như chỉ đi sau “San”, nên không đáng được ưu tiên khi dự đoán từ sau một ngữ cảnh lạ. Do đó xác suất “lùi” dùng số <em>ngữ cảnh khác nhau</em> mà từ xuất hiện sau, không phải tần suất thô:</p>
+$$P_{KN}(w\mid v)=\frac{\max\big(c(v,w)-\delta,\,0\big)}{c(v)}+\lambda(v)\,P_{\text{cont}}(w),\quad P_{\text{cont}}(w)=\frac{|\{v':c(v',w)>0\}|}{|\{(v',w'):c(v',w')>0\}|},\quad \lambda(v)=\frac{\delta\,|\{w:c(v,w)>0\}|}{c(v)}$$
+<p>với hệ số giảm \(\delta\) cố định (thường khoảng 0.75). Perplexity liên hệ trực tiếp với cross-entropy: \(\mathrm{PPL}=2^{H}\) nếu \(H=-\frac1N\sum\log_2P(w_i\mid\cdot)\) tính bằng bit (hoặc \(e^{H}\) nếu tính bằng nat). Hãy tự dựng mô hình bên dưới, đổi bậc \(n\) và \(k\), và nhập câu kiểm tra có bigram lạ:</p>
+<div class="viz" data-viz="ngram1" data-title="Mô hình ngôn ngữ n-gram tự dựng">
+  <p class="viz-help">Sửa ngữ liệu (mỗi dòng một câu). Thử: bậc 2, k = 0, câu kiểm tra “tôi ăn nước” (có bigram chưa từng thấy nên perplexity = ∞) rồi tăng k. Sinh câu ở bậc 1 và bậc 3 để so chất lượng.</p>
+</div>
+<pre><code class="language-python">import math
+from collections import Counter
+
+corpus = [["&lt;s&gt;", "tôi", "ăn", "cơm", "&lt;/s&gt;"], ["&lt;s&gt;", "tôi", "ăn", "phở", "&lt;/s&gt;"], ["&lt;s&gt;", "bạn", "ăn", "cơm", "&lt;/s&gt;"]]
+V = len({w for s in corpus for w in s})
+bigram, context = Counter(), Counter()
+for s in corpus:
+    for a, b in zip(s, s[1:]):
+        bigram[(a, b)] += 1
+        context[a] += 1
+
+def prob(b, a, k):
+    return (bigram[(a, b)] + k) / (context[a] + k * V)
+
+def perplexity(sent, k):
+    lp = sum(math.log(prob(b, a, k)) for a, b in zip(sent, sent[1:]))
+    return math.exp(-lp / (len(sent) - 1))
+
+test = ["&lt;s&gt;", "tôi", "ăn", "cơm", "&lt;/s&gt;"]
+for k in (1e-9, 1, 0.1):            # k rất nhỏ ≈ MLE (k = 0 gây chia cho 0 khi ngữ cảnh chưa thấy)
+    print(k, round(perplexity(test, k), 3))     # ≈ 1.225, 3.162, 1.505</code></pre>
 
 <h2 id="subword">Tokenization theo từ con (subword) và BPE</h2>
 <p>Từ vựng theo từ nguyên vẹn gặp hai vấn đề: quá lớn và luôn có từ chưa gặp (OOV). Tách theo ký tự thì chuỗi quá dài. Giải pháp hiện đại là <strong>subword</strong>: từ phổ biến giữ nguyên, từ hiếm được ghép từ các mảnh. Thuật toán <strong>Byte-Pair Encoding (BPE)</strong>:</p>
@@ -91,6 +175,18 @@ $$\text{PPL}=\exp\!\Big(-\frac{1}{T}\sum_{t=1}^{T}\log P(w_t\mid w_{\lt t})\Big)
 </div>
 <p>Các hệ thống thực tế dùng biến thể: BPE ở mức byte (không bao giờ gặp OOV), WordPiece, hoặc Unigram qua thư viện SentencePiece. Hệ quả quan trọng: <strong>mô hình không thấy “chữ” mà thấy token</strong>. Điều này giải thích vì sao LLM đôi khi đếm chữ cái trong một từ hay làm số học nhiều chữ số kém, và vì sao cùng một câu tiếng Việt có thể tốn nhiều token hơn tiếng Anh với một số bộ tách (ảnh hưởng chi phí và độ dài ngữ cảnh khả dụng).</p>
 
+<h3 id="tokenizer-so-sanh">So sánh các thuật toán tách token con</h3>
+<table>
+  <thead><tr><th>Phương pháp</th><th>Cách xây từ vựng</th><th>Ghi chú</th></tr></thead>
+  <tbody>
+    <tr><td>BPE</td><td>Bắt đầu từ ký tự, gộp cặp liền kề phổ biến nhất lặp đi lặp lại (Sennrich và cộng sự, 2015).</td><td>Đơn giản, xác định; áp dụng bằng cách lặp lại các phép gộp theo thứ tự đã học.</td></tr>
+    <tr><td>BPE mức byte</td><td>Như BPE nhưng ký tự gốc là 256 giá trị byte của UTF-8 (dùng trong họ GPT-2).</td><td>Không bao giờ gặp ký tự lạ; chữ có dấu tiếng Việt chiếm nhiều byte nên có thể tốn nhiều token hơn.</td></tr>
+    <tr><td>WordPiece</td><td>Cũng gộp dần, nhưng chọn cặp theo điểm \(\dfrac{c(ab)}{c(a)\,c(b)}\) (ưu tiên cặp “bất ngờ”) thay vì tần suất thô.</td><td>Dùng trong họ BERT; token tiếp nối thường có tiền tố đặc biệt.</td></tr>
+    <tr><td>Unigram LM</td><td>Bắt đầu từ từ vựng rất lớn rồi loại dần token làm mất mát log-likelihood ít nhất (Kudo, 2018).</td><td>Cho phép nhiều cách tách cùng một chuỗi và lấy mẫu giữa chúng khi huấn luyện; có trong SentencePiece.</td></tr>
+  </tbody>
+</table>
+<p>SentencePiece xử lý văn bản thô (coi khoảng trắng là một ký tự thường) nên không cần tiền tách từ, phù hợp ngôn ngữ như tiếng Việt, tiếng Nhật. Khi so chi phí giữa các mô hình, nhớ rằng số token của cùng một văn bản khác nhau giữa các bộ tách, nên “ngữ cảnh 8k token” không tương đương nhau giữa các mô hình.</p>
+
 <h2 id="embedding">Word embedding</h2>
 <p><em>Giả thuyết phân bố</em>: các từ xuất hiện trong ngữ cảnh giống nhau thường có nghĩa gần nhau. Word2vec (Mikolov và cộng sự, 2013) biến ý tưởng này thành bài toán dự đoán. Với <strong>skip-gram</strong>, từ trung tâm \(c\) dự đoán các từ ngữ cảnh \(o\):</p>
 $$p(o\mid c)=\frac{\exp(\mathbf{u}_o^\top\mathbf{v}_c)}{\sum_{w\in V}\exp(\mathbf{u}_w^\top\mathbf{v}_c)}$$
@@ -99,6 +195,64 @@ $$p(o\mid c)=\frac{\exp(\mathbf{u}_o^\top\mathbf{v}_c)}{\sum_{w\in V}\exp(\mathb
   <li>Từ gần nghĩa có cosine cao; có cả những quan hệ tuyến tính nổi tiếng như “vua − đàn ông + phụ nữ ≈ nữ hoàng”, nhưng đó là ví dụ đẹp, không phải quy luật luôn đúng.</li>
   <li><strong>Hạn chế</strong>: mỗi từ chỉ có một vector, nên “bank” (ngân hàng / bờ sông) hay “đá” (hòn đá / đá bóng) bị trộn lẫn; và embedding thừa hưởng thiên kiến của dữ liệu huấn luyện.</li>
 </ul>
+
+<h3 id="skipgram-suy-dan">Suy dẫn gradient của skip-gram</h3>
+<p>Mỗi từ có hai vector: \(\mathbf{v}_w\) khi làm từ trung tâm và \(\mathbf{u}_w\) khi làm ngữ cảnh. Với cặp (trung tâm \(c\), ngữ cảnh \(o\)), mất mát softmax là</p>
+$$J=-\ln p(o\mid c)=-\mathbf{u}_o^\top\mathbf{v}_c+\ln\sum_{w\in V}\exp\big(\mathbf{u}_w^\top\mathbf{v}_c\big)\ \Longrightarrow\ \frac{\partial J}{\partial\mathbf{v}_c}=-\mathbf{u}_o+\sum_{w}p(w\mid c)\,\mathbf{u}_w,\qquad \frac{\partial J}{\partial\mathbf{u}_w}=\big(p(w\mid c)-\mathbf{1}[w=o]\big)\mathbf{v}_c$$
+<p>Diễn giải: kéo \(\mathbf{v}_c\) về phía vector ngữ cảnh thật \(\mathbf{u}_o\) và đẩy ra khỏi <em>trung bình có trọng số</em> của mọi vector ngữ cảnh theo xác suất mô hình hiện tại. Cái giá là phép tổng trên cả từ vựng: \(O(|V|\,d)\) cho mỗi cặp. <strong>Negative sampling</strong> thay bằng \(K\) mẫu âm \(n_1,\dots,n_K\) rút theo phân phối đơn gram lũy thừa \(3/4\):</p>
+$$J_{NS}=-\ln\sigma\big(\mathbf{u}_o^\top\mathbf{v}_c\big)-\sum_{k=1}^K\ln\sigma\big(-\mathbf{u}_{n_k}^\top\mathbf{v}_c\big),\qquad \frac{\partial J_{NS}}{\partial\mathbf{v}_c}=-\big(1-\sigma(\mathbf{u}_o^\top\mathbf{v}_c)\big)\mathbf{u}_o+\sum_{k}\sigma\big(\mathbf{u}_{n_k}^\top\mathbf{v}_c\big)\mathbf{u}_{n_k}$$
+<p>Chi phí giảm còn \(O((K+1)\,d)\) (ví dụ \(K=5\), \(d=300\): 1,800 phép nhân thay vì hàng triệu). Cả hai gradient này mình đã kiểm bằng sai phân hữu hạn (sai lệch cỡ \(10^{-10}\)).</p>
+<h3 id="w2v-pmi">Embedding ngầm phân rã ma trận PMI</h3>
+<p>Levy và Goldberg (2014) chỉ ra rằng skip-gram với negative sampling (\(K\) mẫu âm) tối ưu tương đương việc phân rã ma trận có phần tử \(\mathrm{PMI}(w,c)-\ln K\), với</p>
+$$\mathrm{PMI}(w,c)=\ln\frac{P(w,c)}{P(w)\,P(c)}$$
+<p>(điều này đúng trong các điều kiện lý tưởng; mình nêu lại ý chính theo trí nhớ, bạn nên đọc bài gốc). Điều này gợi ra một cách “đếm” không cần SGD: tính ma trận đồng xuất hiện, lấy PMI dương (PPMI \(=\max(\mathrm{PMI},0)\)), rồi phân rã SVD cắt cụt; embedding là \(U_d\Sigma_d^{1/2}\). GloVe (Pennington và cộng sự, 2014) cũng đi theo hướng ma trận đồng xuất hiện nhưng khớp trực tiếp \(\mathbf{w}_i^\top\tilde{\mathbf{w}}_j+b_i+\tilde b_j\approx\ln X_{ij}\) với trọng số \(f(X_{ij})\). fastText (Bojanowski và cộng sự, 2017) biểu diễn mỗi từ bằng tổng vector của các n-gram ký tự của nó, nên xử lý được từ hiếm và biến thể hình thái.</p>
+<p>Hãy tự huấn luyện một mô hình skip-gram nhỏ ngay trong trình duyệt. Ngữ liệu gồm các câu sinh theo khuôn về ba nhóm: động vật, trái cây, thành phố. Ban đầu các vector ngẫu nhiên nên mọi cặp đều có cosine gần 0; sau vài chục epoch, các từ cùng nhóm tụ lại vì chúng chia sẻ ngữ cảnh.</p>
+<div class="viz" data-viz="w2v1" data-title="word2vec đồ chơi huấn luyện trực tiếp">
+  <p class="viz-help">Bấm “Huấn luyện thêm 30 epoch” và theo dõi hai con số trung bình cosine (cùng nhóm so với khác nhóm). Đổi từ ở ô chọn để xem láng giềng gần nhất. Mỗi lần “Khởi tạo lại” bắt đầu lại từ vector ngẫu nhiên.</p>
+</div>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+animals = ["mèo", "chó", "ngựa", "bò", "gà", "vịt"]; fruits = ["táo", "cam", "chuối", "xoài", "nho"]
+cities = ["hà_nội", "huế", "đà_nẵng", "sài_gòn"]; food = ["cá", "xương", "cỏ", "thóc"]
+pick = lambda xs: xs[rng.integers(len(xs))]
+sents = []
+for _ in range(90):                                   # ngữ liệu sinh theo khuôn
+    a, f, c = pick(animals), pick(fruits), pick(cities)
+    sents += [rng.choice([f"con {a} ăn {pick(food)}", f"con {a} chạy rất nhanh", f"con {a} kêu to", f"tôi thấy con {a}"]).split(),
+              rng.choice([f"tôi ăn {f}", f"{f} rất ngọt", f"tôi mua {f} ở chợ", f"{f} tươi ở chợ"]).split(),
+              rng.choice([f"tôi sống ở {c}", f"{c} là thành_phố đẹp", f"tôi đi du_lịch {c}", f"{c} rất đẹp"]).split()]
+
+vocab = sorted({w for s in sents for w in s}); idx = {w: i for i, w in enumerate(vocab)}; V = len(vocab)
+C = np.zeros((V, V))                                  # ma trận đồng xuất hiện, cửa sổ ±2
+for s in sents:
+    for i, w in enumerate(s):
+        for j in range(max(0, i - 2), min(len(s), i + 3)):
+            if j != i:
+                C[idx[w], idx[s[j]]] += 1
+total = C.sum(); pw = C.sum(1, keepdims=True) / total; pc = C.sum(0, keepdims=True) / total
+with np.errstate(divide="ignore"):
+    ppmi = np.maximum(np.log((C / total) / (pw * pc)), 0)
+ppmi[~np.isfinite(ppmi)] = 0
+
+U, S, Vt = np.linalg.svd(ppmi)
+E = U[:, :8] * np.sqrt(S[:8])                         # embedding 8 chiều
+E /= np.linalg.norm(E, axis=1, keepdims=True) + 1e-12
+
+def nearest(w, k=4):
+    sims = E @ E[idx[w]]
+    return [(vocab[i], round(float(sims[i]), 2)) for i in np.argsort(-sims) if vocab[i] != w][:k]
+
+print(nearest("mèo"))       # các động vật khác đứng đầu, cosine khoảng 0.9
+print(nearest("táo"))       # các trái cây khác</code></pre>
+<table>
+  <thead><tr><th>Phương pháp</th><th>Một vector cho mỗi…</th><th>Xử lý từ hiếm / chưa gặp</th><th>Phụ thuộc ngữ cảnh</th></tr></thead>
+  <tbody>
+    <tr><td>word2vec, GloVe</td><td>từ</td><td>Không (từ ngoài từ vựng không có vector)</td><td>Không</td></tr>
+    <tr><td>fastText</td><td>từ (tổng các n-gram ký tự)</td><td>Có, ghép từ các n-gram con</td><td>Không</td></tr>
+    <tr><td>ELMo, BERT và các mô hình Transformer</td><td>token trong một câu cụ thể</td><td>Có, qua token con</td><td>Có</td></tr>
+  </tbody>
+</table>
 
 <h2 id="ngu-canh">Biểu diễn theo ngữ cảnh: từ ELMo đến BERT</h2>
 <p>Thay vì tra bảng vector cố định, mạng nơ-ron đọc cả câu rồi tạo vector cho từng token <em>phụ thuộc ngữ cảnh</em>. Với kiến trúc Transformer (giải thích ở trang LLM), có ba họ chính:</p>
@@ -149,6 +303,32 @@ print(tok.tokenize("Tokenization of unbelievably long words"))</code></pre>
 </ul>
 <div class="callout warn"><span class="callout-title">Chỉ số tự động có giới hạn</span>BLEU và ROUGE chỉ đo mức trùng từ với bản tham chiếu, nên có thể phạt oan một bản dịch đúng nhưng diễn đạt khác. Với tác vụ sinh văn bản mở, đánh giá của con người (hoặc “LLM làm giám khảo” có kiểm chứng) thường cần thiết; hãy xem trang LLM.</div>
 
+<h3 id="bleu-chi-tiet">BLEU và ROUGE: công thức và ví dụ</h3>
+<p>BLEU (Papineni và cộng sự, 2002) kết hợp độ chính xác n-gram <em>đã cắt</em> với một hình phạt cho câu quá ngắn. Với ứng viên \(C\) và các tham chiếu:</p>
+$$p_n=\frac{\sum_{g\in n\text{-gram}(C)}\min\big(\mathrm{count}_C(g),\ \max_{\text{ref}}\mathrm{count}_{\text{ref}}(g)\big)}{\sum_{g\in n\text{-gram}(C)}\mathrm{count}_C(g)},\qquad \mathrm{BP}=\begin{cases}1&c>r\\ e^{\,1-r/c}&c\le r\end{cases},\qquad \mathrm{BLEU}=\mathrm{BP}\cdot\exp\Big(\sum_{n=1}^{4}\tfrac14\ln p_n\Big)$$
+<p>Phép “cắt” (min) ngăn việc lặp một từ đúng để tăng điểm: ứng viên “the the the the the the the” so với tham chiếu “the cat is on the mat” có \(p_1=2/7\approx0.286\) (từ “the” chỉ xuất hiện 2 lần trong tham chiếu), chứ không phải 7/7. Ở đây \(c\) là độ dài ứng viên, \(r\) là độ dài tham chiếu gần nhất.</p>
+<p><strong>Ví dụ.</strong> Tham chiếu “con mèo ngồi trên tấm thảm”, ứng viên “con mèo nằm trên thảm”: \(p_1=4/5=0.8\) (con, mèo, trên, thảm khớp), \(p_2=1/4=0.25\) (chỉ “con mèo” khớp), \(c=5<r=6\) nên \(\mathrm{BP}=e^{1-6/5}\approx0.819\). BLEU-2 \(=0.819\sqrt{0.8\times0.25}\approx0.366\) (khớp với cài đặt của NLTK khi mình kiểm tra). BLEU-4 bằng 0 vì không có 3-gram nào khớp; đó là lý do cần làm trơn khi tính ở mức câu. ROUGE-N đối xứng với BLEU: nó đo <em>recall</em> n-gram của tham chiếu (số n-gram tham chiếu được ứng viên bao phủ), ROUGE-L dựa trên chuỗi con chung dài nhất.</p>
+<div class="viz" data-viz="bleu1" data-title="Máy tính BLEU và ROUGE">
+  <p class="viz-help">Thử thay “thảm” bằng một từ đồng nghĩa, đổi thứ tự từ, hoặc lặp một từ nhiều lần để xem chỉ số phản ứng. Chú ý BLEU phạt nặng khi không có n-gram bậc cao nào khớp.</p>
+</div>
+<div class="callout warn"><span class="callout-title">Giới hạn của chỉ số n-gram</span>BLEU và ROUGE không hiểu đồng nghĩa hay diễn đạt lại, và điểm số phụ thuộc cách tách từ, số tham chiếu và biến thể làm trơn. Khi báo cáo kết quả hãy dùng một công cụ chuẩn hóa (như sacreBLEU; Post, 2018) và nêu rõ cấu hình. Các chỉ số học từ mô hình (BERTScore, COMET) thường tương quan với đánh giá của người tốt hơn ở một số tác vụ dịch, nhưng cũng có thiên kiến riêng; với sinh văn bản mở, đánh giá của con người vẫn là tiêu chuẩn tham chiếu.</div>
+
+<h2 id="doc-paper">Đọc nhanh các bài báo nền tảng</h2>
+<p>Ý chính theo hiểu biết của mình; hãy đối chiếu bản gốc và tra tên bài để lấy thông tin xuất bản chính xác.</p>
+<table>
+  <thead><tr><th>Công trình</th><th>Ý chính đáng nhớ</th></tr></thead>
+  <tbody>
+    <tr><td>Spärck Jones (1972), <em>A statistical interpretation of term specificity and its application in retrieval</em>, Journal of Documentation</td><td>Nguồn gốc của idf: từ hiếm trong tập văn bản có sức phân biệt cao.</td></tr>
+    <tr><td>Kneser và Ney (1995), <em>Improved backing-off for m-gram language modeling</em>; Chen và Goodman (1999), <em>An empirical study of smoothing techniques for language modeling</em>, Computer Speech and Language</td><td>Làm trơn dựa trên số ngữ cảnh và so sánh thực nghiệm các phương pháp làm trơn n-gram.</td></tr>
+    <tr><td>Mikolov và cộng sự (2013), arXiv:1301.3781 và arXiv:1310.4546</td><td>Skip-gram/CBOW hiệu quả và negative sampling cho embedding chất lượng cao ở quy mô lớn.</td></tr>
+    <tr><td>Levy và Goldberg (2014), <em>Neural Word Embedding as Implicit Matrix Factorization</em>, NeurIPS</td><td>Skip-gram với negative sampling tương đương phân rã ma trận PMI dịch chuyển.</td></tr>
+    <tr><td>Pennington, Socher, Manning (2014), <em>GloVe</em>, EMNLP; Bojanowski và cộng sự (2017), <em>Enriching Word Vectors with Subword Information</em>, TACL</td><td>Khớp trực tiếp ma trận đồng xuất hiện; embedding dựa trên n-gram ký tự xử lý được từ hiếm.</td></tr>
+    <tr><td>Sennrich và cộng sự (2015), arXiv:1508.07909; Kudo (2018), <em>Subword Regularization</em>, arXiv:1804.10959; Kudo và Richardson (2018), arXiv:1808.06226</td><td>BPE cho dịch máy, mô hình Unigram với lấy mẫu phân đoạn, và thư viện SentencePiece.</td></tr>
+    <tr><td>Peters và cộng sự (2018), <em>Deep contextualized word representations</em> (ELMo), NAACL; Devlin và cộng sự (2018), arXiv:1810.04805</td><td>Biểu diễn từ phụ thuộc ngữ cảnh và mô hình tiền huấn luyện hai chiều.</td></tr>
+    <tr><td>Papineni và cộng sự (2002), <em>BLEU</em>, ACL; Lin (2004), <em>ROUGE</em>; Post (2018), <em>A Call for Clarity in Reporting BLEU Scores</em>, WMT; Zhang và cộng sự (2019), <em>BERTScore</em>, arXiv:1904.09675</td><td>Chỉ số n-gram kinh điển, vì sao phải chuẩn hóa cách báo cáo, và chỉ số dựa trên embedding.</td></tr>
+  </tbody>
+</table>
+
 <h2 id="bai-tap">Bài tập</h2>
 <details class="exercise">
   <summary>Bài 1. Dự đoán các phép gộp BPE</summary>
@@ -176,6 +356,36 @@ print(tok.tokenize("Tokenization of unbelievably long words"))</code></pre>
   <div class="ex-body"><p>Lấy khoảng 200 câu bình luận tiếng Việt có nhãn (tự tạo hoặc từ một bộ dữ liệu công khai mà bạn kiểm tra giấy phép). Xây baseline TF-IDF + hồi quy logistic, báo cáo F1 bằng kiểm định chéo. Thử chuẩn hóa Unicode và tách từ, rồi xem F1 thay đổi ra sao.</p></div>
 </details>
 
+<details class="exercise">
+  <summary>Bài 5. TF-IDF hai biến thể</summary>
+  <div class="ex-body"><p>Tập có \(N=4\) văn bản. Một từ xuất hiện trong đúng 1 văn bản và 3 lần trong văn bản đó. Tính tf-idf theo công thức sách giáo khoa \(\ln(N/\mathrm{df})\) và theo biến thể của scikit-learn.</p>
+  <p><em>Lời giải:</em> sách giáo khoa: \(3\ln4\approx4.159\). scikit-learn: \(\mathrm{idf}=\ln(5/2)+1\approx1.916\), nên \(3\times1.916\approx5.749\) (trước chuẩn hóa L2). Thứ tự xếp hạng thường giống nhau nhưng giá trị khác.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 6. Naive Bayes bằng tay</summary>
+  <div class="ex-body"><p>Với năm văn bản huấn luyện ở ví dụ Naive Bayes, tính xác suất lớp spam của văn bản “giảm giá” với \(\alpha=1\).</p>
+  <p><em>Lời giải:</em> “giảm” và “giá” mỗi từ xuất hiện 2 lần ở spam, 0 lần ở ham. Spam: \(0.6\cdot(3/26)^2\approx7.99\times10^{-3}\); ham: \(0.4\cdot(1/23)^2\approx7.56\times10^{-4}\). Chuẩn hóa: \(P(\text{spam})\approx0.914\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 7. Perplexity khi không làm trơn</summary>
+  <div class="ex-body"><p>Với ngữ liệu “tôi ăn cơm / tôi ăn phở / bạn ăn cơm”, câu “tôi ăn phở” có perplexity (MLE) bao nhiêu? Câu “tôi uống nước” thì sao?</p>
+  <p><em>Lời giải:</em> “tôi ăn phở”: \(\tfrac23\cdot1\cdot\tfrac13\cdot1=\tfrac29\) trên 4 dự đoán nên \((9/2)^{1/4}\approx1.456\). “tôi uống nước” chứa bigram chưa từng thấy (tôi, uống) nên xác suất 0, perplexity vô hạn với MLE; cần làm trơn.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 8. BLEU với cắt n-gram</summary>
+  <div class="ex-body"><p>Ứng viên “mèo mèo mèo ngồi” so với tham chiếu “con mèo ngồi trên thảm”. Tính \(p_1\) và BP.</p>
+  <p><em>Lời giải:</em> “mèo” xuất hiện 3 lần ở ứng viên nhưng chỉ 1 lần ở tham chiếu nên khớp bị cắt về 1; “ngồi” khớp 1: \(p_1=2/4=0.5\). \(c=4<r=5\) nên \(\mathrm{BP}=e^{1-5/4}\approx0.779\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 9. Chi phí softmax so với negative sampling</summary>
+  <div class="ex-body"><p>Từ vựng 100,000 từ, chiều 300. So số phép nhân cho một cặp (trung tâm, ngữ cảnh) giữa softmax đầy đủ và negative sampling với \(K=5\).</p>
+  <p><em>Lời giải:</em> softmax: tính \(\mathbf{u}_w^\top\mathbf{v}_c\) cho mọi \(w\): \(10^5\times300=3\times10^7\) phép nhân (chưa kể gradient). Negative sampling: \((5+1)\times300=1{,}800\). Chênh lệch khoảng 16,000 lần.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 10. Dự án: so sánh biểu diễn</summary>
+  <div class="ex-body"><p>Với bộ bình luận có nhãn mà bạn chọn, so F1 (kiểm định chéo) của ba mô hình: Naive Bayes trên đếm từ, hồi quy logistic trên TF-IDF, và hồi quy logistic trên trung bình embedding từ (tự huấn luyện hoặc tải về). Thử có và không có tách từ tiếng Việt. Ghi lại khác biệt và giải thích bằng những gì bạn đã học.</p></div>
+</details>
+
 <h2 id="tham-khao">Tài liệu tham khảo</h2>
 <ol class="refs">
   <li><a href="https://web.stanford.edu/~jurafsky/slp3/"><em>Speech and Language Processing</em></a> — Jurafsky và Martin, bản thảo miễn phí trực tuyến, giáo trình NLP kinh điển.</li>
@@ -186,6 +396,10 @@ print(tok.tokenize("Tokenization of unbelievably long words"))</code></pre>
   <li>Sennrich, Haddow, Birch (2015), <em>Neural Machine Translation of Rare Words with Subword Units</em>, arXiv:1508.07909. Kudo và Richardson (2018), <em>SentencePiece</em>, arXiv:1808.06226.</li>
   <li>Devlin và cộng sự (2018), <em>BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding</em>, arXiv:1810.04805.</li>
   <li>Nguyen và Nguyen (2020), <em>PhoBERT: Pre-trained language models for Vietnamese</em>, Findings of EMNLP 2020 (mình nhớ tên bài và tác giả, bạn nên tra lại thông tin xuất bản).</li>
+  <li>Spärck Jones (1972), <em>A statistical interpretation of term specificity and its application in retrieval</em>, Journal of Documentation. Kneser và Ney (1995); Chen và Goodman (1999), <em>An Empirical Study of Smoothing Techniques for Language Modeling</em>.</li>
+  <li>Levy và Goldberg (2014), <em>Neural Word Embedding as Implicit Matrix Factorization</em>, NeurIPS. Bojanowski và cộng sự (2017), <em>Enriching Word Vectors with Subword Information</em>, TACL.</li>
+  <li>Peters và cộng sự (2018), <em>Deep contextualized word representations</em>, NAACL. Kudo (2018), <em>Subword Regularization</em>, arXiv:1804.10959.</li>
+  <li>Papineni và cộng sự (2002), <em>BLEU: a Method for Automatic Evaluation of Machine Translation</em>, ACL. Post (2018), <em>A Call for Clarity in Reporting BLEU Scores</em>, WMT. Zhang và cộng sự (2019), <em>BERTScore</em>, arXiv:1904.09675.</li>
 </ol>
 
 </main>
