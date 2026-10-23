@@ -14,6 +14,7 @@
 <script defer src="assets/js/search-index.js"></script>
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-git.js"></script>
+<script defer src="assets/js/viz-git2.js"></script>
 </head>
 <body data-page="github">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -93,6 +94,63 @@ git diff --staged                # thay đổi đã staged</code></pre>
 </div>
 <p>Hai điều đáng quan sát: (1) khi nhánh <code>main</code> chưa có commit mới, <code>merge</code> chỉ đẩy con trỏ đi tiếp (<em>fast-forward</em>); (2) khi hai nhánh cùng có commit mới, Git tạo <em>merge commit</em> có hai commit cha.</p>
 
+<h2 id="noi-bo">Git bên trong: đối tượng và mã băm</h2>
+<p>Git thực chất là một <strong>kho lưu trữ địa chỉ theo nội dung</strong> (content-addressable): mỗi đối tượng được lưu dưới tên là mã băm SHA-1 của nội dung. Có bốn loại đối tượng; ba loại đầu bạn gặp mỗi ngày:</p>
+<table>
+  <thead><tr><th>Loại</th><th>Chứa gì</th><th>Ví dụ</th></tr></thead>
+  <tbody>
+    <tr><td><strong>blob</strong></td><td>Nội dung của một file (không có tên file).</td><td>file <code>config.py</code></td></tr>
+    <tr><td><strong>tree</strong></td><td>Danh sách thư mục: chế độ file, loại, mã băm và tên.</td><td><code>100644 blob 224cfb6… config.py</code></td></tr>
+    <tr><td><strong>commit</strong></td><td>Mã băm của tree gốc, mã băm commit cha, tác giả, người commit, thời gian, thông điệp.</td><td>một “ảnh chụp” + con trỏ tới lịch sử</td></tr>
+    <tr><td>tag</td><td>Nhãn có chú thích, trỏ tới một đối tượng khác.</td><td><code>git tag -a v1.0</code></td></tr>
+  </tbody>
+</table>
+<p>Mã băm của một đối tượng là SHA-1 của chuỗi “<code>&lt;loại&gt; &lt;số byte&gt;</code>”, một byte 0, rồi nội dung. Bạn có thể kiểm chứng bằng tay (kết quả dưới đây là thật, chạy với Git 2.43):</p>
+<pre><code class="language-bash">$ echo 'hello' | git hash-object --stdin
+ce013625030ba8dba906f756967f9e9ca394464a
+
+$ printf 'blob 6\0hello\n' | sha1sum        # "blob 6" vì 'hello\n' dài 6 byte
+ce013625030ba8dba906f756967f9e9ca394464a  -</code></pre>
+<p>Hai lệnh cho cùng kết quả: <code>git hash-object</code> không làm gì thần bí hơn việc băm đúng chuỗi đó. Giờ tạo một repo nhỏ với một commit (đặt cố định ngày giờ để kết quả tái lập):</p>
+<pre><code class="language-bash">$ git init -q -b main demo &amp;&amp; cd demo
+$ git config user.name "Ten Cua Ban"; git config user.email ban@example.com
+$ echo "lr = 0.001" &gt; config.py &amp;&amp; git add config.py
+$ GIT_AUTHOR_DATE="1700000000 +0000" GIT_COMMITTER_DATE="1700000000 +0000" git commit -q -m "Them config"
+
+$ git cat-file -p HEAD                       # đối tượng commit
+tree 2b07690e08f476a99b15e9d951b2e9267ac52730
+author Ten Cua Ban &lt;ban@example.com&gt; 1700000000 +0000
+committer Ten Cua Ban &lt;ban@example.com&gt; 1700000000 +0000
+
+Them config
+
+$ git cat-file -p 'HEAD^{tree}'              # đối tượng tree
+100644 blob 224cfb60d18eb295b818b848ce5309cd62a3af5b	config.py
+
+$ git rev-parse HEAD
+472eca784fb3683d9c703b700d50e136afc1a3c4
+
+$ cat .git/HEAD .git/refs/heads/main        # nhánh chỉ là một file 41 byte chứa mã băm
+ref: refs/heads/main
+472eca784fb3683d9c703b700d50e136afc1a3c4</code></pre>
+<p>Hai điều rút ra. (1) <strong>Một nhánh chỉ là con trỏ</strong>: tạo nhánh gần như miễn phí vì chỉ ghi thêm một file nhỏ. <code>HEAD</code> là file nói “tôi đang ở nhánh nào”. (2) <strong>Mã băm commit phụ thuộc vào mã băm cha</strong>: đổi bất cứ thứ gì trong một commit (nội dung, thông điệp, tác giả, giờ) sẽ đổi mã băm của nó, và vì commit sau chứa mã băm commit trước, mọi commit hậu duệ cũng đổi theo. Cấu trúc này gọi là cây Merkle; nó bảo đảm lịch sử không bị sửa lặng lẽ. Hãy thử:</p>
+<div class="viz" data-viz="hash1" data-title="SHA-1 của một đối tượng blob và hiệu ứng tuyết lở">
+  <p class="viz-help">Gõ nội dung file bất kỳ. Với “hello” và dấu xuống dòng ở cuối, kết quả phải đúng là ce01362… như ở trên (JavaScript trong trang tự tính SHA-1, không gọi Git). Ô cam là các bit khác nhau khi đổi ký tự đầu.</p>
+</div>
+<div class="viz" data-viz="chain1" data-title="Sửa một commit cũ làm đổi mọi commit sau nó">
+  <p class="viz-help">Bốn commit cùng một cây rỗng, cùng tác giả và giờ cố định, chỉ khác thông điệp (đã kiểm chứng khớp với <code>git commit-tree</code> thật). Đổi chữ ở commit 2 và xem các commit 2, 3, 4 đổi mã băm còn commit 1 thì không.</p>
+</div>
+<p>Từ đây dễ hiểu vì sao <code>git rebase</code>, <code>git commit --amend</code> và <code>git reset</code> được gọi là “viết lại lịch sử”: chúng tạo ra commit <em>mới</em> với mã băm mới, và vì vậy làm hỏng bản sao của những người đã kéo về commit cũ.</p>
+<h3 id="goi-pack">Kho đối tượng, nén delta và vì sao file nhị phân lớn là vấn đề</h3>
+<p>Mỗi phiên bản của một file là một blob riêng. Khi dọn dẹp (<code>git gc</code>) Git gói các đối tượng vào <em>packfile</em> và lưu các phiên bản gần giống nhau dưới dạng <strong>delta</strong> (phần khác biệt so với một bản gốc) rồi nén bằng zlib. Với text thay đổi ít, kho tăng rất chậm; với dữ liệu nhị phân có entropy cao (trọng số mô hình, ảnh nén sẵn), mỗi phiên bản gần như là một bản mới hoàn toàn. Phép đo mình chạy thật:</p>
+<pre><code class="language-bash"># (a) 5 phiên bản của một file "trọng số" ngẫu nhiên 1 MiB, mỗi lần commit một nội dung khác
+for i in 1 2 3 4 5; do head -c 1048576 /dev/urandom &gt; model.bin; git add model.bin; git commit -q -m "v$i"; done
+git gc -q; git count-objects -vH | grep size-pack          # size-pack: 5.00 MiB
+
+# (b) file text 385 KB (20 000 dòng số), sửa đúng 1 dòng ở mỗi phiên bản, 6 phiên bản
+git gc -q; git count-objects -vH | grep size-pack          # size-pack: 176.23 KiB</code></pre>
+<p>Con số cụ thể phụ thuộc dữ liệu và phiên bản Git, nhưng xu hướng thì ổn định: (a) tăng đúng bằng 5 lần dung lượng một phiên bản, (b) 6 phiên bản chỉ tốn vài chục phần trăm của một phiên bản vì delta và nén hiệu quả. Đó là lý do trọng số mô hình nên để ở Git LFS, DVC hay kho đối tượng, còn trong Git chỉ giữ con trỏ.</p>
+
 <h2 id="nhanh">Nhánh, merge, rebase và xung đột</h2>
 <pre><code class="language-bash">git switch -c feature/dropout    # tạo và chuyển sang nhánh mới (Git ≥ 2.23)
 # ... sửa code, commit ...
@@ -117,6 +175,30 @@ learning_rate = 0.0003
 </ol>
 <p>Nếu rối, <code>git merge --abort</code> hoặc <code>git rebase --abort</code> đưa mọi thứ về trạng thái trước khi bắt đầu.</p>
 
+<h3 id="merge-3-chieu">Merge ba chiều hoạt động thế nào</h3>
+<p>Git không chỉ so hai phiên bản. Nó tìm <strong>tổ tiên chung</strong> gần nhất của hai nhánh (merge base, xem bằng <code>git merge-base A B</code>) rồi so <em>mỗi nhánh với tổ tiên</em>. Quy tắc cho từng vùng của file:</p>
+<ul>
+  <li>Chỉ một nhánh thay đổi so với tổ tiên: lấy thay đổi đó.</li>
+  <li>Hai nhánh thay đổi giống hệt nhau: lấy một bản.</li>
+  <li>Hai nhánh thay đổi <em>khác nhau</em> cùng vùng: <strong>xung đột</strong>, Git dừng và để bạn quyết định.</li>
+</ul>
+<p>Điểm tinh tế: hai thay đổi trên hai dòng <em>liền kề nhau</em> (không có dòng chưa đổi ở giữa) vẫn bị coi là cùng vùng, nên cũng xung đột. Thí nghiệm thật với <code>git merge-file</code> (cùng thuật toán gộp ba chiều theo dòng):</p>
+<pre><code class="language-bash">$ cat base:   lr = 0.001 / epochs = 10 / batch = 32
+$ ours đổi dòng 1 thành lr = 0.01; theirs đổi dòng 2 thành epochs = 20
+$ git merge-file -p -L ours -L base -L theirs ours base theirs
+&lt;&lt;&lt;&lt;&lt;&lt;&lt; ours
+lr = 0.01
+epochs = 10
+=======
+lr = 0.001
+epochs = 20
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; theirs
+batch = 32</code></pre>
+<p>Hãy thử trực tiếp: cài đặt thuật toán ba chiều bằng JavaScript trong trang (đã đối chiếu kết quả với <code>git merge-file</code> thật trên 9 tình huống, trùng khớp cả chỗ đặt dấu xung đột):</p>
+<div class="viz" data-viz="merge3" data-title="Gộp ba chiều theo dòng">
+  <p class="viz-help">Chọn tình huống hoặc sửa ba ô văn bản. Kết quả bên dưới có dấu xung đột nếu cần. Chú ý tình huống “liền kề”: hai thay đổi không chồng lên nhau nhưng vẫn xung đột.</p>
+</div>
+<p>Để thấy cả bản gốc trong vùng xung đột (giúp quyết định đúng), bật <code>git config --global merge.conflictStyle diff3</code>; các phiên bản mới hơn còn có <code>zdiff3</code> (hãy kiểm tra tài liệu). Thuật toán gộp mặc định gần đây của Git tên là <code>ort</code> (mình nhớ nó thay <code>recursive</code> từ Git 2.34; bạn nên kiểm tra); nó cũng xử lý đổi tên file, điều mà phép gộp theo dòng ở trên không làm.</p>
 <h2 id="remote">Làm việc với remote</h2>
 <pre><code class="language-bash">git clone git@github.com:&lt;user&gt;/&lt;repo&gt;.git     # tải repo về
 git remote -v                                      # xem các remote
@@ -145,6 +227,41 @@ git fetch upstream
 git switch -c fix/typo upstream/main
 # sửa, commit, push lên fork của bạn rồi mở Pull Request</code></pre>
 
+<h3 id="chien-luoc-nhanh">Chiến lược nhánh và cách gộp pull request</h3>
+<figure class="diagram">
+<svg viewBox="0 0 640 345" role="img" aria-label="Ba chiến lược nhánh: trunk-based với nhánh sống ngắn, GitHub flow với nhánh tính năng và pull request, Git flow với develop, release và hotfix">
+  <text x="10" y="40" class="small bold">Trunk-based</text><text x="10" y="55" class="small muted">nhánh sống ngắn</text>
+  <path class="line c1" d="M110 40 H625"/>
+  <path class="line c2" d="M170 40 C180 15 235 15 245 40"/><path class="line c2" d="M330 40 C340 15 385 15 395 40"/><path class="line c2" d="M470 40 C480 15 525 15 535 40"/>
+  <circle class="box c1" cx="130" cy="40" r="6"/><circle class="box c1" cx="170" cy="40" r="6"/><circle class="box c1" cx="245" cy="40" r="6"/><circle class="box c1" cx="290" cy="40" r="6"/><circle class="box c1" cx="330" cy="40" r="6"/><circle class="box c1" cx="395" cy="40" r="6"/><circle class="box c1" cx="440" cy="40" r="6"/><circle class="box c1" cx="535" cy="40" r="6"/><circle class="box c1" cx="590" cy="40" r="6"/>
+  <text x="110" y="76" class="small muted">gộp vào main nhiều lần mỗi ngày; tính năng dở dang giấu sau cờ (feature flag)</text>
+  <text x="10" y="135" class="small bold">GitHub flow</text><text x="10" y="150" class="small muted">nhánh tính năng + PR</text>
+  <path class="line c1" d="M110 135 H625"/>
+  <path class="line c2" d="M150 135 C160 102 270 102 280 135"/><path class="line c2" d="M330 135 C340 102 450 102 460 135"/><path class="line c2" d="M505 135 C515 102 575 102 585 135"/>
+  <circle class="box c1" cx="130" cy="135" r="6"/><circle class="box c1" cx="150" cy="135" r="6"/><circle class="box c3" cx="280" cy="135" r="8"/><circle class="box c1" cx="305" cy="135" r="6"/><circle class="box c1" cx="330" cy="135" r="6"/><circle class="box c3" cx="460" cy="135" r="8"/><circle class="box c1" cx="505" cy="135" r="6"/><circle class="box c3" cx="585" cy="135" r="8"/>
+  <text x="215" y="102" text-anchor="middle" class="small">PR + review + CI</text><text x="395" y="102" text-anchor="middle" class="small">PR</text>
+  <text x="10" y="260" class="small bold">Git flow</text><text x="10" y="275" class="small muted">nhiều nhánh dài hạn</text>
+  <path class="line c1" d="M110 305 H625"/><path class="line c4" d="M110 245 H625"/>
+  <path class="line c2" d="M160 245 C170 215 230 215 240 245"/><path class="line c2" d="M300 245 C310 215 380 215 390 245"/>
+  <path class="line c3" d="M410 245 C420 275 450 285 470 305"/><path class="line c3 dash" d="M480 305 C500 285 520 265 545 245"/>
+  <path class="line c3" d="M560 305 C570 330 600 330 610 305"/>
+  <circle class="box c1" cx="150" cy="305" r="6"/><circle class="box c1" cx="470" cy="305" r="6"/><circle class="box c1" cx="610" cy="305" r="6"/>
+  <circle class="box c4" cx="130" cy="245" r="6"/><circle class="box c4" cx="240" cy="245" r="6"/><circle class="box c4" cx="270" cy="245" r="6"/><circle class="box c4" cx="390" cy="245" r="6"/><circle class="box c4" cx="545" cy="245" r="6"/>
+  <text x="115" y="300" class="small muted" dy="-12">main (bản phát hành)</text><text x="115" y="240" class="small muted" dy="-12">develop</text>
+  <text x="200" y="213" class="small">feature</text><text x="440" y="270" class="small">release</text><text x="574" y="342" class="small">hotfix</text>
+</svg>
+<figcaption>Càng nhiều nhánh dài hạn, càng nhiều công gộp và đồng bộ. Nhóm nhỏ làm sản phẩm triển khai liên tục thường chọn trunk-based hoặc GitHub flow; Git flow hợp với phần mềm phát hành theo phiên bản có nhiều bản cần bảo trì song song.</figcaption>
+</figure>
+<p>Khi bấm “Merge” trên một PR, GitHub thường có ba lựa chọn (tên nút có thể đổi, hãy xem tài liệu hiện hành):</p>
+<table>
+  <thead><tr><th>Cách gộp</th><th>Kết quả trong main</th><th>Đánh đổi</th></tr></thead>
+  <tbody>
+    <tr><td>Create a merge commit</td><td>giữ mọi commit của nhánh và thêm một merge commit</td><td>lịch sử đầy đủ nhưng nhiều nhánh rẽ</td></tr>
+    <tr><td>Squash and merge</td><td>gom cả PR thành <em>một</em> commit mới</td><td>lịch sử gọn, mỗi PR một commit; mất commit trung gian; nhánh PR không còn là tổ tiên của main</td></tr>
+    <tr><td>Rebase and merge</td><td>phát lại từng commit lên đầu main (mã băm mới)</td><td>lịch sử thẳng, giữ từng commit; mã băm khác với trên nhánh PR</td></tr>
+  </tbody>
+</table>
+<p>Hãy bật <strong>bảo vệ nhánh</strong> (branch protection hoặc ruleset) cho <code>main</code>: yêu cầu PR, yêu cầu CI xanh và ít nhất một review, chặn push thẳng và force-push. Tệp <code>CODEOWNERS</code> gán người review bắt buộc cho từng thư mục. Chi tiết cấu hình thay đổi theo thời gian; hãy đọc GitHub Docs.</p>
 <h2 id="actions">GitHub Actions: kiểm thử tự động (CI)</h2>
 <p>Tạo file <code>.github/workflows/ci.yml</code>; mỗi lần push hoặc mở PR, GitHub sẽ chạy các bước bạn khai báo:</p>
 <pre><code class="language-yaml">name: CI
@@ -164,6 +281,56 @@ jobs:
       - run: pip install -r requirements.txt
       - run: pytest -q</code></pre>
 <p>Số phiên bản của các action (<code>@v4</code>, <code>@v5</code>) thay đổi theo thời gian; hãy xem trang của từng action trên GitHub Marketplace để dùng bản hiện hành. Với dự án AI, CI nên chạy kiểm thử nhỏ, nhanh (kiểm tra hình dạng tensor, hàm tiền xử lý), không huấn luyện mô hình lớn.</p>
+
+<h3 id="actions-chi-tiet">Giải phẫu một workflow và ma trận kiểm thử</h3>
+<p>Một workflow gồm <strong>sự kiện kích hoạt</strong> (<code>on</code>), một hoặc nhiều <strong>job</strong> chạy trên máy ảo riêng (song song nếu không khai báo <code>needs</code>), và mỗi job gồm các <strong>step</strong> chạy tuần tự trên cùng máy (<code>uses</code> gọi một action dựng sẵn, <code>run</code> chạy lệnh shell). Ví dụ gần với thực tế hơn cho một dự án Python/AI:</p>
+<pre><code class="language-yaml">name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read              # quyền tối thiểu cho GITHUB_TOKEN
+
+concurrency:                  # hủy lượt chạy cũ khi có commit mới trên cùng nhánh/PR
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip          # lưu cache gói pip giữa các lần chạy
+      - run: pip install -r requirements.txt
+      - run: pytest -q --maxfail=1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-${{ matrix.python-version }}
+          path: reports/
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx run ruff check .</code></pre>
+<p>Hai job <code>test</code> và <code>lint</code> chạy song song; ma trận nhân <code>test</code> thành 3 job (mỗi phiên bản Python một job). Tổng phút chạy \(\approx\) số job \(\times\) thời lượng trung bình, ví dụ 3 job \(\times\) 4 phút \(+\) 1 job \(\times\) 1 phút \(=13\) phút máy (phút này tính vào hạn mức; hệ số tính tiền khác nhau giữa các hệ điều hành, hãy xem bảng giá hiện hành). Mẹo: cache phụ thuộc, hủy lượt chạy cũ bằng <code>concurrency</code>, và để huấn luyện nặng chạy theo lịch (<code>on: schedule</code>) hoặc thủ công (<code>workflow_dispatch</code>) thay vì trên mỗi commit.</p>
+<div class="callout warn"><span class="callout-title">Bảo mật Actions</span>
+<ul>
+  <li>Đặt <code>permissions</code> tối thiểu; chỉ cấp thêm quyền ghi cho job cần.</li>
+  <li><strong>Đừng chèn trực tiếp dữ liệu do người ngoài kiểm soát vào lệnh shell</strong> (ví dụ <code>run: echo ${{ github.event.pull_request.title }}</code> có thể bị chèn lệnh). Truyền qua biến môi trường rồi dùng <code>"$VAR"</code>.</li>
+  <li>Bí mật (<em>Secrets</em>) thường không có sẵn cho workflow chạy từ PR của fork; sự kiện <code>pull_request_target</code> chạy với quyền của repo đích nên cực kỳ nguy hiểm nếu checkout và chạy mã của PR: hãy đọc kỹ tài liệu trước khi dùng.</li>
+  <li>Action của bên thứ ba là mã chạy với quyền của bạn: ưu tiên action uy tín, cân nhắc ghim theo mã băm commit thay vì thẻ phiên bản.</li>
+</ul></div>
 
 <h2 id="pages">GitHub Pages: xuất bản website này</h2>
 <p>Website bạn đang đọc là site tĩnh (HTML/CSS/JS), nên đưa lên GitHub Pages rất dễ:</p>
@@ -187,6 +354,21 @@ data/raw/
 *.ckpt
 wandb/
 mlruns/</code></pre>
+<h3 id="gitignore-mau">Mẫu .gitignore: đoán trước rồi kiểm chứng</h3>
+<p>Quy tắc cơ bản: <code>*.pt</code> khớp tên file ở mọi thư mục; dấu <code>/</code> ở đầu neo vào thư mục gốc; dấu <code>/</code> ở cuối chỉ khớp thư mục; <code>!</code> đảo ngược một quy tắc phía trên. Với <code>.gitignore</code> gồm các dòng <code>*.pt</code>, <code>!keep.pt</code>, <code>data/raw/</code>, <code>/build</code>, <code>.env</code>, kết quả thật của <code>git check-ignore</code> trên từng đường dẫn:</p>
+<table>
+  <thead><tr><th>Đường dẫn</th><th>Kết quả</th><th>Lý do</th></tr></thead>
+  <tbody>
+    <tr><td><code>model.pt</code>, <code>a/b/model.pt</code></td><td>bị bỏ qua</td><td><code>*.pt</code> khớp ở mọi cấp</td></tr>
+    <tr><td><code>keep.pt</code></td><td>được theo dõi</td><td><code>!keep.pt</code> đảo ngược <code>*.pt</code></td></tr>
+    <tr><td><code>data/raw/x.csv</code></td><td>bị bỏ qua</td><td><code>data/raw/</code> khớp thư mục</td></tr>
+    <tr><td><code>data/rawer/x.csv</code></td><td>được theo dõi</td><td>tên thư mục khác (không khớp tiền tố)</td></tr>
+    <tr><td><code>build/o</code></td><td>bị bỏ qua</td><td><code>/build</code> neo vào gốc</td></tr>
+    <tr><td><code>src/build/o</code></td><td>được theo dõi</td><td><code>/build</code> không khớp thư mục lồng sâu</td></tr>
+    <tr><td><code>.env</code></td><td>bị bỏ qua</td><td>khớp đúng tên</td></tr>
+  </tbody>
+</table>
+<p>Quan trọng: <code>.gitignore</code> chỉ áp dụng cho file <em>chưa được theo dõi</em>. File đã commit vẫn được theo dõi; muốn ngừng theo dõi dùng <code>git rm --cached &lt;file&gt;</code> (lịch sử cũ vẫn giữ nội dung, xem phần về bí mật). Dùng <code>git check-ignore -v &lt;đường-dẫn&gt;</code> để biết quy tắc nào đang khớp.</p>
 <div class="callout warn"><span class="callout-title">Lộ API key là sự cố phổ biến nhất</span>
 Nếu lỡ commit khóa API hay mật khẩu, hãy <strong>thu hồi (revoke) và tạo khóa mới ngay</strong>. Xóa commit là chưa đủ vì bản cũ có thể đã được sao chép hoặc nằm trong lịch sử. Lưu bí mật trong biến môi trường hoặc file <code>.env</code> (đã ignore) và dùng <em>Secrets</em> của GitHub cho Actions. GitHub có tính năng quét bí mật (secret scanning), hãy kiểm tra tài liệu để biết phạm vi áp dụng cho tài khoản của bạn.</div>
 <h3 id="du-lieu-lon">2. Dữ liệu và mô hình dung lượng lớn</h3>
@@ -217,6 +399,69 @@ Nếu lỡ commit khóa API hay mật khẩu, hãy <strong>thu hồi (revoke) v�
   </tbody>
 </table>
 
+<h2 id="viet-lai-lich-su">Viết lại lịch sử: reset, rebase, cherry-pick, revert và reflog</h2>
+<h3 id="reset-3-che-do">reset: di chuyển nhánh, và chạm đến ba vùng đến đâu?</h3>
+<p><code>git reset &lt;commit&gt;</code> di chuyển <em>nhánh hiện tại</em> về commit đích. Ba chế độ khác nhau ở chỗ chúng còn đụng đến staging và thư mục làm việc hay không:</p>
+<table>
+  <thead><tr><th>Chế độ</th><th>Con trỏ nhánh</th><th>Staging (index)</th><th>Thư mục làm việc</th></tr></thead>
+  <tbody>
+    <tr><td><code>--soft</code></td><td>di chuyển</td><td>giữ nguyên</td><td>giữ nguyên</td></tr>
+    <tr><td><code>--mixed</code> (mặc định)</td><td>di chuyển</td><td>đặt lại theo commit đích</td><td>giữ nguyên</td></tr>
+    <tr><td><code>--hard</code></td><td>di chuyển</td><td>đặt lại</td><td>đặt lại (<strong>mất thay đổi chưa commit</strong>)</td></tr>
+  </tbody>
+</table>
+<p>Kiểm chứng bằng một thí nghiệm thật: nhánh có hai commit (<code>f.txt</code> = a rồi b), sau đó <code>f.txt</code> được đổi thành c và <code>git add</code>, rồi lại sửa thành d (chưa add). Chạy <code>git reset --X HEAD~1</code> rồi xem trạng thái:</p>
+<pre><code class="language-text">--soft : HEAD=c1 | index(f.txt)=c | thư mục=d | git status --short: "MM f.txt"
+--mixed: HEAD=c1 | index(f.txt)=a | thư mục=d | git status --short: " M f.txt"
+--hard : HEAD=c1 | index(f.txt)=a | thư mục=a | git status --short: (sạch)</code></pre>
+<p>Nhớ rằng reset <em>không xóa</em> commit; chỉ là nhánh không còn trỏ tới chúng. Mọi vị trí HEAD từng đứng được ghi trong <strong>reflog</strong> (<code>git reflog</code>), nên “mất commit” thường cứu được bằng <code>git reset --hard &lt;mã-băm-cũ&gt;</code>. Reflog là nhật ký cục bộ, không được đẩy lên remote, và các mục cũ bị dọn sau một thời gian (mặc định vài chục ngày, hãy kiểm tra cấu hình của bạn); thay đổi chưa bao giờ được commit thì reflog không cứu được.</p>
+<h3 id="rebase-vs-merge">rebase so với merge, cherry-pick và revert</h3>
+<figure class="diagram">
+<svg viewBox="0 0 640 250" role="img" aria-label="Đồ thị commit trước khi gộp, sau merge có merge commit, và sau rebase là lịch sử thẳng với commit mới F1' và F2'">
+  <text x="100" y="16" text-anchor="middle" class="small bold">Trước</text>
+  <text x="320" y="16" text-anchor="middle" class="small bold">Sau git merge (feature vào main)</text>
+  <text x="535" y="16" text-anchor="middle" class="small bold">Sau git rebase main rồi ff</text>
+  <path class="line" d="M30 100 L90 60 M30 100 L90 140 M90 140 L150 140"/>
+  <circle class="box" cx="30" cy="100" r="11"/><text x="30" y="104" text-anchor="middle" class="small">A</text>
+  <circle class="box c1" cx="90" cy="60" r="11"/><text x="90" y="64" text-anchor="middle" class="small">B</text>
+  <circle class="box c2" cx="90" cy="140" r="11"/><text x="90" y="144" text-anchor="middle" class="small">F1</text>
+  <circle class="box c2" cx="150" cy="140" r="11"/><text x="150" y="144" text-anchor="middle" class="small">F2</text>
+  <text x="130" y="64" class="small muted">main</text><text x="150" y="172" text-anchor="middle" class="small muted">feature</text>
+  <path class="line" d="M232 100 L282 60 M232 100 L282 140 M282 140 L332 140 M282 60 L382 100 M332 140 L382 100"/>
+  <circle class="box" cx="232" cy="100" r="11"/><text x="232" y="104" text-anchor="middle" class="small">A</text>
+  <circle class="box c1" cx="282" cy="60" r="11"/><text x="282" y="64" text-anchor="middle" class="small">B</text>
+  <circle class="box c2" cx="282" cy="140" r="11"/><text x="282" y="144" text-anchor="middle" class="small">F1</text>
+  <circle class="box c2" cx="332" cy="140" r="11"/><text x="332" y="144" text-anchor="middle" class="small">F2</text>
+  <circle class="box c3" cx="382" cy="100" r="13"/><text x="382" y="104" text-anchor="middle" class="small bold">M</text>
+  <text x="382" y="78" text-anchor="middle" class="small muted">main</text>
+  <text x="320" y="192" text-anchor="middle" class="small muted">giữ nguyên lịch sử, thêm merge commit</text>
+  <path class="line" d="M450 100 L500 100 L550 100 L600 100"/><path class="line dash" d="M450 100 L490 160 L530 160"/>
+  <circle class="box" cx="450" cy="100" r="11"/><text x="450" y="104" text-anchor="middle" class="small">A</text>
+  <circle class="box c1" cx="500" cy="100" r="11"/><text x="500" y="104" text-anchor="middle" class="small">B</text>
+  <circle class="box c2" cx="550" cy="100" r="12"/><text x="550" y="104" text-anchor="middle" class="small">F1′</text>
+  <circle class="box c2" cx="600" cy="100" r="12"/><text x="600" y="104" text-anchor="middle" class="small">F2′</text>
+  <circle class="box" cx="490" cy="160" r="9" style="stroke-dasharray:3 3;opacity:.55"/><circle class="box" cx="530" cy="160" r="9" style="stroke-dasharray:3 3;opacity:.55"/>
+  <text x="545" y="192" text-anchor="middle" class="small muted">F1, F2 cũ bị bỏ lại</text><text x="600" y="78" text-anchor="middle" class="small muted">main</text>
+  <text x="320" y="232" text-anchor="middle" class="small muted">rebase tạo commit mới (F1′, F2′ có mã băm khác); chỉ làm trên nhánh chưa chia sẻ</text>
+</svg>
+<figcaption>Merge bảo toàn lịch sử và thêm một merge commit; rebase viết lại các commit của nhánh để đặt chúng lên đầu nhánh đích.</figcaption>
+</figure>
+<ul>
+  <li><strong><code>git cherry-pick &lt;commit&gt;</code></strong> sao chép <em>thay đổi</em> của một commit thành commit mới (mã băm mới) trên nhánh hiện tại. Hợp khi cần đưa riêng một bản sửa lỗi sang nhánh khác.</li>
+  <li><strong><code>git revert &lt;commit&gt;</code></strong> tạo commit mới làm điều ngược lại; lịch sử cũ giữ nguyên nên an toàn cho nhánh đã chia sẻ (khác với reset).</li>
+</ul>
+<p>Thử trực tiếp trong mô phỏng (các kịch bản mẫu đã được đối chiếu với Git thật: rebase rồi fast-forward cho lịch sử thẳng <code>F2, F1, B, A, Initial commit</code>; cherry-pick rồi revert cho <code>Revert "tính năng", sửa lỗi NaN, tính năng, Initial commit</code>):</p>
+<div class="viz" data-viz="git2" data-title="Mô phỏng nâng cao: rebase, reset, cherry-pick, revert, reflog">
+  <p class="viz-help">Commit mờ là commit không còn nhánh nào trỏ tới (nhưng vẫn cứu được qua reflog). Mô phỏng không có file thật, không xử lý xung đột, và chỉ rebase được đường thẳng (không qua merge commit).</p>
+</div>
+<h3 id="bisect">git bisect: tìm commit gây lỗi bằng tìm kiếm nhị phân</h3>
+<p>Khi một kết quả (độ chính xác, kiểm thử) đột nhiên tệ đi và bạn có \(n\) commit giữa bản tốt và bản xấu, tìm kiếm nhị phân tìm ra commit đầu tiên gây lỗi sau tối đa \(\lceil\log_2n\rceil\) lần kiểm tra thay vì \(n\). Với \(n=100\): tối đa 7 lần; \(n=1000\): 10 lần.</p>
+<pre><code class="language-bash">git bisect start HEAD HEAD~99                 # HEAD đang xấu, HEAD~99 còn tốt
+git bisect run sh -c '! test -f flag.txt'     # lệnh trả 0 = tốt, khác 0 = xấu (ở đây "xấu" nếu file flag.txt tồn tại)
+# → "... is the first bad commit"; thí nghiệm thật với 100 commit và lỗi bắt đầu ở commit 63 chạy 6 lần kiểm tra
+git bisect reset                              # quay lại nhánh ban đầu</code></pre>
+<p>Với dự án AI, lệnh kiểm tra có thể là một script chạy mô hình nhỏ trên tập kiểm tra cố định và trả về mã lỗi nếu độ chính xác dưới ngưỡng. Điều kiện để bisect hoạt động: lỗi tái hiện ổn định, và mỗi commit trong khoảng đó chạy được (commit không biên dịch/không chạy được có thể đánh dấu bỏ qua bằng <code>git bisect skip</code>).</p>
+
 <h2 id="cheatsheet">Bảng lệnh nhanh</h2>
 <table>
   <thead><tr><th>Mục đích</th><th>Lệnh</th></tr></thead>
@@ -227,6 +472,17 @@ Nếu lỡ commit khóa API hay mật khẩu, hãy <strong>thu hồi (revoke) v�
     <tr><td>Nhánh</td><td><code>git branch</code>, <code>git switch</code>, <code>git merge</code>, <code>git rebase</code></td></tr>
     <tr><td>Đồng bộ</td><td><code>git fetch</code>, <code>git pull</code>, <code>git push</code></td></tr>
     <tr><td>Hoàn tác</td><td><code>git restore</code>, <code>git revert</code>, <code>git stash</code>, <code>git reflog</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="doc-them">Đọc thêm</h2>
+<table>
+  <thead><tr><th>Tài liệu</th><th>Dùng để</th></tr></thead>
+  <tbody>
+    <tr><td>Pro Git (Chacon và Straub), chương “Git Internals” và “Git Tools” (phần Reset Demystified, Revision Selection)</td><td>Đào sâu mô hình đối tượng, ba cây, reset, reflog.</td></tr>
+    <tr><td>Tài liệu Git: <code>git-merge-file</code>, <code>git-rebase</code>, <code>git-bisect</code>, <code>gitignore</code>, <code>gitrevisions</code></td><td>Tham chiếu chính xác hành vi từng lệnh theo phiên bản bạn dùng.</td></tr>
+    <tr><td>GitHub Docs: Actions (workflow syntax, security hardening), Pull requests (merge methods), Repositories (rulesets, CODEOWNERS)</td><td>Cấu hình hiện hành của nền tảng, thay đổi theo thời gian.</td></tr>
+    <tr><td>Bài “Git from the inside out” của Mary Rose Cook (mình nhớ tên bài, hãy tìm bản gốc)</td><td>Giải thích mô hình đối tượng qua ví dụ có hình.</td></tr>
   </tbody>
 </table>
 
@@ -247,6 +503,37 @@ Nếu lỡ commit khóa API hay mật khẩu, hãy <strong>thu hồi (revoke) v�
   <div class="ex-body"><p>Tạo repo thử, commit một file <code>.env</code> giả chứa <code>API_KEY=thu-nghiem</code>. Thêm <code>.env</code> vào <code>.gitignore</code>, dùng <code>git rm --cached .env</code>, commit. Sau đó trả lời: vì sao khóa vẫn còn trong lịch sử, và cần làm gì nếu đó là khóa thật?</p></div>
 </details>
 
+<details class="exercise">
+  <summary>Bài 4. Tự tính mã băm</summary>
+  <div class="ex-body"><p>(a) Tạo file chứa đúng <code>hello</code> kèm xuống dòng; chạy <code>git hash-object</code> và so với <code>printf 'blob 6\0hello\n' | sha1sum</code>. (b) Bỏ dấu xuống dòng: mã băm đổi thế nào và vì sao header đổi thành <code>blob 5</code>? (c) Dùng minh họa hash1 để kiểm tra.</p>
+  <p><em>Lời giải:</em> (a) cả hai cho <code>ce013625…464a</code>. (b) <code>printf 'hello' | git hash-object --stdin</code> cho <code>b6fc4c62…b5a1b0</code> (5 byte, header <code>blob 5</code>). Nội dung khác thì mã băm khác hoàn toàn.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 5. Rebase hay merge?</summary>
+  <div class="ex-body"><p>Dùng mô phỏng git2 (hoặc repo thật) tạo: commit A trên main; nhánh feature có F1, F2; main có thêm B. (a) Gộp feature vào main bằng merge: lịch sử có bao nhiêu commit và có merge commit không? (b) Làm lại bằng rebase rồi fast-forward: lịch sử thế nào? Mã băm của F1, F2 có đổi không?</p>
+  <p><em>Lời giải:</em> (a) 5 commit (Initial, A, B, F1, F2) cộng một merge commit, có hai commit cha. (b) lịch sử thẳng <code>F2, F1, B, A, Initial commit</code> và không có merge commit; F1, F2 được phát lại thành commit mới nên mã băm đổi (F1′, F2′).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 6. Dự đoán reset</summary>
+  <div class="ex-body"><p>Nhánh có commit c1 (<code>f.txt</code>=a) và c2 (<code>f.txt</code>=b). Bạn sửa <code>f.txt</code> thành c, <code>git add</code>, rồi sửa tiếp thành d (không add). Với từng chế độ <code>--soft</code>, <code>--mixed</code>, <code>--hard</code> của <code>git reset HEAD~1</code>, dự đoán nội dung staging, thư mục làm việc và <code>git status --short</code>, rồi chạy thử để kiểm tra.</p>
+  <p><em>Lời giải:</em> soft: staging = c, thư mục = d, <code>MM</code>; mixed: staging = a, thư mục = d, <code> M</code>; hard: cả hai = a, sạch. Nội dung d chỉ mất ở <code>--hard</code> và <strong>không</strong> cứu được bằng reflog vì chưa từng được commit.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 7. bisect</summary>
+  <div class="ex-body"><p>Tạo 100 commit, trong đó từ commit thứ 63 trở đi có file <code>flag.txt</code>. Dùng <code>git bisect run</code> tìm commit đầu tiên có lỗi. Cần bao nhiêu lần kiểm tra? Giới hạn trên theo lý thuyết?</p>
+  <p><em>Lời giải:</em> bisect báo commit 63; trong thí nghiệm của mình chạy 6 lần kiểm tra. Giới hạn trên \(\lceil\log_2100\rceil=7\).</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 8. Xung đột liền kề</summary>
+  <div class="ex-body"><p>File 3 dòng <code>lr</code>, <code>epochs</code>, <code>batch</code>. Nhánh A sửa dòng 1, nhánh B sửa dòng 2. Dự đoán merge có xung đột không rồi thử bằng <code>git merge-file</code> hoặc minh họa merge3. Nếu thêm 2 dòng không đổi vào giữa hai dòng bị sửa thì sao?</p>
+  <p><em>Lời giải:</em> có xung đột, vì hai thay đổi liền kề nhau. Khi giữa hai dòng sửa có ít nhất một dòng không đổi (trường hợp “xa nhau” trong minh họa) thì gộp sạch.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 9. Viết .gitignore</summary>
+  <div class="ex-body"><p>Viết <code>.gitignore</code> bỏ qua mọi checkpoint <code>*.ckpt</code> trừ <code>best.ckpt</code>, thư mục <code>wandb/</code> ở mọi cấp, nhưng chỉ <code>/outputs</code> ở gốc. Kiểm tra bằng <code>git check-ignore -v</code>.</p>
+  <p><em>Lời giải:</em> <code>*.ckpt</code>, <code>!best.ckpt</code>, <code>wandb/</code>, <code>/outputs</code>. Chú ý <code>!best.ckpt</code> phải nằm <em>sau</em> <code>*.ckpt</code>; và nếu một thư mục cha đã bị bỏ qua thì không thể “bỏ bỏ qua” file bên trong nó.</p></div>
+</details>
+
 <h2 id="tham-khao">Tài liệu tham khảo</h2>
 <ol class="refs">
   <li><a href="https://git-scm.com/book">Pro Git</a> — sách miễn phí, tài liệu học Git toàn diện.<div class="meta">Tác giả: Scott Chacon và Ben Straub.</div></li>
@@ -254,6 +541,7 @@ Nếu lỡ commit khóa API hay mật khẩu, hãy <strong>thu hồi (revoke) v�
   <li><a href="https://docs.github.com">GitHub Docs</a> — hướng dẫn cho repo, Actions, Pages, bảo mật.</li>
   <li><a href="https://skills.github.com">GitHub Skills</a> — các khóa thực hành tương tác do GitHub cung cấp.</li>
   <li><a href="https://www.conventionalcommits.org">Conventional Commits</a> — quy ước viết commit message.</li>
+  <li><a href="https://git-scm.com/docs/git-merge-file">git-merge-file</a>, <a href="https://git-scm.com/docs/git-bisect">git-bisect</a>, <a href="https://git-scm.com/docs/gitignore">gitignore</a> — trang man chính thức (mình tin các link đúng, bạn nên kiểm tra).</li>
 </ol>
 <p class="meta">Giao diện GitHub và số phiên bản của các action thay đổi theo thời gian. Khi hướng dẫn ở đây khác với màn hình bạn thấy, hãy tin tài liệu chính thức.</p>
 
