@@ -13,7 +13,8 @@
     { id: 'nlp', href: 'nlp.html', label: 'NLP', lesson: true },
     { id: 'llm', href: 'llm.html', label: 'LLM', lesson: true },
     { id: 'agent', href: 'agentic-ai.html', label: 'Agentic AI', lesson: true },
-    { id: 'mlops', href: 'mlops.html', label: 'MLOps', lesson: true }
+    { id: 'mlops', href: 'mlops.html', label: 'MLOps', lesson: true },
+    { id: 'combo', href: 'ket-hop-cong-cu-ai.html', label: 'Kết hợp AI', lesson: true }
   ];
   var PAGE = document.body.getAttribute('data-page') || 'home';
 
