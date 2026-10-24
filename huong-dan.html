@@ -6,6 +6,8 @@
 <title>Cách dùng website · Tự học AI</title>
 <meta name="description" content="Hướng dẫn dùng website Tự học AI: mở và chạy trên máy, điều hướng và phím tắt, dùng minh họa, chạy code trong bài, thêm nội dung mới và xuất bản lên GitHub Pages.">
 <script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<script src="assets/js/gate-config.js"></script>
+<script src="assets/js/gate.js"></script>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
 <link rel="stylesheet" href="assets/css/style.css">
@@ -192,6 +194,14 @@ tools/build_search_index.py              sinh lại chỉ mục tìm kiếm</cod
   <li>Đừng đặt chữ có dấu tiếng Việt trong <code>\text{...}</code>; KaTeX không có phông cho chúng và sẽ cảnh báo. Hãy viết phần giải thích ngoài công thức.</li>
   <li>Đừng đặt thẻ HTML (<code>&lt;em&gt;</code>, <code>&lt;code&gt;</code>) bên trong cặp dấu công thức.</li>
 </ul></div>
+<h3 id="mat-khau">Mật khẩu vào website</h3>
+<p>Mỗi trang nạp <code>assets/js/gate-config.js</code> và <code>assets/js/gate.js</code> ở <code>&lt;head&gt;</code>; nếu có mật khẩu, trang bị ẩn cho đến khi bạn nhập đúng. Phiên mở khóa được giữ trong <em>tab đang mở</em> (sessionStorage), nên đi qua lại giữa các trang không bị hỏi lại, nhưng đóng tab hoặc mở trình duyệt mới thì hỏi lại.</p>
+<pre><code class="language-bash">python3 tools/set_password.py              # nhập mật khẩu mới (không hiện khi gõ)
+python3 tools/set_password.py --generate   # sinh mật khẩu ngẫu nhiên, in ra một lần
+python3 tools/set_password.py --disable    # tắt cổng
+git add assets/js/gate-config.js &amp;&amp; git commit -m "Đổi mật khẩu" &amp;&amp; git push   # áp dụng trên GitHub Pages</code></pre>
+<p>Tệp cấu hình chỉ chứa muối và mã băm PBKDF2-HMAC-SHA256 (150,000 vòng), không chứa mật khẩu. Khi thêm một trang HTML mới, hãy chép đúng hai thẻ <code>&lt;script&gt;</code> của cổng từ một trang có sẵn; <code>tools/check_site.py</code> (và CI) báo lỗi nếu trang nào thiếu.</p>
+<div class="callout warn"><span class="callout-title">Giới hạn: đây không phải bảo mật thật</span>Website là các tệp tĩnh. Máy chủ vẫn gửi toàn bộ HTML, JavaScript và chỉ mục tìm kiếm cho bất kỳ ai yêu cầu, và repo đang công khai, nên ai biết xem mã nguồn hoặc mở repo đều đọc được nội dung mà không cần mật khẩu. Cổng chỉ ngăn người vào tình cờ. Mật khẩu yếu còn có thể bị dò từ mã băm công khai (mật khẩu ngẫu nhiên dài từ <code>--generate</code> chống dò tốt hơn nhiều). Muốn giấu nội dung thật sự, cần xác thực phía máy chủ hoặc kho lưu trữ riêng tư; việc dùng GitHub Pages cho repo riêng tư phụ thuộc loại gói của bạn, hãy xem tài liệu GitHub.</div>
 <h3 id="them-minh-hoa">Thêm một minh họa tương tác</h3>
 <ol>
   <li>Trong bài, đặt <code>&lt;div class="viz" data-viz="ten-moi" data-title="Tiêu đề"&gt;&lt;p class="viz-help"&gt;Gợi ý cách dùng&lt;/p&gt;&lt;/div&gt;</code>.</li>
