@@ -43,6 +43,14 @@ def main() -> int:
     for js in (ROOT / "assets" / "js").glob("*.js"):
         registered.update(re.findall(r"Viz\.register\('([\w-]+)'", js.read_text(encoding="utf-8")))
 
+    # Mọi trang phải nạp cổng mật khẩu (trừ khi bạn chủ động bỏ trang khỏi cổng ở đây).
+    for page in pages:
+        text = page.read_text(encoding="utf-8")
+        if "assets/js/gate-config.js" not in text or "assets/js/gate.js" not in text:
+            errors.append(f"{page.name}: thiếu thẻ script gate-config.js / gate.js trong <head>")
+        elif text.index("assets/js/gate.js") > text.find("</head>"):
+            errors.append(f"{page.name}: gate.js phải nằm trong <head> (chạy trước khi trang hiện ra)")
+
     for name, s in scans.items():
         for d in s.dupes:
             errors.append(f"{name}: duplicate id '{d}'")
