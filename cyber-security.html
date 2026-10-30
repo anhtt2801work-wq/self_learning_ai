@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>An ninh mạng · Tự học AI</title>
+<meta name="description" content="An ninh mạng từ góc nhìn khái niệm và phòng thủ: nền tảng mạng và TCP, tường lửa/IDS/IPS, OWASP Top 10, Red/Blue Team và MITRE ATT&CK, mã độc, điều tra số (DFIR), quản trị rủi ro, kỹ thuật xã hội và mật mã học, ba sự cố nổi tiếng.">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<script src="assets/js/gate-config.js"></script>
+<script src="assets/js/gate.js"></script>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/search-index.js"></script>
+<script defer src="assets/js/site.js"></script>
+<script defer src="assets/js/viz-cyber.js"></script>
+</head>
+<body data-page="cyber">
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div id="site-header"></div>
+<div class="page">
+<main class="content" id="main">
+
+<h1>An ninh mạng</h1>
+<p class="lead">Trang này đi theo hướng <strong>khái niệm và phòng thủ</strong>: hiểu cơ chế của các lớp bảo vệ, các kiểu tấn công hoạt động ra sao ở mức nguyên lý, và quan trọng nhất là kiểm soát nào chặn được nó — chứ không phải hướng dẫn từng bước khai thác một hệ thống. Ví dụ và lệnh cụ thể (nếu có) chỉ phục vụ việc hiểu bản chất.</p>
+<div class="callout warn"><span class="callout-title">Về phạm vi trang này</span>Mọi kiến thức an ninh mạng đều có hai mặt: hiểu cách tấn công hoạt động để phòng thủ tốt hơn, và khả năng lạm dụng nếu dùng sai nơi. Trang này chủ động <strong>bỏ qua các bước thực hiện cụ thể</strong> (lệnh khai thác, payload, cách vượt qua một hệ thống thật) và chỉ giữ phần giải thích cơ chế cùng biện pháp phòng thủ tương ứng. Nếu bạn cần thực hành kỹ năng tấn công, hãy làm trong môi trường lab hợp pháp (CTF, máy ảo riêng) và theo đúng phạm vi được phép (scope) khi có hợp đồng pentest.</div>
+<div class="callout note"><span class="callout-title">Cần biết trước</span>Không đòi hỏi nền tảng đặc biệt. Biết sơ về địa chỉ IP và cổng mạng (trang GitHub có nhắc qua) giúp phần đầu dễ vào hơn, nhưng mọi khái niệm đều được giải thích lại từ đầu ở đây.</div>
+
+<h2 id="tu-dien">Từ điển đối chiếu: thuật ngữ an ninh mạng ⇄ đời thường</h2>
+<p>Phần lớn khái niệm an ninh mạng có một phép tương đương quen thuộc ngoài đời. Nắm được phép tương đương giúp nhớ <em>vì sao</em> một kiểm soát tồn tại, trước khi đi vào cơ chế kỹ thuật ở các phần sau.</p>
+<table>
+  <thead><tr><th>Thuật ngữ</th><th>Tương đương đời thường</th><th>Vì sao giống</th></tr></thead>
+  <tbody>
+    <tr><td>Địa chỉ IP</td><td>Địa chỉ nhà / số nhà</td><td>Định danh duy nhất một thiết bị trên mạng để gói tin biết gửi đến đâu.</td></tr>
+    <tr><td>Cổng (port)</td><td>Số phòng trong một toà nhà</td><td>Một địa chỉ (toà nhà) có thể chứa nhiều dịch vụ (phòng) khác nhau cùng lúc.</td></tr>
+    <tr><td>Tường lửa (firewall)</td><td>Bảo vệ ở cổng ra vào</td><td>Chỉ cho người/gói tin đúng danh sách đi qua, còn lại chặn ngay từ cổng.</td></tr>
+    <tr><td>Mật khẩu (hash lưu trữ)</td><td>Dấu vân tay thay vì giữ chìa khoá</td><td>Hệ thống không lưu mật khẩu thật, chỉ lưu một dấu vết một chiều để đối chiếu.</td></tr>
+    <tr><td>Mã hoá (encryption)</td><td>Két sắt có chìa khoá</td><td>Dữ liệu vẫn tồn tại nhưng vô nghĩa với ai không có khoá đúng.</td></tr>
+    <tr><td>Chữ ký số (digital signature)</td><td>Chữ ký tay + con dấu chống giả</td><td>Xác nhận ai thực sự tạo ra văn bản, và văn bản chưa bị sửa sau khi ký.</td></tr>
+    <tr><td>Phishing (lừa đảo qua email/tin nhắn)</td><td>Thư giả danh ngân hàng gọi điện xin mã OTP</td><td>Đánh vào lòng tin và sự vội vàng của con người, không cần phá được hệ thống.</td></tr>
+    <tr><td>Ransomware</td><td>Bắt cóc tài sản rồi đòi tiền chuộc</td><td>Dữ liệu vẫn ở đó nhưng bị mã hoá/khoá lại cho tới khi trả tiền (và trả tiền cũng không chắc được trả lại).</td></tr>
+    <tr><td>Vá lỗi (patch)</td><td>Sửa ổ khoá cửa bị lỗi sau khi nhà sản xuất phát hiện</td><td>Lỗ hổng là lỗi thiết kế/triển khai; vá là thay “ổ khoá” mới trước khi ai lợi dụng.</td></tr>
+    <tr><td>Phân quyền tối thiểu (least privilege)</td><td>Chỉ phát chìa phòng cần dùng, không phát chìa chủ</td><td>Một tài khoản bị lộ chỉ gây hại trong đúng phạm vi nó được cấp, không lan rộng.</td></tr>
+    <tr><td>Giám sát (SIEM/SOC)</td><td>Camera an ninh và phòng trực</td><td>Không chặn được mọi vụ, nhưng phát hiện sớm để phản ứng kịp trước khi hậu quả lớn.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="mang-tuong-lua">Nền tảng mạng, bắt tay TCP và tường lửa</h2>
+<h3 id="dong-goi">Đóng gói dữ liệu qua các tầng mạng</h3>
+<p>Một gói tin đi qua Internet được bọc qua nhiều tầng, mỗi tầng thêm thông tin riêng (địa chỉ, cổng, kiểm tra lỗi) rồi giao cho tầng dưới — giống một lá thư được bỏ vào bì thư, rồi bỏ vào túi bưu kiện. Bên nhận mở ngược lại từng lớp.</p>
+<figure class="diagram">
+<svg viewBox="0 0 640 140" role="img" aria-label="Đóng gói dữ liệu qua bốn tầng: ứng dụng, giao vận, mạng, liên kết dữ liệu">
+  <rect class="box c1" x="10" y="20" width="600" height="30" rx="6"/><text x="320" y="39" text-anchor="middle" class="small bold">Dữ liệu ứng dụng (ví dụ: nội dung trang web)</text>
+  <rect class="box c2" x="40" y="55" width="560" height="26" rx="6"/><text x="320" y="72" text-anchor="middle" class="small">+ Tiêu đề TCP/UDP (cổng nguồn, cổng đích, số thứ tự)</text>
+  <rect class="box c3" x="70" y="86" width="500" height="26" rx="6"/><text x="320" y="103" text-anchor="middle" class="small">+ Tiêu đề IP (địa chỉ IP nguồn, địa chỉ IP đích)</text>
+  <rect class="box c4" x="100" y="117" width="440" height="18" rx="4"/><text x="320" y="130" text-anchor="middle" class="small">+ Tiêu đề khung Ethernet/Wi-Fi (địa chỉ MAC)</text>
+</svg>
+<figcaption>Mỗi tầng chỉ cần đọc tiêu đề của chính nó để định tuyến; đây là lý do một tường lửa có thể chặn theo cổng (tầng giao vận) mà không cần hiểu nội dung ứng dụng bên trong.</figcaption>
+</figure>
+
+<h3 id="bat-tay">Bắt tay 3 bước TCP và SYN Flood</h3>
+<p>TCP cần cả hai phía xác nhận trước khi trao đổi dữ liệu thật, qua ba gói: <strong>SYN</strong> (client xin mở kết nối, kèm số thứ tự khởi đầu), <strong>SYN-ACK</strong> (server xác nhận và xin mở chiều ngược lại), <strong>ACK</strong> (client xác nhận lại). Server phải tạm giữ thông tin của mỗi SYN chưa hoàn tất trong một hàng đợi gọi là <em>SYN backlog</em>, có kích thước hữu hạn.</p>
+<p>Một cách tấn công từ chối dịch vụ (DoS) cổ điển — <strong>SYN flood</strong> — không cần phá được gì cả: chỉ cần gửi rất nhiều gói SYN (thường giả địa chỉ nguồn) mà không bao giờ gửi ACK, hàng đợi đầy, client thật không còn chỗ để kết nối. Phòng thủ phổ biến là <strong>SYN cookies</strong>: server không lưu trạng thái ngay khi nhận SYN, mà nhúng thông tin cần thiết vào số thứ tự của gói SYN-ACK trả lời; chỉ khi ACK hợp lệ quay về thì kết nối mới thật sự được cấp phát, nên gói giả (không ai gửi ACK) không chiếm được tài nguyên nào.</p>
+<div class="viz" data-viz="tcp1" data-title="Bắt tay 3 bước và SYN flood / SYN cookies"></div>
+
+<h3 id="firewall-ids">Tường lửa có trạng thái, IDS và IPS</h3>
+<p>Một <strong>tường lửa có trạng thái</strong> (stateful firewall) không chỉ xét từng gói đơn lẻ theo luật, mà còn giữ một bảng các kết nối đang mở; gói phản hồi của một kết nối do chính nội bộ khởi tạo được tự động cho qua, nên không cần một luật "cho vào" riêng cho mọi dịch vụ bên ngoài mà nội bộ muốn gọi tới. Luật thường được xét theo thứ tự, và nên kết thúc bằng một luật <strong>default-deny</strong>: không khớp luật nào thì từ chối, thay vì mặc định cho qua.</p>
+<table>
+  <thead><tr><th></th><th>IDS (Intrusion Detection System)</th><th>IPS (Intrusion Prevention System)</th></tr></thead>
+  <tbody>
+    <tr><td>Vị trí</td><td>Thường đặt song song (nghe lưu lượng sao chép)</td><td>Đặt trực tiếp trên đường truyền (inline)</td></tr>
+    <tr><td>Hành động khi phát hiện</td><td>Chỉ cảnh báo, không chặn</td><td>Có thể tự động chặn ngay gói/luồng đó</td></tr>
+    <tr><td>Rủi ro</td><td>Phát hiện giả (false positive) chỉ gây nhiễu cảnh báo</td><td>Phát hiện giả có thể chặn nhầm lưu lượng hợp lệ</td></tr>
+  </tbody>
+</table>
+<p>Cả hai dò theo hai cách chính: <strong>theo chữ ký (signature-based)</strong> — khớp mẫu đã biết của một cuộc tấn công cụ thể, nhanh và ít báo nhầm nhưng không bắt được cái mới; và <strong>theo bất thường (anomaly-based)</strong> — học hành vi "bình thường" rồi cảnh báo khi lệch khỏi đó, bắt được tấn công mới nhưng dễ báo nhầm hơn. Hãy tự thử tư duy xây luật dưới đây:</p>
+<div class="viz" data-viz="fw1" data-title="Mô phỏng luật tường lửa có trạng thái"></div>
+
+<h2 id="web-owasp">Bảo mật ứng dụng web: OWASP Top 10 ở mức khái niệm</h2>
+<p><a href="https://owasp.org/www-project-top-ten/">OWASP Top 10</a> là danh sách các nhóm lỗ hổng ứng dụng web phổ biến nhất, được cập nhật định kỳ dựa trên dữ liệu thực tế. Bảng dưới chỉ nêu <em>bản chất</em> và <em>phòng thủ chính</em>, không đi vào từng kỹ thuật khai thác:</p>
+<table>
+  <thead><tr><th>Nhóm lỗ hổng</th><th>Bản chất</th><th>Phòng thủ chính</th></tr></thead>
+  <tbody>
+    <tr><td>Injection (SQL, command…)</td><td>Dữ liệu người dùng bị hiểu nhầm thành một phần lệnh/câu truy vấn</td><td>Luôn tách dữ liệu khỏi câu lệnh: truy vấn tham số hoá, API an toàn sẵn</td></tr>
+    <tr><td>Broken Access Control</td><td>Ứng dụng không kiểm tra lại quyền ở phía server cho từng yêu cầu</td><td>Kiểm tra quyền trên mọi endpoint ở server, không tin giao diện phía client</td></tr>
+    <tr><td>Cryptographic Failures</td><td>Dữ liệu nhạy cảm truyền/lưu không mã hoá, hoặc dùng thuật toán yếu</td><td>HTTPS bắt buộc, thuật toán và thư viện mật mã hiện hành, không tự chế</td></tr>
+    <tr><td>Cross-Site Scripting (XSS)</td><td>Mã JavaScript của kẻ tấn công chạy được trong trình duyệt người dùng khác</td><td>Mã hoá đầu ra (output encoding) theo đúng ngữ cảnh, Content Security Policy (CSP)</td></tr>
+    <tr><td>Security Misconfiguration</td><td>Cấu hình mặc định, thừa tính năng, lộ thông tin lỗi chi tiết</td><td>Chuẩn hoá cấu hình (hardening), tắt mọi thứ không dùng, rà soát định kỳ</td></tr>
+    <tr><td>Vulnerable &amp; Outdated Components</td><td>Thư viện/khung ứng dụng dùng có lỗ hổng đã công bố, chưa cập nhật</td><td>Theo dõi CVE của phụ thuộc, cập nhật có kiểm soát, loại bỏ thư viện không dùng</td></tr>
+    <tr><td>Identification &amp; Authentication Failures</td><td>Đăng nhập/quản lý phiên yếu: mật khẩu yếu, không có MFA, phiên không hết hạn</td><td>MFA, chính sách mật khẩu hợp lý (độ dài hơn là ký tự lạ), hết phiên hợp lý</td></tr>
+  </tbody>
+</table>
+
+<h3 id="sql-injection">Vì sao câu lệnh tham số hoá triệt tiêu SQL Injection</h3>
+<p>SQL Injection xảy ra khi một chuỗi do người dùng nhập được <strong>nối trực tiếp</strong> vào văn bản câu lệnh SQL. Nếu chuỗi đó chứa một dấu nháy đơn, nó có thể kết thúc sớm phần dữ liệu và biến phần còn lại thành một phần câu lệnh — logic bị thay đổi mà không cần "hack" gì cả, chỉ là cách ghép chuỗi sai. Giải pháp triệt để là <strong>truy vấn tham số hoá (parameterized query / prepared statement)</strong>: câu lệnh và giá trị được gửi tách biệt tới cơ sở dữ liệu, nên giá trị luôn được hiểu là dữ liệu, không bao giờ là một phần cú pháp, bất kể nó chứa ký tự gì.</p>
+<div class="viz" data-viz="sqli1" data-title="Nối chuỗi so với truy vấn tham số hoá"></div>
+<h3 id="xss-csp">XSS và Content Security Policy</h3>
+<p>Cross-Site Scripting xảy ra khi nội dung do người dùng khác nhập (bình luận, tên hiển thị…) được hiển thị lại thành HTML mà không được xử lý, cho phép chèn một đoạn <code>&lt;script&gt;</code> chạy trong trình duyệt của người xem khác với quyền của chính họ (đọc cookie, giả mạo hành động). Phòng thủ gồm hai lớp: <strong>mã hoá đầu ra</strong> theo đúng ngữ cảnh (HTML, thuộc tính, URL — mỗi ngữ cảnh cần cách mã hoá khác nhau) khi hiển thị lại dữ liệu người dùng, và <strong>Content Security Policy</strong> — một tiêu đề HTTP cho trình duyệt biết chỉ được chạy script từ những nguồn được khai báo trước, nên kể cả khi có đoạn script lọt vào trang, trình duyệt vẫn từ chối chạy nó nếu nguồn không khớp chính sách.</p>
+
+<h2 id="pentest-redteam">Kiểm thử xâm nhập, Red/Blue Team và MITRE ATT&amp;CK</h2>
+<p>Kiểm thử xâm nhập (penetration testing) là một hoạt động <strong>có hợp đồng, có phạm vi (scope) rõ ràng và được phép bằng văn bản</strong> — khác hẳn việc tự ý dò xét một hệ thống không phải của mình, hành vi đó là phạm pháp ở hầu hết nơi dù "chỉ để học". Quy trình chuẩn (như PTES) thường gồm: thoả thuận phạm vi trước → thu thập thông tin công khai → phân tích lỗ hổng → khai thác có kiểm soát để xác nhận lỗ hổng là thật → đánh giá hậu quả có thể → báo cáo kỹ thuật và báo cáo quản trị. Giá trị cốt lõi nằm ở <strong>báo cáo và việc vá lỗi sau đó</strong>, không phải ở việc "đột nhập được".</p>
+<p><strong>Red Team</strong> đóng vai kẻ tấn công để kiểm tra khả năng phát hiện và phản ứng của tổ chức; <strong>Blue Team</strong> là bên phòng thủ, vận hành giám sát và ứng cứu; <strong>Purple Team</strong> là cách làm việc hai bên cùng chia sẻ thông tin theo thời gian thực để cả hai học nhanh hơn, thay vì Red Team "thắng" trong im lặng. <a href="https://attack.mitre.org/">MITRE ATT&amp;CK</a> là một khung phân loại hành vi tấn công theo chiến thuật/kỹ thuật, được cả hai phía dùng làm ngôn ngữ chung: Blue Team dùng nó để kiểm tra mình đã có kiểm soát nào cho từng kỹ thuật, Red Team dùng nó để mô phỏng hành vi tấn công thật thay vì tấn công ngẫu nhiên.</p>
+<h3 id="kill-chain">Chuỗi tấn công (Cyber Kill Chain) và phòng thủ theo từng giai đoạn</h3>
+<p>Cyber Kill Chain (Lockheed Martin) chia một cuộc tấn công thành các giai đoạn nối tiếp. Ý nghĩa phòng thủ quan trọng nhất: <strong>chặn được ở bất kỳ giai đoạn nào cũng phá vỡ toàn bộ chuỗi</strong> — không cần chặn hoàn hảo ở một điểm, nhiều lớp phòng thủ mỏng ở nhiều giai đoạn thường hiệu quả hơn một lớp phòng thủ "hoàn hảo" ở một điểm.</p>
+<div class="viz" data-viz="kill1" data-title="Chuỗi tấn công và biện pháp phòng thủ theo từng giai đoạn"></div>
+
+<h2 id="malware">Mã độc: phân loại và cách phân tích an toàn</h2>
+<table>
+  <thead><tr><th>Loại</th><th>Đặc điểm</th></tr></thead>
+  <tbody>
+    <tr><td>Virus</td><td>Gắn vào một tệp/chương trình chủ, cần tệp đó được chạy để lan truyền.</td></tr>
+    <tr><td>Worm (sâu)</td><td>Tự lan qua mạng mà không cần người dùng chạy gì, thường lợi dụng lỗ hổng dịch vụ mạng.</td></tr>
+    <tr><td>Trojan</td><td>Giả dạng phần mềm hữu ích để lừa người dùng tự cài vào.</td></tr>
+    <tr><td>Ransomware</td><td>Mã hoá dữ liệu nạn nhân rồi đòi tiền chuộc để đưa khoá giải mã.</td></tr>
+    <tr><td>Spyware</td><td>Theo dõi và gửi thông tin (gõ phím, màn hình…) ra ngoài âm thầm.</td></tr>
+    <tr><td>Rootkit</td><td>Ẩn chính mình và các hoạt động khác khỏi hệ điều hành và công cụ giám sát.</td></tr>
+  </tbody>
+</table>
+<h3 id="ransomware">Cơ chế tống tiền của ransomware và các lớp phòng thủ</h3>
+<div class="flow">
+  <div><b>Lây nhiễm</b>qua phishing, lỗ hổng chưa vá, hoặc thông tin đăng nhập bị lộ</div><div class="arrow">→</div>
+  <div><b>Lan rộng</b>tìm và mã hoá càng nhiều máy/dữ liệu càng tốt trước khi bị phát hiện</div><div class="arrow">→</div>
+  <div><b>Mã hoá</b>dùng mã hoá đối xứng nhanh cho dữ liệu, khoá đó lại được bảo vệ bằng khoá công khai của kẻ tấn công</div><div class="arrow">→</div>
+  <div><b>Đòi tiền chuộc</b>để lại thông báo kèm địa chỉ thanh toán (thường bằng tiền mã hoá)</div>
+</div>
+<p>Vì sao backup là lớp phòng thủ quan trọng nhất: ransomware hiện đại thường cố tìm và mã hoá/xoá luôn các bản sao lưu nối mạng trước khi ra tay với dữ liệu chính, nên quy tắc <strong>3-2-1</strong> (3 bản sao, trên 2 loại lưu trữ khác nhau, 1 bản ở nơi tách biệt/ngoại tuyến hoặc không thể ghi đè — immutable) vẫn là biện pháp quyết định khả năng phục hồi mà không phải trả tiền. Các lớp khác: EDR trên máy trạm phát hiện hành vi mã hoá bất thường, phân đoạn mạng hạn chế lan rộng, và vá lỗi nhanh để giảm đường vào ban đầu.</p>
+<h3 id="phan-tich-an-toan">Phân tích mã độc an toàn: tĩnh và động</h3>
+<p>Khi cần tìm hiểu một tệp nghi ngờ, có hai hướng bổ sung cho nhau, luôn thực hiện <strong>cách ly hoàn toàn khỏi mạng thật và hệ thống thật</strong>: <strong>phân tích tĩnh</strong> — xem xét tệp mà không chạy nó (chữ ký, chuỗi ký tự bên trong, cấu trúc tệp) để có manh mối nhanh và an toàn tuyệt đối; và <strong>phân tích động</strong> — chạy tệp trong một "hộp cát" (sandbox) cách ly, không kết nối ra ngoài, để quan sát nó thực sự làm gì (tạo tiến trình nào, ghi tệp nào, cố kết nối đi đâu). Đây là việc của người đã được đào tạo, trong môi trường dựng riêng cho mục đích đó; trang này chỉ dừng ở việc hiểu khái niệm.</p>
+
+<h2 id="dfir-soc">Điều tra số (DFIR) và giám sát SOC</h2>
+<h3 id="ung-cuu">Vòng đời ứng cứu sự cố (NIST SP 800-61)</h3>
+<div class="flow">
+  <div><b>Chuẩn bị</b>chính sách, công cụ, vai trò đã phân sẵn trước khi có sự cố</div><div class="arrow">→</div>
+  <div><b>Phát hiện &amp; phân tích</b>xác nhận đây là sự cố thật, phạm vi tới đâu</div><div class="arrow">→</div>
+  <div><b>Ngăn chặn &amp; loại bỏ</b>cách ly hệ thống bị ảnh hưởng, gỡ nguyên nhân gốc</div><div class="arrow">→</div>
+  <div><b>Khôi phục</b>đưa hệ thống trở lại hoạt động, theo dõi sát sau đó</div><div class="arrow">→</div>
+  <div><b>Rút kinh nghiệm</b>viết báo cáo, cập nhật lại kế hoạch chuẩn bị</div><div class="arrow">↺</div>
+</div>
+<p>Điểm hay bị bỏ sót: vòng lặp quay lại "Chuẩn bị" ở cuối. Mỗi sự cố là một cơ hội cập nhật runbook, không phải việc kết thúc khi hệ thống chạy lại.</p>
+<h3 id="chung-cu">Thứ tự biến mất của chứng cứ số (RFC 3227)</h3>
+<p>Khi thu thập chứng cứ trên một máy đang chạy, cần ưu tiên những gì "biến mất" nhanh nhất trước, vì việc điều tra bản thân cũng có thể làm mất dữ liệu nếu làm sai thứ tự:</p>
+<ol>
+  <li>Thanh ghi CPU, bộ nhớ cache — mất ngay khi tắt điện, gần như không thu được trong thực tế.</li>
+  <li>Bộ nhớ RAM và bảng tiến trình đang chạy — mất khi tắt máy, nên cần "chụp" (memory dump) trước nếu có thể.</li>
+  <li>Kết nối mạng và trạng thái hệ thống tạm thời — thay đổi liên tục theo thời gian thực.</li>
+  <li>Dữ liệu trên đĩa — tồn tại lâu hơn, nhưng vẫn nên sao y bản (forensic image) trước khi phân tích để không làm thay đổi bản gốc.</li>
+  <li>Bản ghi log từ xa, bản sao lưu — lâu bền nhất, nhưng có thể đã bị kẻ tấn công xoá ở nguồn gần.</li>
+</ol>
+<h3 id="soc-siem">SOC và SIEM</h3>
+<p>Một <strong>SOC</strong> (Security Operations Center) là bộ phận/con người trực giám sát liên tục; công cụ trung tâm thường là <strong>SIEM</strong> (Security Information and Event Management) — gom log từ nhiều hệ thống về một nơi, tương quan chúng với nhau để phát hiện mẫu hình đáng ngờ mà một log đơn lẻ không thấy được (ví dụ: một tài khoản đăng nhập thành công ở hai quốc gia cách nhau vài phút).</p>
+
+<h2 id="rui-ro-chuan">Quản trị rủi ro và các chuẩn quốc tế</h2>
+<p>Ba mục tiêu nền tảng của an ninh thông tin, gọi là <strong>tam giác CIA</strong>: <strong>Confidentiality</strong> (bảo mật — chỉ người được phép mới đọc được), <strong>Integrity</strong> (toàn vẹn — dữ liệu không bị sửa đổi trái phép, hoặc phát hiện được nếu có), <strong>Availability</strong> (sẵn sàng — hệ thống hoạt động được khi cần). Hầu hết quyết định an ninh là đánh đổi giữa ba mục tiêu này, không có kiểm soát nào tối đa hoá cả ba cùng lúc mà không tốn chi phí.</p>
+<h3 id="ale">Định lượng rủi ro: ALE = SLE × ARO</h3>
+<p>Một cách định lượng rủi ro kinh điển: <strong>SLE</strong> (Single Loss Expectancy) là thiệt hại nếu sự cố xảy ra một lần; <strong>ARO</strong> (Annualized Rate of Occurrence) là số lần kỳ vọng xảy ra mỗi năm; nhân lại được <strong>ALE</strong> (Annualized Loss Expectancy) — thiệt hại kỳ vọng mỗi năm, dùng để so sánh với chi phí của một kiểm soát (nếu kiểm soát rẻ hơn ALE giảm được, nó đáng đầu tư):</p>
+$$\text{ALE} = \text{SLE} \times \text{ARO}$$
+<p>Song song với con số, ma trận <strong>khả năng × ảnh hưởng</strong> là cách định lượng trực quan hơn khi khó ước lượng chính xác bằng tiền:</p>
+<div class="viz" data-viz="risk1" data-title="Ma trận rủi ro và máy tính ALE"></div>
+<h3 id="chuan-quoc-te">Các chuẩn và chứng chỉ thường gặp</h3>
+<p><strong>ISO/IEC 27001</strong> là chuẩn quốc tế cho hệ thống quản lý an ninh thông tin (ISMS) — tập trung vào quy trình quản trị liên tục hơn là một danh sách kỹ thuật cố định. <strong>NIST Cybersecurity Framework</strong> tổ chức hoạt động an ninh thành năm chức năng dễ nhớ: <strong>Nhận diện</strong> (Identify) tài sản và rủi ro, <strong>Bảo vệ</strong> (Protect) bằng kiểm soát, <strong>Phát hiện</strong> (Detect) khi có bất thường, <strong>Phản ứng</strong> (Respond) khi có sự cố, <strong>Khôi phục</strong> (Recover) sau sự cố. <strong>CISSP</strong> là một chứng chỉ quản lý an ninh thông tin uy tín, bao quát 8 miền kiến thức (an ninh &amp; quản trị rủi ro, an ninh tài sản, kiến trúc &amp; kỹ thuật an ninh, an ninh mạng truyền thông, quản lý truy cập &amp; nhận diện, đánh giá &amp; kiểm thử an ninh, vận hành an ninh, an ninh phát triển phần mềm) — hữu ích để biết bản đồ lĩnh vực rộng tới đâu, hơn là một tài liệu học chi tiết.</p>
+
+<h2 id="xa-hoi-mat-ma">Kỹ thuật xã hội và mật mã học ứng dụng</h2>
+<h3 id="ky-thuat-xa-hoi">Kỹ thuật xã hội: tấn công vào con người, không vào máy</h3>
+<p>Phần lớn sự cố an ninh thực tế bắt đầu từ một người bấm vào đúng thứ không nên bấm, không phải từ một lỗ hổng phần mềm phức tạp. Một số dạng phổ biến:</p>
+<ul>
+  <li><strong>Phishing</strong>: email/tin nhắn giả danh một nguồn tin cậy, tạo cảm giác gấp gáp để nạn nhân bấm liên kết hoặc nhập thông tin.</li>
+  <li><strong>BEC (Business Email Compromise)</strong>: giả danh lãnh đạo hoặc đối tác, yêu cầu chuyển tiền hoặc đổi thông tin thanh toán — thường nhắm vào bộ phận tài chính.</li>
+  <li><strong>Giả mạo giọng nói / hình ảnh (deepfake)</strong>: dùng AI tạo giọng nói hoặc video giả của một người có thật để tăng độ tin cậy của một yêu cầu lừa đảo.</li>
+  <li><strong>Quishing</strong>: lừa đảo qua mã QR dẫn tới một trang giả, lợi dụng việc mã QR khó đọc "địa chỉ thật" bằng mắt trước khi quét.</li>
+</ul>
+<p>Phòng thủ hiệu quả nhất không phải "cẩn thận hơn" một cách mơ hồ, mà là <strong>quy trình xác minh độc lập</strong> bắt buộc cho các hành động nhạy cảm (ví dụ: mọi yêu cầu đổi thông tin chuyển tiền phải gọi điện xác nhận qua số điện thoại đã biết từ trước, không dùng số trong chính email/tin nhắn đó) cộng với MFA cho tài khoản quan trọng, để kể cả khi mật khẩu bị lộ, một yếu tố thứ hai vẫn chặn được việc đăng nhập.</p>
+<h3 id="mat-ma">Mật mã học ứng dụng: đối xứng, bất đối xứng, băm, PKI</h3>
+<p><strong>Mã hoá đối xứng</strong> (ví dụ AES) dùng cùng một khoá để mã hoá và giải mã — nhanh, nhưng cần một cách an toàn để chia sẻ khoá đó trước. <strong>Mã hoá bất đối xứng</strong> (ví dụ RSA, ECC) dùng một cặp khoá: khoá công khai (chia sẻ tự do, dùng để mã hoá hoặc kiểm tra chữ ký) và khoá riêng (giữ bí mật, dùng để giải mã hoặc tạo chữ ký) — giải quyết được vấn đề chia sẻ khoá nhưng chậm hơn nhiều, nên trong thực tế (như HTTPS) thường dùng bất đối xứng để trao đổi an toàn một khoá đối xứng tạm thời, rồi dùng khoá đối xứng đó cho phần dữ liệu lớn.</p>
+<figure class="diagram">
+<svg viewBox="0 0 640 170" role="img" aria-label="So sánh mã hoá đối xứng và bất đối xứng">
+  <text x="160" y="22" text-anchor="middle" class="small bold">Đối xứng (AES)</text>
+  <rect class="box c1" x="40" y="34" width="80" height="34" rx="6"/><text x="80" y="55" text-anchor="middle" class="small">Bản rõ</text>
+  <path class="arrow" d="M120 51 H160"/><text x="140" y="44" text-anchor="middle" class="small muted">cùng khoá</text>
+  <rect class="box c2" x="160" y="34" width="100" height="34" rx="6"/><text x="210" y="55" text-anchor="middle" class="small">Bản mã</text>
+  <path class="arrow" d="M260 51 H300"/><text x="280" y="44" text-anchor="middle" class="small muted">cùng khoá</text>
+  <rect class="box c1" x="300" y="34" width="80" height="34" rx="6"/><text x="340" y="55" text-anchor="middle" class="small">Bản rõ</text>
+  <text x="480" y="22" text-anchor="middle" class="small bold">Bất đối xứng (RSA/ECC)</text>
+  <rect class="box c1" x="420" y="34" width="80" height="34" rx="6"/><text x="460" y="55" text-anchor="middle" class="small">Bản rõ</text>
+  <path class="arrow" d="M500 51 H540"/><text x="520" y="44" text-anchor="middle" class="small muted">khoá công khai</text>
+  <rect class="box c2" x="540" y="34" width="80" height="34" rx="6"/><text x="580" y="55" text-anchor="middle" class="small">Bản mã</text>
+  <path class="arrow" d="M580 68 V96"/><text x="588" y="85" text-anchor="start" class="small muted">khoá riêng</text>
+  <rect class="box c1" x="540" y="96" width="80" height="34" rx="6"/><text x="580" y="117" text-anchor="middle" class="small">Bản rõ</text>
+  <text x="320" y="152" text-anchor="middle" class="small muted">Chữ ký số dùng ngược chiều: ký bằng khoá riêng, ai cũng kiểm tra được bằng khoá công khai tương ứng.</text>
+</svg>
+<figcaption>Khoá công khai có thể chia sẻ tự do; khoá riêng không bao giờ rời khỏi nơi tạo ra nó.</figcaption>
+</figure>
+<p><strong>Hàm băm</strong> (ví dụ SHA-256) biến một dữ liệu bất kỳ thành một chuỗi độ dài cố định, một chiều (không tính ngược lại được bản gốc) và nhạy với thay đổi nhỏ nhất — dùng để lưu dấu vết mật khẩu (không lưu mật khẩu thật) và để kiểm tra một tệp có bị sửa không. <strong>PKI</strong> (Public Key Infrastructure) là hệ thống các tổ chức phát hành chứng chỉ số (Certificate Authority) xác nhận "khoá công khai này thuộc về đúng tổ chức này" — chính là cơ chế đứng sau biểu tượng khoá/HTTPS của trình duyệt mà trang mật khẩu của website này cũng dựa vào gián tiếp (qua GitHub Pages).</p>
+
+<h2 id="dai-an">Ba sự cố an ninh mạng đáng nhớ</h2>
+<p>Ba sự cố dưới đây hay được dùng làm ví dụ vì mỗi vụ minh hoạ một bài học kiểm soát khác nhau. Các số liệu dưới đây được đối chiếu qua tìm kiếm, và nhiều nguồn đưa số hơi khác nhau (ký hiệu độ tin cậy: <span class="conf ok">✔</span> nhiều nguồn thống nhất, <span class="conf mid">◐</span> số liệu dao động giữa các nguồn).</p>
+<h3 id="bangladesh">Vụ cướp Ngân hàng Trung ương Bangladesh (2016)</h3>
+<p><span class="conf ok">✔</span> Tin tặc chiếm được máy trong mạng nội bộ của Ngân hàng Trung ương Bangladesh và dùng chính hệ thống SWIFT hợp lệ để gửi lệnh chuyển tiền giả từ tài khoản của ngân hàng này tại Cục Dự trữ Liên bang New York. <span class="conf mid">◐</span> Khoảng 35 lệnh chuyển với tổng trị giá gần 1 tỷ USD được gửi đi; phần lớn bị chặn, nhưng 5 lệnh trị giá khoảng <strong>101 triệu USD</strong> đã trót lọt (81 triệu USD chuyển tới Philippines, 20 triệu USD tới Sri Lanka — phần này sau được thu hồi). <span class="conf ok">✔</span> Các lệnh còn lại bị Fed New York chặn lại nhờ một chi tiết nhỏ: một lệnh viết sai tên tổ chức nhận (ghi "fandation" thay vì "foundation") khiến nhân viên nghi ngờ và kiểm tra lại. Phần lớn số 81 triệu USD chuyển tới Philippines đã được rút và chuyển qua hệ thống casino, rất khó thu hồi. <strong>Bài học kiểm soát</strong>: hệ thống thanh toán liên ngân hàng là mục tiêu giá trị cao; xác thực nhiều lớp và đối soát bất thường theo thời gian thực (không chỉ dựa vào một kênh thông báo duy nhất) là lớp phòng thủ cuối cùng khi mạng nội bộ đã bị chiếm.</p>
+<h3 id="capitalone">Rò rỉ dữ liệu Capital One (2019)</h3>
+<p><span class="conf ok">✔</span> Một cựu kỹ sư của nhà cung cấp dịch vụ cloud đã lợi dụng một tường lửa ứng dụng web (WAF) bị cấu hình sai trên hạ tầng AWS của Capital One để chiếm được quyền truy cập dữ liệu, rồi dùng quyền đó để lấy dữ liệu từ các bộ chứa lưu trữ (S3 bucket). Vụ này ảnh hưởng khoảng <strong>106 triệu khách hàng</strong> tại Mỹ và Canada (khoảng 100 triệu tại Mỹ, 6 triệu tại Canada), trong đó có khoảng 140.000 số an sinh xã hội Mỹ và 1 triệu số bảo hiểm xã hội Canada bị lộ cùng các dữ liệu ít nhạy cảm hơn như điểm tín dụng. Capital One ước tính chi phí khắc phục 100–150 triệu USD. <strong>Bài học kiểm soát</strong>: sai sót cấu hình (không phải lỗ hổng "mới") vẫn là nguyên nhân phổ biến hàng đầu trên cloud; nguyên tắc phân quyền tối thiểu cho cả vai trò dịch vụ (không chỉ con người) và rà soát cấu hình định kỳ quan trọng không kém việc vá lỗi phần mềm.</p>
+<h3 id="wannacry">Mã độc WannaCry (2017)</h3>
+<p><span class="conf ok">✔</span> WannaCry là ransomware lan truyền như một con sâu (worm) nhờ khai thác lỗ hổng SMB trên Windows có tên <strong>EternalBlue</strong> (CVE-2017-0144) — một công cụ bị rò rỉ từ NSA. Microsoft đã phát hành bản vá khoảng một tháng <em>trước</em> khi công cụ này bị công khai, nhưng rất nhiều hệ thống chưa vá kịp. <span class="conf mid">◐</span> Các nguồn đưa số liệu quy mô khác nhau: thường được trích dẫn nhiều nhất là hơn <strong>200.000 máy tại khoảng 150 quốc gia</strong> trong vòng vài ngày; tại Anh, hệ thống y tế công NHS bị ảnh hưởng nặng, với hàng chục tổ chức y tế báo cáo nhiễm và hàng chục nghìn thiết bị/cuộc hẹn bị ảnh hưởng. Sự lan truyền bị chặn phần lớn nhờ một nhà nghiên cứu tình cờ tìm ra một "kill switch" được cài sẵn trong mã độc. <strong>Bài học kiểm soát</strong>: vá lỗi kịp thời cho các dịch vụ lộ ra mạng là biện pháp rẻ nhất chặn được cả một đợt dịch toàn cầu; phân đoạn mạng cũng quan trọng vì WannaCry lan chủ yếu bằng cách tự quét mạng nội bộ sau khi vào được một máy.</p>
+
+<h2 id="checklist">Checklist phòng thủ cơ bản</h2>
+<p>Không cần làm hết mọi thứ cùng lúc; đây là những biện pháp có tỷ lệ "hiệu quả / công sức" cao nhất cho cá nhân và tổ chức nhỏ, gần như không tốn tiền:</p>
+<ul>
+  <li><strong>Bật MFA</strong> cho email, tài khoản quản trị và mọi dịch vụ quan trọng — chặn được phần lớn hậu quả của việc lộ mật khẩu.</li>
+  <li><strong>Dùng trình quản lý mật khẩu</strong> và mật khẩu dài, không dùng lại giữa các dịch vụ.</li>
+  <li><strong>Vá lỗi thường xuyên</strong>, đặc biệt hệ điều hành, trình duyệt và bất kỳ dịch vụ nào lộ ra Internet.</li>
+  <li><strong>Backup theo quy tắc 3-2-1</strong>, với ít nhất một bản không thể bị ghi đè từ máy chính (ngoại tuyến hoặc immutable), và <em>thử khôi phục thật</em> định kỳ.</li>
+  <li><strong>Phân quyền tối thiểu</strong>: không dùng tài khoản quản trị cho công việc hằng ngày; thu hồi quyền ngay khi không còn cần.</li>
+  <li><strong>Có quy trình xác minh độc lập</strong> cho các yêu cầu nhạy cảm (chuyển tiền, đổi thông tin thanh toán, cấp quyền) — không chỉ dựa vào một email/tin nhắn.</li>
+  <li><strong>Viết sẵn một kế hoạch ứng cứu sự cố</strong> đơn giản (ai gọi ai, cách ly thế nào) trước khi cần dùng nó trong hoảng loạn.</li>
+  <li><strong>Đào tạo nhận thức định kỳ</strong>, kể cả ngắn, vẫn hiệu quả hơn không có gì vì phần lớn sự cố bắt đầu từ con người.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<details class="exercise">
+  <summary>Bài 1. SYN flood và SYN cookies</summary>
+  <div class="ex-body"><p>Vì sao SYN cookies chặn được SYN flood mà không cần biết trước địa chỉ IP nào là giả? Gợi ý: thứ server làm khác đi nằm ở thời điểm nào trong 3 bước bắt tay.</p>
+  <p><em>Lời giải:</em> Bình thường server cấp phát tài nguyên (một ô trong hàng đợi) ngay khi nhận SYN, trước khi biết ACK có quay về không — đó là thứ kẻ tấn công lợi dụng. Với SYN cookies, server hoãn việc cấp phát tới khi ACK hợp lệ quay về; thông tin cần để xác thực ACK đó được nhúng ngay trong số thứ tự của SYN-ACK, không cần lưu trạng thái nào ở giữa. Gói SYN giả không có ai gửi ACK lại nên không bao giờ chiếm được tài nguyên, bất kể địa chỉ nguồn là gì.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 2. default-deny</summary>
+  <div class="ex-body"><p>Vì sao một tường lửa nên kết thúc bằng luật "default-deny" (từ chối những gì không khớp luật nào) thay vì "default-allow"?</p>
+  <p><em>Lời giải:</em> Với default-allow, bất kỳ dịch vụ mới nào vô tình mở ra (một cổng debug để quên, một dịch vụ cài thêm) sẽ lộ ra ngoài cho tới khi ai đó nhớ viết luật chặn nó — lỗi phải được phát hiện mới an toàn. Với default-deny, dịch vụ mới mặc định không ai gọi được tới khi có người chủ động mở luật cho nó — lỗi (quên mở luật) chỉ gây bất tiện, không gây lộ.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 3. Vì sao tham số hoá triệt để hơn "lọc dấu nháy đơn"</summary>
+  <div class="ex-body"><p>Một cách phòng thủ SQL Injection khác đôi khi được thử là tự viết hàm lọc/escape các ký tự đặc biệt trước khi nối chuỗi, thay vì dùng truy vấn tham số hoá. Vì sao cách tham số hoá vẫn được coi là đáng tin cậy hơn?</p>
+  <p><em>Lời giải:</em> Lọc ký tự phụ thuộc vào việc người viết hàm lọc nhớ đúng và đủ mọi ký tự/encoding đặc biệt của đúng loại cơ sở dữ liệu đang dùng (và có thể sai khi đổi hệ quản trị, đổi bảng mã, hoặc có một cách encode mới mà hàm lọc chưa biết). Truy vấn tham số hoá không "lọc" gì cả — nó loại bỏ hoàn toàn bước nối chuỗi, nên không có khái niệm "quên lọc một ký tự nào" ngay từ đầu.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 4. Tính ALE</summary>
+  <div class="ex-body"><p>Một cửa hàng ước tính nếu bị tấn công ransomware thành công, thiệt hại (ngừng bán hàng, phục hồi, uy tín) khoảng 800 triệu đồng. Dựa trên dữ liệu ngành, họ ước tính xác suất bị tấn công thành công khoảng 0,2 lần/năm (tức trung bình 5 năm một lần). Một gói kiểm soát (backup có kiểm tra, EDR cơ bản, đào tạo nhân viên) giá 60 triệu đồng/năm, giúp giảm ARO xuống còn 0,05. Gói này có đáng đầu tư không?</p>
+  <p><em>Lời giải:</em> ALE trước kiểm soát = 800 × 0,2 = 160 triệu đồng/năm. ALE sau kiểm soát = 800 × 0,05 = 40 triệu đồng/năm. Mức giảm thiệt hại kỳ vọng = 160 − 40 = 120 triệu đồng/năm, lớn hơn chi phí 60 triệu đồng/năm, nên gói kiểm soát đáng đầu tư (tiết kiệm kỳ vọng 60 triệu đồng/năm). Lưu ý đây chỉ là kỳ vọng trung bình nhiều năm, không đảm bảo năm nào cũng tiết kiệm được đúng số đó.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 5. Chọn giai đoạn trong Kill Chain để đầu tư</summary>
+  <div class="ex-body"><p>Một tổ chức nhỏ có ngân sách hạn chế và phải chọn đầu tư vào một trong hai: (a) lọc email/web gateway tốt hơn ở giai đoạn Phát tán, hoặc (b) một hệ thống giám sát lưu lượng ra (egress filtering) tốt hơn ở giai đoạn C2. Hãy nêu một lý do hợp lý cho mỗi lựa chọn, và giải thích vì sao "chặn sớm hơn" không luôn luôn là lựa chọn đúng duy nhất.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 6. Thứ tự biến mất của chứng cứ</summary>
+  <div class="ex-body"><p>Một máy chủ bị nghi nhiễm mã độc vẫn đang chạy. Theo RFC 3227, bạn nên thu thập gì trước, dữ liệu trên đĩa hay dữ liệu trong RAM? Vì sao việc đầu tiên "theo bản năng" (rút điện ngay) lại thường là sai?</p>
+  <p><em>Lời giải:</em> Nên thu thập RAM (và trạng thái kết nối mạng đang chạy) trước, vì chúng biến mất ngay khi tắt máy, trong khi dữ liệu trên đĩa vẫn còn nguyên (dù chậm thay đổi theo thời gian do ghi log liên tục). Rút điện ngay sẽ làm mất toàn bộ bằng chứng trong RAM — bao gồm các tiến trình độc hại đang chạy, kết nối mạng đang mở, khoá mã hoá tạm thời trong bộ nhớ — những thứ không thể lấy lại được từ đĩa.</p></div>
+</details>
+
+<h2 id="tham-khao">Tài liệu tham khảo</h2>
+<ul>
+  <li><a href="https://owasp.org/www-project-top-ten/">OWASP Top 10</a> — danh sách lỗ hổng ứng dụng web phổ biến, cập nhật định kỳ.</li>
+  <li><a href="https://attack.mitre.org/">MITRE ATT&amp;CK</a> — khung phân loại chiến thuật/kỹ thuật tấn công, dùng chung cho Red/Blue Team.</li>
+  <li><a href="https://csrc.nist.gov/pubs/sp/800/61/r2/final">NIST SP 800-61</a> — hướng dẫn xử lý sự cố an ninh máy tính (Computer Security Incident Handling Guide).</li>
+  <li><a href="https://www.cisa.gov/">CISA</a> (Cybersecurity and Infrastructure Security Agency, Mỹ) — khuyến cáo, cảnh báo lỗ hổng và hướng dẫn phòng thủ cập nhật thường xuyên.</li>
+  <li><a href="https://en.wikipedia.org/wiki/Bangladesh_Bank_robbery">Bangladesh Bank robbery</a> (Wikipedia) — tổng hợp nguồn cho sự cố năm 2016.</li>
+</ul>
+<div class="callout note"><span class="callout-title">Lĩnh vực thay đổi nhanh</span>Kỹ thuật tấn công, công cụ phòng thủ và cả danh sách OWASP Top 10 được cập nhật theo thời gian. Hãy đối chiếu với tài liệu chính thức hiện hành của từng chuẩn/công cụ trước khi áp dụng, đặc biệt với các con số trong phần "Ba sự cố" ở trên — các nguồn tin tức đưa số liệu không hoàn toàn khớp nhau.</div>
+
+</main>
+</div>
+<div id="site-footer"></div>
+</body>
+</html>
