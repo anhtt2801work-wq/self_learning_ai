@@ -36,7 +36,7 @@ assets/js/site.js           header, tìm kiếm, mục lục, tô màu code, ren
 assets/js/viz-*.js          minh họa tương tác theo từng chủ đề (git, ml, dl, cv, nlp, llm, agent, mlops, combo)
 assets/js/search-index.js   chỉ mục tìm kiếm (được sinh tự động, đừng sửa tay)
 assets/vendor/katex/        KaTeX (MIT) để hiển thị công thức, đã đóng gói sẵn
-tools/                      script kiểm tra và sinh chỉ mục
+tools/                      kiểm tra, sinh chỉ mục, đặt mật khẩu
 .github/workflows/          CI và triển khai GitHub Pages
 ```
 
@@ -52,6 +52,18 @@ tools/                      script kiểm tra và sinh chỉ mục
 python3 tools/build_search_index.py
 python3 tools/check_site.py
 ```
+
+## Mật khẩu vào website
+
+Mọi trang có một cổng mật khẩu phía trình duyệt (`assets/js/gate.js`, cấu hình ở `assets/js/gate-config.js`). Đổi hoặc tắt mật khẩu:
+
+```bash
+python3 tools/set_password.py              # nhập mật khẩu mới
+python3 tools/set_password.py --generate   # sinh mật khẩu ngẫu nhiên
+python3 tools/set_password.py --disable    # tắt cổng
+```
+
+Cổng **chỉ ngăn người vào tình cờ**, không phải bảo mật thật: website là các tệp tĩnh công khai, ai xem mã nguồn hoặc repo đều đọc được nội dung. Tệp cấu hình chỉ chứa muối và mã băm PBKDF2, không chứa mật khẩu. Trang HTML mới phải chép hai thẻ script của cổng; `tools/check_site.py` kiểm tra điều này.
 
 ## Xuất bản bằng GitHub Pages
 
