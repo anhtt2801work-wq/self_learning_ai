@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quant Trading · Tự học AI</title>
+<meta name="description" content="Quant trading bằng trực giác và minh họa: lợi suất đuôi dày, chuỗi thời gian, Sharpe và lợi thế, backtest và overfitting, chi phí, danh mục và Kelly, drawdown, học máy cho tài chính, vi cấu trúc thị trường, chứng khoán Việt Nam, crypto và quyền chọn.">
+<script>(function(){var t=null;try{t=localStorage.getItem('theme')}catch(e){}if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.setAttribute('data-theme',t||'light');})();</script>
+<script src="assets/js/gate-config.js"></script>
+<script src="assets/js/gate.js"></script>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/style.css">
+<script defer src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/katex/auto-render.min.js"></script>
+<script defer src="assets/js/search-index.js"></script>
+<script defer src="assets/js/site.js"></script>
+<script defer src="assets/js/viz-quant.js"></script>
+<script defer src="assets/js/viz-quant2.js"></script>
+</head>
+<body data-page="quant">
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div id="site-header"></div>
+<div class="page">
+<main class="content" id="main">
+
+<h1>Quant Trading</h1>
+<p class="lead">Quant trading là dùng dữ liệu, thống kê và mã nguồn để tìm một lợi thế nhỏ nhưng lặp lại được, rồi khai thác nó có kỷ luật về rủi ro và chi phí. Trang này đi bằng <strong>trực giác và minh họa</strong>: mỗi ý lớn có một mô hình đồ chơi để bạn kéo thanh trượt và tự thấy cơ chế, từ nền tảng thống kê, kiểm định chiến lược, danh mục và rủi ro, học máy, vi cấu trúc thị trường, đến đặc thù chứng khoán Việt Nam, crypto và quyền chọn.</p>
+
+<h2 id="doc-truoc">Đọc trước: mục đích và độ tin cậy</h2>
+<div class="callout warn"><span class="callout-title">Tài liệu học tập, không phải tư vấn đầu tư</span>
+<p>Không có tín hiệu mua bán, khuyến nghị mã hay chiến lược “chắc thắng” nào ở đây. Toàn bộ minh họa dùng <strong>dữ liệu mô phỏng</strong> để làm rõ cơ chế. Một backtest đẹp không đảm bảo lợi nhuận thật (phần Backtest giải thích vì sao), và giao dịch có đòn bẩy có thể làm mất toàn bộ vốn. Nếu bạn định dùng tiền thật, hãy bắt đầu bằng giao dịch giả lập, vốn nhỏ bạn chấp nhận mất, và tìm hiểu quy định áp dụng cho bạn.</p></div>
+<p>Các nhãn độ tin cậy (cùng quy ước với trang Kết hợp AI):</p>
+<ul>
+  <li><span class="conf ok">✔</span> con số trong bài đã được tính hoặc mô phỏng bằng code khi soạn;</li>
+  <li><span class="conf mid">◐</span> kiến thức chuẩn trong sách hoặc bài báo kinh điển, nhưng mình <strong>chưa mở lại nguồn</strong> để đối chiếu từng chi tiết;</li>
+  <li><span class="conf low">✱</span> quy định hoặc đặc tả hợp đồng thay đổi theo thời gian và theo sàn, chưa xác nhận từ nguồn chính thức. Hãy kiểm tra trực tiếp trước khi dựa vào.</li>
+</ul>
+<div class="callout note"><span class="callout-title">Cần biết trước</span>Xác suất, thống kê cơ bản và Python (xem trang Machine Learning). Phần học máy (mục 6) giả định bạn đã đọc phần đánh giá mô hình ở đó.</div>
+
+<h2 id="loi-suat">1. Lợi suất không “chuẩn”: đuôi dày</h2>
+<p>Hầu hết công cụ thống kê quen thuộc ngầm giả định biến cố cực đoan hiếm đến mức gần như không xảy ra. Với lợi suất tài chính, giả định này sai: những ngày lệch cực mạnh xảy ra <strong>thường hơn nhiều</strong> so với phân phối chuẩn dự đoán. Điều đó làm mọi thứ dựa trên “độ lệch chuẩn” (VaR, Sharpe, kích thước vị thế) đánh giá thấp rủi ro thật.</p>
+<p>Về mặt tính toán, nên dùng <strong>lợi suất log</strong> \(r_t=\ln(P_t/P_{t-1})\) khi cộng dồn theo thời gian (log cộng được qua các kỳ), và lợi suất đơn \(P_t/P_{t-1}-1\) khi gộp theo danh mục tại một thời điểm. Với lợi suất ngày nhỏ hai cách gần như bằng nhau.</p>
+<div class="viz" data-viz="ret1" data-title="Đuôi dày: những ngày “không thể xảy ra” vẫn xảy ra">
+  <p class="viz-help">Giảm df để làm đuôi dày hơn và đếm số ngày lệch quá 3σ so với con số kỳ vọng nếu phân phối chuẩn. Ở df = 3 những ngày 6–8σ xuất hiện đều đặn. Kéo df lên 50 để thấy phân phối tiến về chuẩn.</p>
+</div>
+<p><span class="conf ok">✔</span> Kiểm bằng code: với phân phối chuẩn, \(P(|r|>3\sigma)=0.27\%\); với Student-t chuẩn hóa về phương sai 1, df = 5 cho khoảng 1.2%, df = 3 cho khoảng 1.4%, tức gấp 4–5 lần. Thị trường thật còn có thêm <strong>cụm biến động</strong> (mục 2.3) và nhảy giá khi có tin.</p>
+
+<h2 id="chuoi-thoi-gian">2. Chuỗi thời gian: nhớ, quay về, hay bước ngẫu nhiên</h2>
+<h3 id="ar-quan-tinh">2.1. Ba hành vi cơ bản</h3>
+<p>Một chuỗi có thể (a) <strong>quán tính</strong> (momentum: tăng rồi có xu hướng tăng tiếp), (b) <strong>quay về trung bình</strong> (mean reversion: lệch xa thì bị kéo lại), hoặc (c) <strong>bước ngẫu nhiên</strong> (random walk: quá khứ không giúp gì cho dự đoán độ lệch). Mô hình nhỏ nhất chứa cả ba là AR(1): \(x_t=\varphi\,x_{t-1}+\varepsilon_t\). Khi \(|\varphi|\lt1\) chuỗi dừng và quay về 0 với <strong>nửa chu kỳ</strong> \(\ln 0.5/\ln\varphi\); khi \(\varphi=1\) là bước ngẫu nhiên.</p>
+<div class="viz" data-viz="ar1" data-title="Kéo φ từ 0 lên 1: từ nhiễu đến bước ngẫu nhiên">
+  <p class="viz-help">Đường xám đứt luôn là bước ngẫu nhiên (φ = 1) với cùng nhiễu. Quan sát cột tự tương quan so với chấm lý thuyết \(\varphi^k\).</p>
+</div>
+<p>Điểm cốt lõi: <strong>giá</strong> của hầu hết tài sản gần với bước ngẫu nhiên (khó dự đoán), nên lợi thế thường được tìm ở những đại lượng <em>có cấu trúc</em> hơn giá: chênh lệch giữa hai tài sản gắn kết với nhau, hoặc độ lớn của biến động. <span class="conf mid">◐</span> Đây là lý do khái niệm đồng tích hợp (cointegration, Engle–Granger 1987) quan trọng: hai chuỗi giá đều là bước ngẫu nhiên nhưng một tổ hợp tuyến tính của chúng có thể dừng.</p>
+
+<h3 id="pairs">2.2. Giao dịch cặp: khai thác chênh lệch quay về</h3>
+<p>Ý tưởng: tìm hai tài sản cùng chịu một yếu tố chung, tính chênh lệch \(s_t=A_t-\beta B_t\), mua phần bị rẻ và bán phần bị đắt khi chênh lệch lệch quá xa mức bình thường (điểm z lớn), đóng khi nó quay về. Rủi ro lớn nhất là mối quan hệ <strong>không còn đúng nữa</strong> (cấu trúc đổi, doanh nghiệp đổi mô hình kinh doanh), và khi đó “lệch xa” là tín hiệu thật, không phải cơ hội.</p>
+<div class="viz" data-viz="pairs1" data-title="Giao dịch cặp trên chênh lệch mô phỏng">
+  <p class="viz-help">Đặt φ = 1 (không có quay về) và bấm “Mẫu nhiễu mới” nhiều lần: lãi lỗ chỉ là may rủi. Rồi đặt φ ≈ 0.92 và để ý chi phí: ngưỡng thấp tạo nhiều giao dịch nhỏ và chi phí ăn hết lợi nhuận.</p>
+</div>
+<p><span class="conf ok">✔</span> Đã đếm bằng code trên 200 mẫu nhiễu (ngưỡng vào lệnh 2, chi phí 0.3, cửa sổ 60 nhịp): với φ = 1 lãi gộp trung bình chỉ khoảng +2 và 53% mẫu dương (đúng như may rủi), sau chi phí trung bình khoảng −2.3; với φ = 0.95 trung bình khoảng +28 và 100% mẫu dương. Khác biệt không nằm ở một mẫu may mắn mà ở việc chênh lệch có thật sự quay về hay không. Vì φ thật không biết trước và phải ước lượng từ dữ liệu nhiễu, đây là chỗ <em>kiểm định đồng tích hợp</em> và theo dõi suy giảm quan trọng.</p>
+
+<h3 id="bien-dong">2.3. Biến động đi thành cụm (GARCH)</h3>
+<p>Hướng của lợi suất gần như không dự đoán được, nhưng <strong>độ lớn</strong> thì có: ngày biến động mạnh thường kéo theo những ngày biến động mạnh, rồi lặng dần. <span class="conf mid">◐</span> Mô hình GARCH(1,1) (Bollerslev 1986, mở rộng ARCH của Engle 1982) cập nhật phương sai ngày mai từ cú sốc hôm nay và phương sai hôm qua: \(\sigma_{t+1}^2=\omega+\alpha\,r_t^2+\beta\,\sigma_t^2\). Tổng \(\alpha+\beta\) là độ bền: gần 1 nghĩa là cú sốc phai rất chậm.</p>
+<div class="viz" data-viz="garch1" data-title="GARCH(1,1): biến động đi thành cụm">
+  <p class="viz-help">Giữ α + β = 0.98 rồi so với 0.80. Để ý tự tương quan của lợi suất gần 0 nhưng của bình phương lợi suất thì dương rõ.</p>
+</div>
+<p>Ứng dụng thực tế: dự báo biến động để <strong>đặt kích thước vị thế</strong> (giảm vị thế khi biến động tăng) và định giá quyền chọn, khả thi hơn nhiều so với dự báo hướng giá.</p>
+
+<h2 id="loi-the">3. Lợi thế (edge) và cách đo nó</h2>
+<p>Thước đo phổ biến nhất là <strong>Sharpe ratio</strong> \(=\) lợi suất vượt lãi phi rủi ro chia độ lệch chuẩn, quy về năm. Nhưng Sharpe bạn <em>đo</em> từ dữ liệu quá khứ chỉ là một ước lượng nhiễu của Sharpe thật. <span class="conf mid">◐</span> Theo xấp xỉ của Lo (2002) cho lợi suất độc lập, sai số chuẩn của Sharpe quy năm là \(\sqrt{(1+\mathrm{SR}^2/2)/Y}\) với \(Y\) là số năm dữ liệu.</p>
+<div class="viz" data-viz="sharpe1" data-title="Sharpe đo được nhiễu đến mức nào?">
+  <p class="viz-help">Đặt Sharpe thật = 1 và kéo số năm từ 20 xuống 1: với 1 năm dữ liệu, xác suất đo ra âm không hề nhỏ.</p>
+</div>
+<p><span class="conf ok">✔</span> Ví dụ: Sharpe thật 1, dữ liệu 5 năm cho sai số chuẩn 0.55; dữ liệu 1 năm cho 1.22. Một chiến lược “Sharpe 2 trong 6 tháng” hầu như không chứa thông tin đủ để phân biệt với may rủi.</p>
+
+<h3 id="luat-co-ban">3.1. Quy luật cơ bản: tín hiệu yếu + rất nhiều cơ hội</h3>
+<p><span class="conf mid">◐</span> Grinold và Kahn mô tả một xấp xỉ lý tưởng: \(\mathrm{IR}\approx \mathrm{IC}\times\sqrt{\mathrm{breadth}}\), trong đó IC là tương quan giữa dự báo và kết quả, breadth là số quyết định <em>độc lập</em> mỗi năm. Nó giải thích vì sao quỹ định lượng thích “nhiều mã, nhiều tín hiệu, mỗi tín hiệu rất yếu”.</p>
+<div class="viz" data-viz="fl1" data-title="Tín hiệu yếu vẫn ổn nếu có đủ quyết định độc lập">
+  <p class="viz-help">Với IC = 0.02, kéo số quyết định từ 100 lên 2500 và xem IR từ 0.2 lên 1.0. Rồi nghĩ xem 2500 quyết định ấy có thực sự độc lập không.</p>
+</div>
+
+<h2 id="backtest">4. Backtest: dễ làm đẹp, khó làm đúng</h2>
+<p>Backtest mô phỏng chiến lược trên dữ liệu quá khứ. Vì bạn đã biết kết quả, mọi sai sót nhỏ đều nghiêng theo hướng làm kết quả <em>đẹp hơn thực tế</em>. Các lỗi kinh điển:</p>
+<table>
+  <thead><tr><th>Lỗi</th><th>Bản chất</th><th>Cách tránh</th></tr></thead>
+  <tbody>
+    <tr><td>Nhìn trước tương lai (look-ahead)</td><td>Dùng thông tin chưa có tại thời điểm quyết định (giá đóng cửa để quyết định lúc mở cửa, báo cáo tài chính trước ngày công bố, chuẩn hóa bằng trung bình cả giai đoạn)</td><td>Gắn nhãn thời điểm công bố cho mọi dữ liệu; mọi thống kê chỉ tính từ quá khứ; trễ tín hiệu ít nhất một nhịp</td></tr>
+    <tr><td>Thiên lệch người sống sót</td><td>Chỉ có các mã còn tồn tại hôm nay, bỏ các mã đã hủy niêm yết hoặc phá sản</td><td>Dùng dữ liệu có cả mã đã rời sàn, và danh sách thành phần chỉ số tại từng thời điểm</td></tr>
+    <tr><td>Nạo dữ liệu (data snooping)</td><td>Thử rất nhiều ý tưởng trên cùng một bộ dữ liệu rồi giữ cái đẹp nhất</td><td>Đếm số lần đã thử; để dành dữ liệu ngoài mẫu chưa bao giờ nhìn; điều chỉnh ngưỡng ý nghĩa</td></tr>
+    <tr><td>Bỏ qua chi phí và khả năng khớp lệnh</td><td>Giả định mua bán ở giá đóng cửa, không spread, không tác động giá</td><td>Mô hình hóa chi phí thật và hạn chế khối lượng theo thanh khoản</td></tr>
+  </tbody>
+</table>
+
+<h3 id="overfit">4.1. Chọn cái tốt nhất trong N lần thử: bẫy overfitting</h3>
+<p>Nếu bạn thử đủ nhiều chiến lược <em>không có lợi thế gì</em>, cái đứng đầu trên dữ liệu cũ sẽ trông rất xuất sắc, chỉ vì chọn cực đại của nhiễu. Ngoài mẫu, nó trở về mức 0.</p>
+<div class="viz" data-viz="overfit1" data-title="Cái tốt nhất trong N chiến lược nhiễu">
+  <p class="viz-help">Mỗi chấm là một chiến lược vô giá trị. Chấm lớn viền đen là cái bạn sẽ chọn vì Sharpe trong mẫu cao nhất; nhìn tung độ của nó (Sharpe ngoài mẫu). Bấm “Mẫu mới” nhiều lần.</p>
+</div>
+<p><span class="conf ok">✔</span> Mô phỏng: với 1 năm dữ liệu (sai số chuẩn ≈ 1), cực đại trung bình của N Sharpe nhiễu là khoảng 1.55 khi N = 10, 2.5 khi N = 100 và 3.2 khi N = 1000. Nghĩa là <strong>một Sharpe 2.5 trong mẫu hoàn toàn có thể là sản phẩm của việc thử 100 biến thể</strong>. <span class="conf mid">◐</span> Bailey và López de Prado (2014) đề xuất “Deflated Sharpe Ratio” để điều chỉnh Sharpe theo số lần thử và độ lệch/độ nhọn của lợi suất; ý tưởng cốt lõi ở đây chính là minh họa trên.</p>
+
+<h3 id="chi-phi">4.2. Chi phí giao dịch ăn mòn lợi thế</h3>
+<p>Mỗi lần mua hoặc bán đều tốn phí, spread và trượt giá. Chiến lược quay vòng nhanh có thể có tín hiệu thật nhưng lãi gộp mỗi lệnh quá mỏng so với chi phí.</p>
+<div class="viz" data-viz="cost1" data-title="Sharpe sau chi phí theo vòng quay">
+  <p class="viz-help">Giữ Sharpe gộp = 1, chi phí 10 bps, rồi tăng vòng quay từ 5 lên 100 lần/năm và xem điểm rơi xuống âm. Gấp đôi chi phí (đường cam) làm vòng quay hòa vốn giảm một nửa.</p>
+</div>
+<p><span class="conf ok">✔</span> Ví dụ: lãi gộp 10%/năm (Sharpe 1, biến động 10%), vòng quay 20 lần/năm, chi phí 10 bps mỗi chiều: chi phí 2%/năm, Sharpe còn 0.8.</p>
+
+<h3 id="quy-trinh-kiem-dinh">4.3. Kiểm định đúng cách: walk-forward, purged CV, embargo</h3>
+<p>Chia ngẫu nhiên train/test (như bài toán ML thông thường) <strong>sai</strong> với chuỗi thời gian vì mẫu liền kề tương quan và nhãn thường trải dài nhiều ngày (rò rỉ qua ranh giới). Cách làm chuẩn: huấn luyện trên quá khứ, kiểm trên tương lai, trượt cửa sổ qua thời gian, và <strong>loại bỏ (purge)</strong> các mẫu huấn luyện có nhãn chồng lên giai đoạn kiểm, cộng một khoảng đệm <strong>embargo</strong>.</p>
+<figure class="diagram">
+<svg viewBox="0 0 640 200" role="img" aria-label="Walk-forward: ba lượt trượt cửa sổ huấn luyện rồi kiểm định, với khoảng purge và embargo giữa chúng">
+  <text x="8" y="22" class="small bold">Lượt 1</text>
+  <rect class="box c1" x="70" y="8" width="230" height="22" rx="4"/><text x="185" y="23" text-anchor="middle" class="small">huấn luyện</text>
+  <rect class="box" x="300" y="8" width="24" height="22" rx="4"/><text x="312" y="23" text-anchor="middle" class="small muted">đệm</text>
+  <rect class="box c3" x="324" y="8" width="90" height="22" rx="4"/><text x="369" y="23" text-anchor="middle" class="small">kiểm</text>
+  <text x="8" y="62" class="small bold">Lượt 2</text>
+  <rect class="box c1" x="70" y="48" width="320" height="22" rx="4"/><text x="230" y="63" text-anchor="middle" class="small">huấn luyện (mở rộng hoặc trượt)</text>
+  <rect class="box" x="390" y="48" width="24" height="22" rx="4"/><text x="402" y="63" text-anchor="middle" class="small muted">đệm</text>
+  <rect class="box c3" x="414" y="48" width="90" height="22" rx="4"/><text x="459" y="63" text-anchor="middle" class="small">kiểm</text>
+  <text x="8" y="102" class="small bold">Lượt 3</text>
+  <rect class="box c1" x="70" y="88" width="410" height="22" rx="4"/><text x="275" y="103" text-anchor="middle" class="small">huấn luyện</text>
+  <rect class="box" x="480" y="88" width="24" height="22" rx="4"/><text x="492" y="103" text-anchor="middle" class="small muted">đệm</text>
+  <rect class="box c3" x="504" y="88" width="90" height="22" rx="4"/><text x="549" y="103" text-anchor="middle" class="small">kiểm</text>
+  <path class="arrow" d="M70 150 H600"/><text x="335" y="172" text-anchor="middle" class="small muted">thời gian →  (chỉ quá khứ dùng để dự đoán tương lai; không bao giờ ngược lại)</text>
+  <text x="8" y="190" class="small muted">“đệm” = khoảng purge/embargo: bỏ các mẫu có nhãn chồng sang giai đoạn kiểm hoặc nằm sát ngay trước nó.</text>
+</svg>
+<figcaption>Kết quả đáng tin là chuỗi các điểm số ngoài mẫu qua nhiều lượt, không phải một con số đẹp trên một lần chia.</figcaption>
+</figure>
+<p><span class="conf mid">◐</span> Chi tiết purged k-fold và embargo trình bày hệ thống trong López de Prado, <em>Advances in Financial Machine Learning</em> (2018). Quy tắc thực dụng thêm: dành riêng một đoạn dữ liệu cuối cùng và chỉ nhìn nó <strong>một lần</strong>, sau khi đã chốt mọi quyết định.</p>
+
+<h2 id="danh-muc">5. Danh mục và quản trị rủi ro</h2>
+<h3 id="markowitz">5.1. Đa dạng hóa và đường biên hiệu quả</h3>
+<p>Hai tài sản không tương quan hoàn toàn thì danh mục của chúng có rủi ro <em>thấp hơn</em> trung bình có trọng số của rủi ro riêng lẻ: \(\sigma_p^2=w_1^2\sigma_1^2+w_2^2\sigma_2^2+2\rho w_1w_2\sigma_1\sigma_2\). <span class="conf mid">◐</span> Markowitz (1952) hệ thống hóa ý tưởng này thành bài toán chọn trọng số tối ưu.</p>
+<div class="viz" data-viz="mv1" data-title="Đường biên hai tài sản theo tương quan">
+  <p class="viz-help">Kéo ρ từ 1 xuống −1: đường cong “phồng” sang trái, nghĩa là cùng lợi suất kỳ vọng có rủi ro thấp hơn. Chú ý danh mục rủi ro nhỏ nhất có thể thấp hơn cả tài sản an toàn hơn.</p>
+</div>
+<p><span class="conf ok">✔</span> Với rủi ro 20% và 30%, ρ = 0: danh mục rủi ro nhỏ nhất dồn 69% vào tài sản đầu, rủi ro 16.6% (thấp hơn cả 20%); ρ = 0.3 cho 18.7%; ρ = 1 không có lợi ích gì. Cảnh báo thực tế: nghiệm tối ưu <strong>rất nhạy với kỳ vọng lợi suất</strong>, mà đại lượng này ước lượng cực nhiễu (xem mục 3), nên người ta thường hạn chế trọng số, thu hẹp ước lượng về mức trung bình, hoặc dùng cách không cần kỳ vọng như cân bằng rủi ro (risk parity) hay chia đều. Và tương quan thường <strong>tăng vọt khi khủng hoảng</strong>, đúng lúc bạn cần đa dạng hóa nhất.</p>
+
+<h3 id="kelly">5.2. Cược bao nhiêu? Tiêu chí Kelly</h3>
+<p>Khi có lợi thế, đặt quá ít bỏ phí cơ hội, đặt quá nhiều thì rủi ro phá sản. <span class="conf mid">◐</span> Kelly (1956) chỉ ra tỉ lệ vốn mỗi lệnh tối đa hóa tốc độ tăng trưởng log của vốn về lâu dài. Với lệnh thắng được \(b\) lần vốn đã đặt, thua mất toàn bộ vốn đặt, xác suất thắng \(p\): \(f^*=\dfrac{bp-(1-p)}{b}\). Tốc độ tăng trưởng \(g(f)=p\ln(1+bf)+(1-p)\ln(1-f)\) đạt cực đại tại \(f^*\) rồi <strong>giảm, và về 0 quanh 2f*</strong> (xấp xỉ 2f* khi lợi thế nhỏ; minh họa dưới tính điểm hòa vốn chính xác).</p>
+<div class="viz" data-viz="kelly1" data-title="Tốc độ tăng trưởng theo tỉ lệ vốn mỗi lệnh">
+  <p class="viz-help">Đồ thị trên là tăng trưởng kỳ vọng; đồ thị dưới là ba đường vốn mô phỏng với cùng chuỗi thắng thua. Cược gấp đôi Kelly dao động dữ dội mà không tăng trưởng hơn, thậm chí kém hơn.</p>
+</div>
+<p><span class="conf ok">✔</span> Ví dụ p = 0.55, b = 1: f* = 10%, tăng trưởng 0.50%/lệnh; ½ Kelly còn 0.375%/lệnh (75% tốc độ); cược 2× Kelly tăng trưởng gần như bằng 0 (hơi âm), 3× Kelly là âm rõ. Vì p và b chỉ là ước lượng nhiễu, cược theo “Kelly đầy đủ” hầu như luôn là cược quá tay; người ta thường dùng một phần nhỏ của nó.</p>
+
+<h3 id="drawdown">5.3. Drawdown, VaR và vì sao đòn bẩy nguy hiểm</h3>
+<p><strong>Drawdown</strong> là mức sụt từ đỉnh vốn xuống đáy. Đây là thước đo “đau” mà nhà đầu tư thật sự cảm nhận, và nó thường lớn hơn trực giác. <strong>VaR</strong> mức 95% một ngày là mức lỗ mà chỉ 5% số ngày tệ hơn; <strong>CVaR</strong> (expected shortfall) là lỗ trung bình trong 5% ngày tệ nhất, nhạy với đuôi dày hơn VaR. Với phân phối chuẩn, VaR 95% là \(1.645\sigma\) và CVaR là \(2.06\sigma\) <span class="conf ok">✔</span>; với đuôi dày, cả hai bị đánh giá thấp.</p>
+<div class="viz" data-viz="dd1" data-title="Đường vốn mô phỏng: sụt giảm và đòn bẩy">
+  <p class="viz-help">Đặt Sharpe thật = 0.5 và so đòn bẩy 1× với 3×. Rồi đặt Sharpe = 0 để thấy sụt giảm sâu vẫn xảy ra khi chiến lược không có lợi thế.</p>
+</div>
+<p>Hai bài học: (1) sụt giảm dài và sâu là <strong>bình thường</strong> kể cả khi chiến lược có lợi thế thật, nên bạn cần kế hoạch (giới hạn lỗ, giảm kích thước) từ trước, không phải quyết định lúc hoảng; (2) khi mất 50% thì cần lãi 100% để hòa vốn (mất \(x\) cần lãi \(x/(1-x)\)), nên đòn bẩy làm nghiệm “không quay lại được” đến nhanh hơn nhiều so với trực giác tuyến tính.</p>
+
+<h2 id="ml">6. Học máy cho giao dịch</h2>
+<p>Học máy rất mạnh ở nơi tín hiệu rõ (ảnh, văn bản), nhưng tài chính là nơi <strong>tỉ lệ tín hiệu trên nhiễu cực thấp</strong>, dữ liệu ít so với số tham số có thể có, và quy luật đổi theo thời gian (khi nhiều người khai thác cùng một lợi thế, nó biến mất). Hệ quả là mô hình phức tạp rất dễ khớp nhiễu (mục 4.1).</p>
+<ul>
+  <li><strong>Đặc trưng (features)</strong>: thường là các đại lượng có ý nghĩa kinh tế (động lượng, giá trị, chất lượng, biến động, thanh khoản, tin tức/dữ liệu thay thế). Chuẩn hóa theo mặt cắt tại từng thời điểm, không dùng thống kê toàn giai đoạn (tránh nhìn trước).</li>
+  <li><strong>Nhãn (labels)</strong>: dự đoán “giá ngày mai tăng hay giảm” rất nhiễu. <span class="conf mid">◐</span> Phương pháp <em>triple-barrier</em> (López de Prado) gắn nhãn theo việc giá chạm rào trên (chốt lãi), rào dưới (cắt lỗ) hay hết thời gian trước, gần với cách giao dịch thật hơn.</li>
+  <li><strong>Kiểm định</strong>: walk-forward với purge/embargo (mục 4.3); báo cáo cả IC (tương quan hạng giữa dự báo và kết quả), không chỉ độ chính xác phân loại.</li>
+  <li><strong>Ưu tiên mô hình đơn giản</strong>: hồi quy có chính quy hóa hoặc cây nông thường đủ; mạng sâu chỉ khi bạn có lượng dữ liệu và kỷ luật kiểm định tương xứng.</li>
+</ul>
+<figure class="diagram">
+<svg viewBox="0 0 640 190" role="img" aria-label="Triple-barrier: đường giá chạm rào trên, rào dưới hoặc rào thời gian">
+  <rect class="box" x="60" y="20" width="520" height="140" rx="6"/>
+  <path class="line c3" d="M60 52 H580"/><text x="64" y="45" class="small">rào trên (chốt lãi) → nhãn +1</text>
+  <path class="line c2" d="M60 128 H580"/><text x="64" y="144" class="small">rào dưới (cắt lỗ) → nhãn −1</text>
+  <path class="line dash" d="M440 20 V160"/><text x="444" y="36" class="small">rào thời gian → nhãn 0</text>
+  <path class="line c1" d="M60 90 L110 82 L160 100 L210 88 L260 70 L310 76 L360 56 L395 48"/>
+  <circle class="fill3" cx="395" cy="48" r="5"/>
+  <path class="line c1" d="M60 90 L100 98 L150 90 L200 110 L250 104 L300 122 L330 130" opacity="0.55"/>
+  <circle class="fill2" cx="330" cy="130" r="5"/>
+  <text x="320" y="182" text-anchor="middle" class="small muted">hai kịch bản từ cùng điểm vào: nhãn do rào nào chạm trước; rào thường đặt theo biến động hiện tại</text>
+</svg>
+<figcaption>Nhãn gắn với một khoảng thời gian, nên hai mẫu gần nhau có nhãn chồng lên nhau: đây chính là lý do cần purge khi kiểm định.</figcaption>
+</figure>
+
+<h2 id="vi-cau-truc">7. Vi cấu trúc thị trường: giá thật được hình thành thế nào</h2>
+<p>Giá không phải một con số: ở mỗi thời điểm có một <strong>sổ lệnh</strong> gồm các lệnh mua chờ (bid) và bán chờ (ask) ở nhiều mức giá, mỗi mức có một khối lượng. Lệnh thị trường khớp ngay với lệnh chờ tốt nhất, và nếu đủ lớn sẽ ăn sang các mức xấu hơn. Chênh lệch giữa ask tốt nhất và bid tốt nhất là <strong>spread</strong>, chính là phần thưởng cho người cung cấp thanh khoản và chi phí cho người cần khớp ngay.</p>
+<div class="viz" data-viz="book1" data-title="Đơn mua thị trường ăn qua sổ lệnh">
+  <p class="viz-help">Tăng khối lượng đơn mua và để ý giá trung bình rời khỏi giá giữa. Giảm độ sâu thanh khoản để mô phỏng mã kém thanh khoản: cùng một đơn nhưng trượt giá lớn hơn nhiều.</p>
+</div>
+<p>Người tạo lập thị trường (market maker) đặt đồng thời lệnh mua và bán để ăn spread, nhưng chịu <strong>rủi ro tồn kho</strong> (giá đi một chiều khi họ đang giữ hàng) và rủi ro khớp với người biết nhiều hơn (<em>lựa chọn bất lợi</em>, adverse selection). <span class="conf mid">◐</span> Mô hình Almgren–Chriss (2000) là khung kinh điển cân bằng giữa khớp nhanh (tác động giá lớn) và khớp chậm (rủi ro giá trong lúc chờ); thực nghiệm thường thấy chi phí tác động tăng chậm hơn tuyến tính theo khối lượng (hay gọi là quy tắc căn bậc hai), nhưng mức độ phụ thuộc vào thị trường và mã. Bài học thực hành: chi phí giao dịch phụ thuộc <em>quy mô của bạn so với thanh khoản</em>, nên backtest trên vốn nhỏ không ngoại suy được lên vốn lớn.</p>
+
+<h2 id="thi-truong">8. Từ nguyên lý chung đến từng thị trường</h2>
+<p>Mọi nguyên lý ở trên (đuôi dày, nhiễu của Sharpe, overfitting, chi phí, Kelly) đúng ở mọi nơi. Khác biệt nằm ở <strong>ràng buộc vận hành</strong>: phí, quy tắc khớp lệnh, đòn bẩy, thời gian thanh toán, khả năng bán khống. Phần này nêu những điều nên tra cứu trước khi mô hình hóa từng thị trường.</p>
+<div class="callout warn"><span class="callout-title">Quy định thay đổi: hãy tự xác nhận từ nguồn chính thức</span>Trong môi trường soạn bài này mình chỉ tra cứu được qua tìm kiếm, và nguồn thứ cấp không thống nhất ở một số điểm. Vì vậy mọi quy định cụ thể bên dưới gắn nhãn <span class="conf low">✱</span>. Nguồn đáng tin: Ủy ban Chứng khoán Nhà nước và các sở giao dịch (với Việt Nam), tài liệu hợp đồng của chính sàn bạn dùng (với crypto).</div>
+
+<h3 id="vn">8.1. Chứng khoán Việt Nam</h3>
+<ul>
+  <li><span class="conf low">✱</span> <strong>Biên độ giá</strong>: nhiều nguồn ghi ±7% (HOSE), ±10% (HNX), ±15% (UPCoM); nhưng một nguồn môi giới ghi UPCoM là ±10%, và có thông tin về kế hoạch chuyển niêm yết từ HNX sang HOSE kèm thay đổi quy tắc giao dịch. Hãy kiểm tra quy định hiện hành.</li>
+  <li><span class="conf low">✱</span> <strong>Chu kỳ thanh toán</strong> (thường nghe là T+2), <strong>đơn vị giao dịch tối thiểu</strong>, và <strong>khả năng bán khống/giao dịch trong ngày</strong>: mình <strong>không xác nhận được</strong> qua tìm kiếm; các thông tin này ảnh hưởng trực tiếp đến việc chiến lược nào có thể thực hiện, nên cần tra từ nguồn chính thức trước khi thiết kế.</li>
+</ul>
+<p>Điều có thể suy ra mà không cần nhớ chi tiết quy định: nếu có biên độ giá, lợi suất ngày bị <strong>cắt</strong> ở biên và các phiên liền nhau tương quan, nên độ biến động quan sát thấp hơn rủi ro thật, và lúc dính sàn bạn có thể không bán được. Backtest phải mô phỏng được điều này.</p>
+<div class="viz" data-viz="band1" data-title="Biên độ giá làm một cú sốc kéo dài nhiều phiên">
+  <p class="viz-help">Chọn sàn và cú sốc −20%: giá phải mất nhiều phiên mới “nói hết” thông tin (giả sử mỗi phiên bị chặn ở biên). Các con số biên độ là ✱, chỉ để minh họa cơ chế.</p>
+</div>
+
+<h3 id="crypto">8.2. Crypto và hợp đồng vĩnh viễn (perpetual)</h3>
+<ul>
+  <li><strong>Giao dịch 24/7</strong>, nên khái niệm “đóng cửa ngày” là quy ước của người làm dữ liệu; thanh khoản mỏng vào các khung giờ vắng.</li>
+  <li><span class="conf low">✱</span> <strong>Phí maker/taker</strong>: lệnh chờ (tạo thanh khoản) thường rẻ hơn lệnh khớp ngay; biểu phí khác nhau theo sàn và thay đổi.</li>
+  <li><span class="conf mid">◐</span> <strong>Funding rate</strong>: hợp đồng vĩnh viễn không có ngày đáo hạn, nên có khoản thanh toán định kỳ giữa bên mua và bên bán để giá hợp đồng bám giá cơ sở. Nhiều sàn tính mỗi 8 giờ nhưng có sàn dùng chu kỳ khác <span class="conf low">✱</span>; công thức chi tiết khác nhau.</li>
+  <li><span class="conf low">✱</span> <strong>Thanh lý</strong>: khi ký quỹ không đủ mức duy trì, vị thế bị đóng cưỡng bức; công thức giá thanh lý khác nhau theo sàn, chế độ ký quỹ (cô lập hay chéo), phí và funding. Minh họa dưới dùng xấp xỉ \(1/\text{đòn bẩy}-\text{ký quỹ duy trì}\).</li>
+</ul>
+<div class="viz" data-viz="fund1" data-title="Đòn bẩy, khoảng cách thanh lý và funding">
+  <p class="viz-help">Với biến động 4%/ngày, đòn bẩy 10× và 30 ngày giữ, xác suất chạm mức thanh lý đã rất lớn. Hạ đòn bẩy xuống 3× và quan sát.</p>
+</div>
+<p><span class="conf ok">✔</span> Ví dụ: đòn bẩy 10×, ký quỹ duy trì 0.5% cho khoảng cách thanh lý 9.5%; với biến động 4%/ngày trong 30 ngày, xác suất chạm trong mô hình bước ngẫu nhiên là khoảng 65%; ở 3× còn khoảng 7%. Funding 0.01% mỗi 8 giờ nghe nhỏ nhưng là khoảng 10.95%/năm trên giá trị vị thế, và ở đòn bẩy 5× là 54.75%/năm trên tiền ký quỹ.</p>
+
+<h3 id="quyen-chon">8.3. Quyền chọn và phái sinh quốc tế</h3>
+<p>Quyền chọn mua (call) cho quyền, không phải nghĩa vụ, mua tài sản ở giá thực hiện \(K\) khi đáo hạn; quyền chọn bán (put) là quyền bán. Giá trị khi đáo hạn là \(\max(S-K,0)\) (call). Trước đáo hạn, giá có thêm <strong>giá trị thời gian</strong> vì còn khả năng giá đi có lợi. <span class="conf mid">◐</span> Mô hình Black–Scholes (1973) cho giá lý thuyết từ \(S,K,\sigma,T,r\); các “Greeks” đo độ nhạy: <strong>delta</strong> (theo giá cơ sở), <strong>gamma</strong> (delta thay đổi ra sao), <strong>vega</strong> (theo biến động), <strong>theta</strong> (theo thời gian).</p>
+<div class="viz" data-viz="opt1" data-title="Giá quyền chọn và các Greeks">
+  <p class="viz-help">Tăng σ: giá tăng cả hai bên (biến động là “nguyên liệu” của quyền chọn). Giảm thời gian đến hạn: đường cong sát dần đường giá trị khi đáo hạn; theta cho thấy quyền chọn “tan” theo thời gian.</p>
+</div>
+<p><span class="conf ok">✔</span> Mặc định (call, \(S=K=100\), σ = 20%, 1 năm, r = 5%): giá 10.45, delta 0.637, put cùng điều kiện 5.57. <strong>Delta hedging</strong> là giữ vị thế cổ phiếu bằng đúng delta để triệt tiêu rủi ro giá nhỏ; vì delta đổi theo giá (gamma) nên phải điều chỉnh liên tục và mỗi lần điều chỉnh tốn chi phí. Điều quant giao dịch quyền chọn thực sự bán/mua là <em>biến động</em>: so biến động ngầm định trong giá với biến động bạn dự báo sẽ xảy ra. Giới hạn của Black–Scholes (biến động hằng số, giá liên tục, không chi phí) là lý do thị trường thật có “nụ cười biến động”.</p>
+
+<h2 id="van-hanh">9. Từ ý tưởng đến vận hành</h2>
+<ol>
+  <li><strong>Viết giả thuyết kinh tế trước</strong> (vì sao lợi thế này tồn tại và ai là người chịu thua?). Tín hiệu không có lời giải thích thường là nhiễu.</li>
+  <li><strong>Đếm số lần thử</strong> và để dành dữ liệu ngoài mẫu (mục 4.1, 4.3).</li>
+  <li><strong>Mô hình hóa chi phí và khả năng khớp lệnh</strong> thực tế, gồm cả tác động khi quy mô lớn lên (mục 4.2, 7).</li>
+  <li><strong>Giao dịch giả lập (paper trading)</strong> trước khi dùng tiền thật: kiểm tra hệ thống chạy đúng, độ trễ, và kết quả có gần với backtest không. Sai lệch lớn thường chỉ ra một lỗi trong backtest.</li>
+  <li><strong>Đặt giới hạn rủi ro cứng</strong> (mức lỗ ngày/tháng, mức sụt giảm tối đa, kích thước vị thế tối đa, tắt khẩn cấp) hoạt động độc lập với chiến lược.</li>
+  <li><strong>Giám sát suy giảm</strong>: so kết quả thực với phân phối kỳ vọng từ backtest; lợi thế thường mờ dần, nên cần quy tắc rõ về lúc nào thu hẹp hoặc dừng một chiến lược (liên hệ giám sát drift ở trang MLOps).</li>
+</ol>
+
+<h2 id="bai-tap">Bài tập</h2>
+<details class="exercise">
+  <summary>Bài 1. Sharpe và độ tin cậy</summary>
+  <div class="ex-body"><p>Một chiến lược có Sharpe quy năm 0.5 đo trên 2 năm dữ liệu. Khoảng 95% xấp xỉ cho Sharpe thật là gì? Có thể kết luận chiến lược có lợi thế không?</p>
+  <p><em>Lời giải:</em> sai số chuẩn \(\sqrt{(1+0.5^2/2)/2}=0.75\), nửa độ rộng 95% \(\approx1.47\), khoảng \(\approx(-1.0;\,2.0)\). Khoảng này chứa 0 nên chưa đủ bằng chứng; cần nhiều năm dữ liệu hoặc nhiều tài sản/độc lập hơn.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 2. Kelly</summary>
+  <div class="ex-body"><p>Tính tỉ lệ Kelly cho (a) p = 0.6, b = 1; (b) p = 0.4, b = 2. Cái nào có lợi thế lớn hơn theo kỳ vọng mỗi lệnh?</p>
+  <p><em>Lời giải:</em> (a) \(f^*=(0.6-0.4)/1=20\%\). (b) \(f^*=(2\cdot0.4-0.6)/2=10\%\). Kỳ vọng mỗi đơn vị đặt: (a) \(0.6-0.4=0.2\); (b) \(0.4\cdot2-0.6=0.2\), bằng nhau. Nhưng tăng trưởng log tại Kelly khác hẳn: (a) \(\approx2.0\%\)/lệnh, (b) \(\approx0.97\%\)/lệnh. Cùng kỳ vọng nhưng kết quả (b) “thắng ít, thắng to” dao động mạnh hơn, và dao động làm giảm tốc độ tăng trưởng vốn.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 3. Chi phí và Sharpe</summary>
+  <div class="ex-body"><p>Lãi gộp 8%/năm, biến động 10%, vòng quay 50 lần/năm, chi phí 5 bps mỗi chiều. Sharpe sau chi phí? Vòng quay hòa vốn?</p>
+  <p><em>Lời giải:</em> chi phí \(50\times0.05\%=2.5\%\)/năm; lãi ròng 5.5%; Sharpe \(=0.55\) (so với 0.8 trước chi phí). Hòa vốn khi \(T\times0.05\%=8\%\Rightarrow T=160\) lần/năm.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 4. Quy luật cơ bản</summary>
+  <div class="ex-body"><p>IC = 0.03. Với 400 quyết định độc lập mỗi năm, IR xấp xỉ bao nhiêu? Cần bao nhiêu quyết định để đạt IR = 1? Điều gì có thể làm con số này quá lạc quan?</p>
+  <p><em>Lời giải:</em> \(0.03\sqrt{400}=0.6\). Cần \(\sqrt N=1/0.03\Rightarrow N\approx1111\). Quá lạc quan nếu các quyết định không độc lập (cùng ngành, cùng chịu cú sốc thị trường), nếu chưa trừ chi phí, hoặc nếu IC suy giảm theo thời gian.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 5. Danh mục rủi ro nhỏ nhất</summary>
+  <div class="ex-body"><p>Tài sản A rủi ro 20%, B rủi ro 30%, tương quan 0. Trọng số A của danh mục rủi ro nhỏ nhất và rủi ro của nó?</p>
+  <p><em>Lời giải:</em> \(w_A=\sigma_B^2/(\sigma_A^2+\sigma_B^2)=0.09/0.13\approx0.692\); rủi ro \(\approx16.6\%\), thấp hơn cả 20%. Kiểm chứng bằng minh họa Markowitz với ρ = 0.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 6. Funding và đòn bẩy</summary>
+  <div class="ex-body"><p>Funding +0.01% mỗi 8 giờ (giả định 3 lần/ngày). Chi phí quy năm trên giá trị vị thế? Với đòn bẩy 5× thì trên tiền ký quỹ? Vì sao “nhỏ” mà đáng kể?</p>
+  <p><em>Lời giải:</em> \(0.01\%\times3\times365=10.95\%\)/năm trên giá trị vị thế; nhân 5 là \(54.75\%\)/năm trên ký quỹ. Khoản này trả liên tục dù giá đi ngang, ăn thẳng vào lợi nhuận của bất cứ chiến lược nào giữ vị thế dài.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 7. Biên độ giá</summary>
+  <div class="ex-body"><p>Một cổ phiếu có giá tham chiếu 20 (nghìn đồng), biên ±7% (✱). Giá trần/sàn là bao nhiêu (chưa làm tròn)? Nếu thông tin xấu đáng ra làm giá giảm 20% thì cần mấy phiên nếu mỗi phiên đều bị chặn ở sàn?</p>
+  <p><em>Lời giải:</em> trần \(21.4\), sàn \(18.6\). Giá đóng cửa 18.6, 17.30, 16.09, rồi chạm mục tiêu 16.0 ở phiên 4, tức <strong>4 phiên</strong>. Hệ quả cho mô hình: lợi suất ngày liền nhau tương quan, độ biến động ngày bị đánh giá thấp.</p></div>
+</details>
+<details class="exercise">
+  <summary>Bài 8. Thiết kế một quy trình kiểm định</summary>
+  <div class="ex-body"><p>Bạn thử 60 biến thể của một chiến lược momentum trên 5 năm dữ liệu và chọn biến thể có Sharpe 1.4. Hãy liệt kê ít nhất ba bước để đánh giá có đáng tin không, dựa vào các mục 3 và 4.</p></div>
+</details>
+
+<h2 id="tham-khao">Tài liệu tham khảo</h2>
+<p><span class="conf mid">◐</span> Mình nêu theo trí nhớ về các tài liệu kinh điển và <strong>chưa mở lại từng nguồn</strong> trong lúc soạn; hãy tra tên và năm trước khi trích dẫn.</p>
+<ul>
+  <li>Markowitz, H. (1952), “Portfolio Selection”, <em>Journal of Finance</em>.</li>
+  <li>Kelly, J. L. (1956), “A New Interpretation of Information Rate”, <em>Bell System Technical Journal</em>.</li>
+  <li>Black, F. và Scholes, M. (1973), “The Pricing of Options and Corporate Liabilities”, <em>Journal of Political Economy</em>.</li>
+  <li>Engle, R. (1982) về ARCH; Bollerslev, T. (1986) về GARCH; Engle, R. và Granger, C. (1987) về đồng tích hợp.</li>
+  <li>Grinold, R. và Kahn, R., <em>Active Portfolio Management</em> (quy luật cơ bản).</li>
+  <li>Lo, A. (2002), “The Statistics of Sharpe Ratios”, <em>Financial Analysts Journal</em>.</li>
+  <li>Almgren, R. và Chriss, N. (2000), “Optimal Execution of Portfolio Transactions”, <em>Journal of Risk</em>.</li>
+  <li>Bailey, D. và López de Prado, M. (2014), “The Deflated Sharpe Ratio”; López de Prado, M. (2018), <em>Advances in Financial Machine Learning</em>.</li>
+</ul>
+<div class="callout note"><span class="callout-title">Về các minh họa</span>Mọi đồ thị dùng dữ liệu mô phỏng với hạt giống cố định (trừ khi có nút nhiễu mới). Chúng cho thấy <em>cơ chế</em>, không phải hiệu năng của chiến lược hay thị trường thật.</div>
+
+</main>
+</div>
+<div id="site-footer"></div>
+</body>
+</html>
