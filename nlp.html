@@ -17,6 +17,8 @@
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-nlp.js"></script>
 <script defer src="assets/js/viz-nlp2.js"></script>
+<script defer src="assets/js/viz-econ-core.js"></script>
+<script defer src="assets/js/viz-econ-nlp.js"></script>
 </head>
 <body data-page="nlp">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -27,6 +29,7 @@
 <h1>Xử lý ngôn ngữ tự nhiên (NLP)</h1>
 <p class="lead">NLP dạy máy làm việc với ngôn ngữ của con người: phân loại, trích xuất, dịch, tóm tắt, hỏi đáp, hội thoại. Trang này đi theo dòng lịch sử có chủ đích: từ đếm từ đến vector ngữ nghĩa, rồi tới mô hình ngữ cảnh. Hiểu chuỗi ý tưởng này giúp bạn thấy LLM không phải “phép màu” mà là bước tiếp theo hợp lý.</p>
 <div class="callout note"><span class="callout-title">Cần biết trước</span>Trang Machine Learning (đặc biệt phân loại và cross-entropy) và nền tảng Deep Learning (embedding, softmax, huấn luyện bằng gradient).</div>
+<div class="callout tip"><span class="callout-title">Đọc trang này với nền kinh tế</span>Công thức được <strong>gập vào các khối “Xem công thức / Xem suy dẫn”</strong>; mạch chính chỉ cần ví dụ và minh họa. Các phép tương tự: TF-IDF = <em>giá trị thông tin của một tin hiếm</em>; Naive Bayes = <em>cập nhật tỉ lệ cược (logit) khi có thêm bằng chứng</em>; perplexity = <em>số lựa chọn mà mô hình còn phân vân</em>; ngưỡng tự tin của chatbot = <em>bài toán chi phí–lợi ích</em>.</div>
 
 <h2 id="tong-quan">Bài toán và thách thức</h2>
 <p>Máy tính chỉ xử lý số, vì vậy mọi hệ thống NLP đều phải trả lời câu hỏi: <em>biểu diễn văn bản thành số như thế nào?</em> Lịch sử gần như là chuỗi các câu trả lời ngày càng tốt:</p>
@@ -54,10 +57,20 @@ print(unicodedata.normalize("NFC", b) == a)     # True: chuẩn hóa về một 
 <div class="callout tip"><span class="callout-title">Quy tắc thực hành</span>Luôn chuẩn hóa Unicode (thường là NFC) ở bước đầu của pipeline dữ liệu tiếng Việt. Một số mô hình tiền huấn luyện cho tiếng Việt (ví dụ họ PhoBERT) theo hiểu biết của mình được huấn luyện trên văn bản đã tách từ, vì vậy hãy đọc model card để biết định dạng đầu vào mong đợi.</div>
 
 <h2 id="bow-tfidf">Bag-of-words, TF-IDF và cosine</h2>
+<p>Biểu diễn đơn giản nhất: mỗi văn bản là một vector đếm số lần xuất hiện của từng từ (bag-of-words), bỏ qua thứ tự. <strong>TF-IDF</strong> nhân thêm một hệ số về độ hiếm: những từ có mặt ở hầu hết văn bản (như “và”, “là”, hay “giao hàng” trong đánh giá bán hàng) không giúp phân biệt nên bị hạ trọng số, còn từ hiếm (như “hỏng”) được nhấn mạnh. Giống một tin “ai cũng biết” có giá trị thông tin thấp. Thử từng bước trên sáu đánh giá sản phẩm:</p>
+<div class="viz" data-viz="tfidf1" data-title="TF-IDF từng bước trên đánh giá sản phẩm">
+  <p class="viz-help">Chọn một đánh giá rồi bấm “Bước tiếp” bốn lần: đếm từ, đếm số đánh giá chứa từ, tính độ hiếm, rồi nhân lại. Thử đánh giá 6: “hỏng” lặp hai lần và hiếm nên đứng đầu.</p>
+</div>
+<details class="derivation">
+  <summary>Xem công thức TF-IDF và cosine</summary>
+  <div class="dv-body">
 <p>Biểu diễn đơn giản nhất: mỗi văn bản là một vector đếm số lần xuất hiện của từng từ trong từ vựng (bag-of-words), bỏ qua thứ tự. TF-IDF giảm trọng số các từ xuất hiện ở hầu hết văn bản (như “và”, “là”) và nhấn mạnh các từ đặc trưng:</p>
 $$\text{tf-idf}(t,d)=\text{tf}(t,d)\cdot\log\frac{N}{\text{df}(t)}$$
 <p>với \(N\) là số văn bản và \(\text{df}(t)\) là số văn bản chứa từ \(t\). (Các thư viện có biến thể làm trơn khác nhau; ví dụ scikit-learn mặc định dùng một dạng có làm trơn, hãy đọc tài liệu.) Độ tương tự giữa hai vector thường đo bằng <strong>cosine</strong>, chỉ phụ thuộc <em>hướng</em>, không phụ thuộc độ dài:</p>
 $$\cos\theta=\frac{\mathbf{u}\cdot\mathbf{v}}{\lVert\mathbf{u}\rVert\,\lVert\mathbf{v}\rVert}\in[-1,1]$$
+  </div>
+</details>
+<p><strong>Cosine</strong> đo hai văn bản “cùng hướng” đến đâu (1 là cùng hướng, 0 là không liên quan) và không phụ thuộc độ dài văn bản. Kéo hai vector bên dưới:</p>
 <div class="viz" data-viz="cos1" data-title="Cosine similarity: kéo hai vector">
   <p class="viz-help">Kéo đầu mũi tên. Thử nhân đôi độ dài của v: tích vô hướng đổi, cosine thì không. Đây là lý do cosine được dùng để so sánh embedding.</p>
 </div>
@@ -75,6 +88,10 @@ print(cosine_similarity(X[0], X).round(2))   # văn bản 0 giống văn bản 1
 <p>TF-IDF vẫn là baseline mạnh và rẻ cho tìm kiếm và phân loại văn bản. Hạn chế: “xe hơi” và “ô tô” hoàn toàn khác nhau trong không gian này, vì không có khái niệm đồng nghĩa.</p>
 
 <h3 id="tfidf-suy-dan">TF-IDF từ góc nhìn thông tin, kèm ví dụ số</h3>
+<p>Ý tưởng của idf: từ xuất hiện trong ít văn bản mang nhiều thông tin để phân biệt, giống một tin hiếm có giá trị cao. Ví dụ với 3 văn bản: “mưa” chỉ có ở 1 văn bản nên idf ≈ 1,693, cao hơn “học” có ở 2 văn bản (idf ≈ 1,288). Thư viện thường dùng biến thể có làm trơn để tránh chia cho 0 nên số khác sách giáo khoa đôi chút.</p>
+<details class="derivation">
+  <summary>Xem công thức idf, ví dụ số và mã đối chiếu scikit-learn</summary>
+  <div class="dv-body">
 <p>Ý tưởng của idf (Spärck Jones, 1972): một từ xuất hiện trong ít văn bản thì mang nhiều thông tin để phân biệt văn bản. Nếu xác suất một văn bản ngẫu nhiên chứa từ \(t\) là \(\mathrm{df}(t)/N\), thì \(\mathrm{idf}(t)=\log\frac{N}{\mathrm{df}(t)}=-\log P(t\in d)\), chính là “độ ngạc nhiên” của việc thấy từ đó. Các thư viện dùng biến thể làm trơn để tránh chia cho 0; scikit-learn mặc định dùng</p>
 $$\mathrm{idf}(t)=\ln\frac{1+N}{1+\mathrm{df}(t)}+1,\qquad \text{tf-idf}(t,d)=\mathrm{tf}(t,d)\cdot\mathrm{idf}(t),$$
 <p>rồi chuẩn hóa L2 từng vector văn bản (đặt <code>norm=None</code> để tắt). Với ba văn bản ở ví dụ trên (\(N=3\)): từ “học” có \(\mathrm{df}=2\) nên \(\mathrm{idf}=\ln\frac43+1\approx1.288\), từ “mưa” có \(\mathrm{df}=1\) nên \(\mathrm{idf}=\ln\frac42+1\approx1.693\); “mưa” hiếm hơn nên trọng số lớn hơn. Văn bản thứ hai chứa “học” hai lần nên \(\text{tf-idf}=2\times1.288\approx2.575\).</p>
@@ -91,13 +108,27 @@ df = (X &gt; 0).sum(axis=0)
 idf = np.log((1 + N) / (1 + df)) + 1                  # biến thể làm trơn của scikit-learn
 j = vocab.index("học")
 print(df[j], idf[j], X[:, j])                         # 2, 1.2877, [1.2877 2.5754 0.]</code></pre>
+  </div>
+</details>
 <h3 id="naive-bayes">Naive Bayes: bộ phân loại văn bản từ đầu</h3>
+<p>Cách làm: xem mỗi từ xuất hiện nhiều ở thư rác hay thư thường, rồi <strong>cộng bằng chứng</strong> của từng từ, giống cập nhật tỉ lệ cược trong mô hình logit. Gọi là “ngây thơ” vì coi các từ độc lập với nhau khi đã biết lớp.</p>
+<p><strong>Ví dụ.</strong> Năm văn bản huấn luyện: spam: “khuyến mãi lớn mua ngay”, “mua ngay giảm giá”, “giảm giá lớn”; ham: “họp nhóm sáng mai”, “gửi báo cáo sáng mai”. Có \(|V|=14\), lớp spam có 12 từ, lớp ham có 9 từ. Hãy phân loại tin “mua ngay họp”.</p>
+<div class="viz" data-viz="nbodds1" data-title="Naive Bayes: bằng chứng cộng dồn từng từ">
+  <p class="viz-help">Bấm “Thêm từ tiếp theo” để xem mỗi từ đẩy xác suất thư rác lên hay xuống. Đổi tin nhắn: “họp” kéo về phía thư thường nhưng “mua”, “ngay” mạnh hơn.</p>
+</div>
+<details class="derivation">
+  <summary>Xem công thức Naive Bayes, làm trơn Laplace và phép tính ví dụ</summary>
+  <div class="dv-body">
 <p>Phân loại văn bản \(d\) (gồm các từ \(w_1,\dots,w_m\)) vào lớp \(c\) bằng quy tắc Bayes, rồi giả định “ngây thơ” rằng các từ độc lập có điều kiện khi biết lớp:</p>
 $$P(c\mid d)\propto P(c)\prod_{i=1}^{m}P(w_i\mid c),\qquad \hat c=\arg\max_c\Big[\ln P(c)+\sum_i\ln P(w_i\mid c)\Big]$$
 <p>Ước lượng bằng đếm với làm trơn Laplace \(\alpha\): \(P(w\mid c)=\dfrac{n_{wc}+\alpha}{n_c+\alpha|V|}\), với \(n_{wc}\) là số lần từ \(w\) xuất hiện trong các văn bản lớp \(c\), \(n_c\) là tổng số từ của lớp, \(|V|\) là kích thước từ vựng. Làm việc trong không gian log để tránh tràn số dưới.</p>
-<p><strong>Ví dụ.</strong> Năm văn bản huấn luyện: spam: “khuyến mãi lớn mua ngay”, “mua ngay giảm giá”, “giảm giá lớn”; ham: “họp nhóm sáng mai”, “gửi báo cáo sáng mai”. Có \(|V|=14\), lớp spam có 12 từ, lớp ham có 9 từ. Phân loại “mua ngay họp” với \(\alpha=1\):</p>
 $$\text{spam}:\ 0.6\cdot\tfrac{2+1}{26}\cdot\tfrac{2+1}{26}\cdot\tfrac{0+1}{26}\approx3.07\times10^{-4},\qquad \text{ham}:\ 0.4\cdot\tfrac{0+1}{23}\cdot\tfrac{0+1}{23}\cdot\tfrac{1+1}{23}\approx6.6\times10^{-5}$$
 <p>Chuẩn hóa hai số này cho \(P(\text{spam}\mid d)\approx0.824\). Dù từ “họp” là bằng chứng cho ham, hai từ “mua”, “ngay” chỉ xuất hiện ở spam nên thắng. Kiểm tra từ đầu và so với scikit-learn:</p>
+  </div>
+</details>
+<details class="derivation">
+  <summary>Xem mã Naive Bayes từ đầu và đối chiếu scikit-learn</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import math
 from collections import Counter
 from sklearn.feature_extraction.text import CountVectorizer
@@ -123,25 +154,42 @@ print({c: round(math.exp(s) / Z, 4) for c, s in scores.items()})
 cv = CountVectorizer()
 nb = MultinomialNB(alpha=1.0).fit(cv.fit_transform([d for d, _ in train]), [c for _, c in train])
 print(nb.classes_, nb.predict_proba(cv.transform([test])).round(4))     # cùng kết quả: ham 0.1763, spam 0.8237</code></pre>
+  </div>
+</details>
 <div class="callout tip"><span class="callout-title">Điểm mạnh và giới hạn</span>Naive Bayes huấn luyện chỉ bằng đếm, cực nhanh, hoạt động tốt với ít dữ liệu và là baseline đáng thử cho phân loại văn bản. Giả định độc lập thường sai (các từ liên quan nhau), nên xác suất đầu ra thường quá cực đoan (gần 0 hoặc 1) và cần hiệu chỉnh nếu bạn dùng xác suất để ra quyết định. Xếp hạng lớp thường vẫn khá tốt dù xác suất lệch.</div>
 
 <h2 id="ngram">Mô hình ngôn ngữ n-gram và perplexity</h2>
+<p>Mô hình ngôn ngữ trả lời câu hỏi: <em>sau chuỗi từ này, từ nào hay đến?</em> N-gram chỉ nhìn \(n-1\) từ gần nhất và ước lượng bằng cách đếm, như một bảng xác suất chuyển trạng thái. Cụm chưa từng thấy có xác suất 0 nên cần <strong>làm trơn</strong>. Thước đo chuẩn là <strong>perplexity</strong>: có thể hiểu là “số lựa chọn ngang nhau mà mô hình còn phân vân ở mỗi bước”; thấp hơn là tốt hơn, và đoán đều trên V từ cho PPL = V.</p>
+<details class="derivation">
+  <summary>Xem công thức n-gram và perplexity</summary>
+  <div class="dv-body">
 <p>Mô hình ngôn ngữ gán xác suất cho chuỗi từ. Theo quy tắc chuỗi \(P(w_1,\dots,w_T)=\prod_t P(w_t\mid w_{1:t-1})\). N-gram xấp xỉ bằng cách chỉ nhìn \(n-1\) từ gần nhất, ước lượng bằng đếm:</p>
 $$P(w_t\mid w_{t-2},w_{t-1})\approx\frac{C(w_{t-2},w_{t-1},w_t)}{C(w_{t-2},w_{t-1})}$$
 <p>Vấn đề: cụm chưa từng thấy có xác suất 0, nên cần làm trơn (add-k, Kneser–Ney...). Và \(n\) lớn thì số cụm tăng theo hàm mũ. Độ đo chuẩn là <strong>perplexity</strong>:</p>
 $$\text{PPL}=\exp\!\Big(-\frac{1}{T}\sum_{t=1}^{T}\log P(w_t\mid w_{\lt t})\Big)$$
 <p>Hiểu trực quan: PPL là “số lựa chọn có xác suất ngang nhau” mà mô hình đang phân vân trung bình ở mỗi bước. Mô hình đoán đều trên \(V\) từ có PPL = \(V\); PPL càng thấp càng tốt. Perplexity vẫn là thước đo huấn luyện cốt lõi của LLM (liên hệ trực tiếp với cross-entropy), nhưng chỉ so sánh được khi cùng bộ tách token và cùng dữ liệu.</p>
+  </div>
+</details>
 
 <h3 id="ngram-vi-du">Làm trơn add-k và perplexity: ví dụ tính tay</h3>
+<p>Ví dụ ngữ liệu ba câu “tôi ăn cơm”, “tôi ăn phở”, “bạn ăn cơm”: sau “ăn”, “cơm” xuất hiện 2 trên 3 lần và “phở” 1 trên 3. Câu “tôi ăn cơm” có perplexity ≈ 1,225. Nhưng chỉ cần một cặp từ chưa từng thấy thì xác suất cả câu bằng 0 và perplexity vô hạn. <strong>Làm trơn add-k</strong> chia một phần xác suất cho các sự kiện chưa thấy, giống lập dự phòng cho rủi ro chưa từng xảy ra: add-1 làm phẳng quá mạnh với ngữ liệu nhỏ (perplexity thành ≈ 3,16), k = 0,1 cho ≈ 1,51. <strong>Kneser–Ney</strong> khôn hơn: dùng số ngữ cảnh khác nhau mà một từ đi sau (“Francisco” hầu như chỉ đi sau “San”). Hãy tự dựng mô hình bên dưới, đổi bậc n và k, và nhập câu kiểm tra có cặp từ lạ:</p>
+<details class="derivation">
+  <summary>Xem công thức add-k, Kneser–Ney và cách tính perplexity</summary>
+  <div class="dv-body">
 <p>Ước lượng hợp lý cực đại (MLE) cho bigram: \(P(w\mid v)=c(v,w)/c(v)\). Với ngữ liệu ba câu “tôi ăn cơm”, “tôi ăn phở”, “bạn ăn cơm” (thêm <code>&lt;s&gt;</code> ở đầu và <code>&lt;/s&gt;</code> ở cuối): <i>P</i>(ăn | tôi) = 1, <i>P</i>(cơm | ăn) = 2/3, <i>P</i>(phở | ăn) = 1/3, và <i>P</i>(tôi | &lt;s&gt;) = 2/3. Câu “tôi ăn cơm” có xác suất \(\tfrac23\cdot1\cdot\tfrac23\cdot1=\tfrac49\) trên 4 dự đoán, nên perplexity là \((9/4)^{1/4}\approx1.225\).</p>
 <p>Vấn đề: bất kỳ bigram chưa từng thấy nào cho xác suất 0, nên cả câu có xác suất 0 và perplexity vô hạn. <strong>Làm trơn add-k</strong> chia sẻ một phần khối lượng cho các sự kiện chưa thấy:</p>
 $$P_k(w\mid v)=\frac{c(v,w)+k}{c(v)+k\,|V|}$$
 <p>Với \(|V|=7\) trong ví dụ trên, câu “tôi ăn cơm” có perplexity \(\approx3.16\) khi \(k=1\) và \(\approx1.51\) khi \(k=0.1\). Add-1 làm “phẳng” rất mạnh với ngữ liệu nhỏ vì \(|V|\) lớn so với số đếm, nên người ta chọn \(k\) nhỏ hoặc dùng phương pháp tốt hơn. <strong>Kneser–Ney</strong> (nội suy, bigram) dựa trên một trực giác đẹp: từ “Francisco” có tần suất cao nhưng hầu như chỉ đi sau “San”, nên không đáng được ưu tiên khi dự đoán từ sau một ngữ cảnh lạ. Do đó xác suất “lùi” dùng số <em>ngữ cảnh khác nhau</em> mà từ xuất hiện sau, không phải tần suất thô:</p>
 $$P_{KN}(w\mid v)=\frac{\max\big(c(v,w)-\delta,\,0\big)}{c(v)}+\lambda(v)\,P_{\text{cont}}(w),\quad P_{\text{cont}}(w)=\frac{|\{v':c(v',w)>0\}|}{|\{(v',w'):c(v',w')>0\}|},\quad \lambda(v)=\frac{\delta\,|\{w:c(v,w)>0\}|}{c(v)}$$
 <p>với hệ số giảm \(\delta\) cố định (thường khoảng 0.75). Perplexity liên hệ trực tiếp với cross-entropy: \(\mathrm{PPL}=2^{H}\) nếu \(H=-\frac1N\sum\log_2P(w_i\mid\cdot)\) tính bằng bit (hoặc \(e^{H}\) nếu tính bằng nat). Hãy tự dựng mô hình bên dưới, đổi bậc \(n\) và \(k\), và nhập câu kiểm tra có bigram lạ:</p>
+  </div>
+</details>
 <div class="viz" data-viz="ngram1" data-title="Mô hình ngôn ngữ n-gram tự dựng">
   <p class="viz-help">Sửa ngữ liệu (mỗi dòng một câu). Thử: bậc 2, k = 0, câu kiểm tra “tôi ăn nước” (có bigram chưa từng thấy nên perplexity = ∞) rồi tăng k. Sinh câu ở bậc 1 và bậc 3 để so chất lượng.</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã tính perplexity với làm trơn add-k</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import math
 from collections import Counter
 
@@ -163,6 +211,8 @@ def perplexity(sent, k):
 test = ["&lt;s&gt;", "tôi", "ăn", "cơm", "&lt;/s&gt;"]
 for k in (1e-9, 1, 0.1):            # k rất nhỏ ≈ MLE (k = 0 gây chia cho 0 khi ngữ cảnh chưa thấy)
     print(k, round(perplexity(test, k), 3))     # ≈ 1.225, 3.162, 1.505</code></pre>
+  </div>
+</details>
 
 <h2 id="subword">Tokenization theo từ con (subword) và BPE</h2>
 <p>Từ vựng theo từ nguyên vẹn gặp hai vấn đề: quá lớn và luôn có từ chưa gặp (OOV). Tách theo ký tự thì chuỗi quá dài. Giải pháp hiện đại là <strong>subword</strong>: từ phổ biến giữ nguyên, từ hiếm được ghép từ các mảnh. Thuật toán <strong>Byte-Pair Encoding (BPE)</strong>:</p>
@@ -190,28 +240,49 @@ for k in (1e-9, 1, 0.1):            # k rất nhỏ ≈ MLE (k = 0 gây chia cho
 <p>SentencePiece xử lý văn bản thô (coi khoảng trắng là một ký tự thường) nên không cần tiền tách từ, phù hợp ngôn ngữ như tiếng Việt, tiếng Nhật. Khi so chi phí giữa các mô hình, nhớ rằng số token của cùng một văn bản khác nhau giữa các bộ tách, nên “ngữ cảnh 8k token” không tương đương nhau giữa các mô hình.</p>
 
 <h2 id="embedding">Word embedding</h2>
+<p><em>Giả thuyết phân bố</em>: các từ xuất hiện trong ngữ cảnh giống nhau thường gần nghĩa. Word2vec biến ý tưởng này thành bài toán đoán: cho một từ, đoán các từ quanh nó. Sau huấn luyện, mỗi từ là một vector (thường 100–300 số), như một <strong>tọa độ trên bản đồ nghĩa</strong>: từ gần nghĩa nằm gần nhau. Tính đầy đủ rất đắt vì phải so với cả từ vựng, nên <em>negative sampling</em> chỉ so với vài từ “nhiễu” lấy ngẫu nhiên.</p>
+<details class="derivation">
+  <summary>Xem công thức skip-gram và negative sampling</summary>
+  <div class="dv-body">
 <p><em>Giả thuyết phân bố</em>: các từ xuất hiện trong ngữ cảnh giống nhau thường có nghĩa gần nhau. Word2vec (Mikolov và cộng sự, 2013) biến ý tưởng này thành bài toán dự đoán. Với <strong>skip-gram</strong>, từ trung tâm \(c\) dự đoán các từ ngữ cảnh \(o\):</p>
 $$p(o\mid c)=\frac{\exp(\mathbf{u}_o^\top\mathbf{v}_c)}{\sum_{w\in V}\exp(\mathbf{u}_w^\top\mathbf{v}_c)}$$
 <p>Mẫu số phải cộng trên toàn bộ từ vựng nên rất đắt; <em>negative sampling</em> thay bằng bài toán phân loại nhị phân: tăng \(\log\sigma(\mathbf{u}_o^\top\mathbf{v}_c)\) cho cặp thật và giảm cho \(K\) cặp “nhiễu” lấy mẫu ngẫu nhiên. Sau huấn luyện, \(\mathbf{v}_w\) là embedding của từ \(w\) (thường 100–300 chiều).</p>
+  </div>
+</details>
 <ul>
   <li>Từ gần nghĩa có cosine cao; có cả những quan hệ tuyến tính nổi tiếng như “vua − đàn ông + phụ nữ ≈ nữ hoàng”, nhưng đó là ví dụ đẹp, không phải quy luật luôn đúng.</li>
   <li><strong>Hạn chế</strong>: mỗi từ chỉ có một vector, nên “bank” (ngân hàng / bờ sông) hay “đá” (hòn đá / đá bóng) bị trộn lẫn; và embedding thừa hưởng thiên kiến của dữ liệu huấn luyện.</li>
 </ul>
 
 <h3 id="skipgram-suy-dan">Suy dẫn gradient của skip-gram</h3>
+<p>Khi huấn luyện, vector của từ trung tâm được kéo về phía từ ngữ cảnh thật và đẩy ra khỏi các từ khác. Negative sampling giảm chi phí từ hàng triệu phép nhân xuống cỡ 1.800 cho mỗi cặp (K = 5, d = 300).</p>
+<details class="derivation">
+  <summary>Xem suy dẫn gradient của skip-gram</summary>
+  <div class="dv-body">
 <p>Mỗi từ có hai vector: \(\mathbf{v}_w\) khi làm từ trung tâm và \(\mathbf{u}_w\) khi làm ngữ cảnh. Với cặp (trung tâm \(c\), ngữ cảnh \(o\)), mất mát softmax là</p>
 $$J=-\ln p(o\mid c)=-\mathbf{u}_o^\top\mathbf{v}_c+\ln\sum_{w\in V}\exp\big(\mathbf{u}_w^\top\mathbf{v}_c\big)\ \Longrightarrow\ \frac{\partial J}{\partial\mathbf{v}_c}=-\mathbf{u}_o+\sum_{w}p(w\mid c)\,\mathbf{u}_w,\qquad \frac{\partial J}{\partial\mathbf{u}_w}=\big(p(w\mid c)-\mathbf{1}[w=o]\big)\mathbf{v}_c$$
 <p>Diễn giải: kéo \(\mathbf{v}_c\) về phía vector ngữ cảnh thật \(\mathbf{u}_o\) và đẩy ra khỏi <em>trung bình có trọng số</em> của mọi vector ngữ cảnh theo xác suất mô hình hiện tại. Cái giá là phép tổng trên cả từ vựng: \(O(|V|\,d)\) cho mỗi cặp. <strong>Negative sampling</strong> thay bằng \(K\) mẫu âm \(n_1,\dots,n_K\) rút theo phân phối đơn gram lũy thừa \(3/4\):</p>
 $$J_{NS}=-\ln\sigma\big(\mathbf{u}_o^\top\mathbf{v}_c\big)-\sum_{k=1}^K\ln\sigma\big(-\mathbf{u}_{n_k}^\top\mathbf{v}_c\big),\qquad \frac{\partial J_{NS}}{\partial\mathbf{v}_c}=-\big(1-\sigma(\mathbf{u}_o^\top\mathbf{v}_c)\big)\mathbf{u}_o+\sum_{k}\sigma\big(\mathbf{u}_{n_k}^\top\mathbf{v}_c\big)\mathbf{u}_{n_k}$$
 <p>Chi phí giảm còn \(O((K+1)\,d)\) (ví dụ \(K=5\), \(d=300\): 1,800 phép nhân thay vì hàng triệu). Cả hai gradient này mình đã kiểm bằng sai phân hữu hạn (sai lệch cỡ \(10^{-10}\)).</p>
+  </div>
+</details>
 <h3 id="w2v-pmi">Embedding ngầm phân rã ma trận PMI</h3>
+<p>Có thể “đếm” thay vì huấn luyện: lập bảng các từ hay đi cùng nhau, đo mức “đi cùng nhiều hơn ngẫu nhiên” (PMI, gần với chỉ số lift trong phân tích giỏ hàng), rồi nén bảng bằng SVD. Levy và Goldberg (2014) chỉ ra skip-gram thực chất cũng phân rã một bảng như vậy (mình nhớ ý chính, bạn nên đọc bài gốc). GloVe và fastText là các biến thể.</p>
+<details class="derivation">
+  <summary>Xem công thức PMI và các biến thể GloVe, fastText</summary>
+  <div class="dv-body">
 <p>Levy và Goldberg (2014) chỉ ra rằng skip-gram với negative sampling (\(K\) mẫu âm) tối ưu tương đương việc phân rã ma trận có phần tử \(\mathrm{PMI}(w,c)-\ln K\), với</p>
 $$\mathrm{PMI}(w,c)=\ln\frac{P(w,c)}{P(w)\,P(c)}$$
 <p>(điều này đúng trong các điều kiện lý tưởng; mình nêu lại ý chính theo trí nhớ, bạn nên đọc bài gốc). Điều này gợi ra một cách “đếm” không cần SGD: tính ma trận đồng xuất hiện, lấy PMI dương (PPMI \(=\max(\mathrm{PMI},0)\)), rồi phân rã SVD cắt cụt; embedding là \(U_d\Sigma_d^{1/2}\). GloVe (Pennington và cộng sự, 2014) cũng đi theo hướng ma trận đồng xuất hiện nhưng khớp trực tiếp \(\mathbf{w}_i^\top\tilde{\mathbf{w}}_j+b_i+\tilde b_j\approx\ln X_{ij}\) với trọng số \(f(X_{ij})\). fastText (Bojanowski và cộng sự, 2017) biểu diễn mỗi từ bằng tổng vector của các n-gram ký tự của nó, nên xử lý được từ hiếm và biến thể hình thái.</p>
+  </div>
+</details>
 <p>Hãy tự huấn luyện một mô hình skip-gram nhỏ ngay trong trình duyệt. Ngữ liệu gồm các câu sinh theo khuôn về ba nhóm: động vật, trái cây, thành phố. Ban đầu các vector ngẫu nhiên nên mọi cặp đều có cosine gần 0; sau vài chục epoch, các từ cùng nhóm tụ lại vì chúng chia sẻ ngữ cảnh.</p>
 <div class="viz" data-viz="w2v1" data-title="word2vec đồ chơi huấn luyện trực tiếp">
   <p class="viz-help">Bấm “Huấn luyện thêm 30 epoch” và theo dõi hai con số trung bình cosine (cùng nhóm so với khác nhóm). Đổi từ ở ô chọn để xem láng giềng gần nhất. Mỗi lần “Khởi tạo lại” bắt đầu lại từ vector ngẫu nhiên.</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã embedding bằng PPMI và SVD</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import numpy as np
 
 rng = np.random.default_rng(0)
@@ -247,6 +318,8 @@ def nearest(w, k=4):
 
 print(nearest("mèo"))       # các động vật khác đứng đầu, cosine khoảng 0.9
 print(nearest("táo"))       # các trái cây khác</code></pre>
+  </div>
+</details>
 <table>
   <thead><tr><th>Phương pháp</th><th>Một vector cho mỗi…</th><th>Xử lý từ hiếm / chưa gặp</th><th>Phụ thuộc ngữ cảnh</th></tr></thead>
   <tbody>
@@ -304,12 +377,22 @@ print(tok.tokenize("Tokenization of unbelievably long words"))</code></pre>
   <li><strong>Mô hình ngôn ngữ</strong>: perplexity.</li>
 </ul>
 <div class="callout warn"><span class="callout-title">Chỉ số tự động có giới hạn</span>BLEU và ROUGE chỉ đo mức trùng từ với bản tham chiếu, nên có thể phạt oan một bản dịch đúng nhưng diễn đạt khác. Với tác vụ sinh văn bản mở, đánh giá của con người (hoặc “LLM làm giám khảo” có kiểm chứng) thường cần thiết; hãy xem trang LLM.</div>
-
+<h3 id="roi-cskh">Chi phí–lợi ích: chatbot nên tự trả lời những ticket nào?</h3>
+<p>Một ứng dụng NLP phổ biến trong doanh nghiệp: tự động phân loại và trả lời ticket chăm sóc khách hàng. Quyết định cốt lõi là <strong>ngưỡng tự tin</strong>: chỉ khi mô hình đủ chắc mới tự trả lời, còn lại chuyển cho nhân viên. Đặt ngưỡng thấp thì tiết kiệm được nhiều nhân công nhưng trả lời sai nhiều; đặt cao thì an toàn nhưng ít tiết kiệm. Đây là bài toán chi phí–lợi ích biên và có cả thời gian hoàn vốn:</p>
+<div class="viz" data-viz="supportroi1" data-title="Tự động hóa chăm sóc khách hàng: tiết kiệm và hoàn vốn">
+  <p class="viz-help">Kéo ngưỡng tự tin (chấm tím) và xem chấm xanh lá là ngưỡng tốt nhất. Thử tick “Mô hình quá tự tin” để xem điều gì xảy ra nếu độ tự tin mô hình báo cao hơn độ chính xác thật. Các giá có dấu ✱ là giả định minh họa.</p>
+</div>
 <h3 id="bleu-chi-tiet">BLEU và ROUGE: công thức và ví dụ</h3>
+<p><strong>BLEU</strong> đo bao nhiêu phần từ và cụm từ của bản dịch ứng viên xuất hiện trong bản tham chiếu (độ chính xác n-gram, có “cắt” để không thể ăn gian bằng cách lặp một từ đúng), rồi phạt câu quá ngắn. <strong>ROUGE</strong> đo ngược lại: bản tham chiếu được ứng viên bao phủ bao nhiêu (độ phủ). Ví dụ: tham chiếu “con mèo ngồi trên tấm thảm”, ứng viên “con mèo nằm trên thảm”: 4 trên 5 từ khớp, nhưng chỉ 1 trên 4 cụm hai từ khớp, và câu ngắn hơn tham chiếu nên bị phạt; BLEU-2 ≈ 0,366.</p>
+<details class="derivation">
+  <summary>Xem công thức BLEU, ROUGE và phép tính ví dụ</summary>
+  <div class="dv-body">
 <p>BLEU (Papineni và cộng sự, 2002) kết hợp độ chính xác n-gram <em>đã cắt</em> với một hình phạt cho câu quá ngắn. Với ứng viên \(C\) và các tham chiếu:</p>
 $$p_n=\frac{\sum_{g\in n\text{-gram}(C)}\min\big(\mathrm{count}_C(g),\ \max_{\text{ref}}\mathrm{count}_{\text{ref}}(g)\big)}{\sum_{g\in n\text{-gram}(C)}\mathrm{count}_C(g)},\qquad \mathrm{BP}=\begin{cases}1&c>r\\ e^{\,1-r/c}&c\le r\end{cases},\qquad \mathrm{BLEU}=\mathrm{BP}\cdot\exp\Big(\sum_{n=1}^{4}\tfrac14\ln p_n\Big)$$
 <p>Phép “cắt” (min) ngăn việc lặp một từ đúng để tăng điểm: ứng viên “the the the the the the the” so với tham chiếu “the cat is on the mat” có \(p_1=2/7\approx0.286\) (từ “the” chỉ xuất hiện 2 lần trong tham chiếu), chứ không phải 7/7. Ở đây \(c\) là độ dài ứng viên, \(r\) là độ dài tham chiếu gần nhất.</p>
 <p><strong>Ví dụ.</strong> Tham chiếu “con mèo ngồi trên tấm thảm”, ứng viên “con mèo nằm trên thảm”: \(p_1=4/5=0.8\) (con, mèo, trên, thảm khớp), \(p_2=1/4=0.25\) (chỉ “con mèo” khớp), \(c=5<r=6\) nên \(\mathrm{BP}=e^{1-6/5}\approx0.819\). BLEU-2 \(=0.819\sqrt{0.8\times0.25}\approx0.366\) (khớp với cài đặt của NLTK khi mình kiểm tra). BLEU-4 bằng 0 vì không có 3-gram nào khớp; đó là lý do cần làm trơn khi tính ở mức câu. ROUGE-N đối xứng với BLEU: nó đo <em>recall</em> n-gram của tham chiếu (số n-gram tham chiếu được ứng viên bao phủ), ROUGE-L dựa trên chuỗi con chung dài nhất.</p>
+  </div>
+</details>
 <div class="viz" data-viz="bleu1" data-title="Máy tính BLEU và ROUGE">
   <p class="viz-help">Thử thay “thảm” bằng một từ đồng nghĩa, đổi thứ tự từ, hoặc lặp một từ nhiều lần để xem chỉ số phản ứng. Chú ý BLEU phạt nặng khi không có n-gram bậc cao nào khớp.</p>
 </div>
