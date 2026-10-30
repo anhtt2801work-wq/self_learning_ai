@@ -14,7 +14,8 @@
     { id: 'llm', href: 'llm.html', label: 'LLM', lesson: true },
     { id: 'agent', href: 'agentic-ai.html', label: 'Agentic AI', lesson: true },
     { id: 'mlops', href: 'mlops.html', label: 'MLOps', lesson: true },
-    { id: 'combo', href: 'ket-hop-cong-cu-ai.html', label: 'Kết hợp AI', lesson: true }
+    { id: 'combo', href: 'ket-hop-cong-cu-ai.html', label: 'Kết hợp AI', lesson: true },
+    { id: 'cyber', href: 'cyber-security.html', label: 'An ninh mạng', lesson: true }
   ];
   var PAGE = document.body.getAttribute('data-page') || 'home';
 

@@ -24,6 +24,7 @@ PAGES = [
     ("agentic-ai.html", "Agentic AI"),
     ("mlops.html", "MLOps"),
     ("ket-hop-cong-cu-ai.html", "Kết hợp AI"),
+    ("cyber-security.html", "An ninh mạng"),
 ]
 SKIP = {"script", "style", "pre", "noscript"}
 MAX_CHARS = 1400
