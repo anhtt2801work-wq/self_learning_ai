@@ -17,6 +17,8 @@
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-cv.js"></script>
 <script defer src="assets/js/viz-cv2.js"></script>
+<script defer src="assets/js/viz-econ-core.js"></script>
+<script defer src="assets/js/viz-econ-cv.js"></script>
 </head>
 <body data-page="cv">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -27,21 +29,35 @@
 <h1>Computer Vision</h1>
 <p class="lead">Thị giác máy tính dạy máy “hiểu” ảnh và video: phân loại, phát hiện vật thể, phân đoạn, đọc chữ, tạo ảnh. Trang này đi từ phép tích chập đến CNN, Vision Transformer, các mô hình ảnh–văn bản, và những chi tiết thực hành hay bị bỏ qua khi đánh giá.</p>
 <div class="callout note"><span class="callout-title">Cần biết trước</span>Trang Deep Learning (backprop, huấn luyện bằng PyTorch). Trang LLM sẽ giúp hiểu phần Vision Transformer và mô hình đa phương thức.</div>
+<div class="callout tip"><span class="callout-title">Đọc trang này với nền kinh tế</span>Phần lớn công thức đã được <strong>gập vào các khối “Xem công thức / Xem suy dẫn”</strong>; bạn có thể bỏ qua chúng mà vẫn hiểu mạch chính. Các phép tương tự dùng xuyên suốt: bộ lọc tích chập = <em>trung bình trượt</em> có trọng số; số tham số vs khối lượng tính toán = <em>chi phí cố định vs chi phí biến đổi</em>; precision/recall = <em>đánh đổi giữa cảnh báo nhầm và bỏ sót</em>, được quy ra tiền.</div>
 
 <h2 id="anh-la-gi">Ảnh dưới góc nhìn của máy</h2>
-<p>Một ảnh là tensor số: \(H\times W\times C\) (chiều cao, chiều rộng, số kênh). Ảnh màu RGB có \(C=3\), mỗi giá trị thường là số nguyên 0–255 (<code>uint8</code>). Trước khi vào mạng, ảnh được đổi sang số thực và <strong>chuẩn hóa</strong> theo từng kênh: \(x'=(x/255-\mu_c)/\sigma_c\). Các framework khác nhau sắp xếp chiều khác nhau (PyTorch dùng \(C\times H\times W\), nhiều thư viện ảnh dùng \(H\times W\times C\)), nên nhầm thứ tự chiều là lỗi rất hay gặp.</p>
+<p>Một ảnh là một bảng số: chiều cao × chiều rộng × số kênh. Ảnh màu có 3 kênh (đỏ, lục, lam), mỗi giá trị là số nguyên 0–255. Trước khi vào mạng, ảnh được đổi sang số thực và <strong>chuẩn hóa</strong> theo từng kênh: trừ trung bình rồi chia độ lệch chuẩn, đúng như chuẩn hóa z-score bạn dùng khi so các chỉ tiêu khác thang đo. Các framework khác nhau sắp xếp chiều khác nhau (PyTorch dùng kênh × cao × rộng, nhiều thư viện ảnh dùng cao × rộng × kênh), nên nhầm thứ tự chiều là lỗi rất hay gặp.</p>
 <p>Vì sao không dùng mạng kết nối đầy đủ? Ảnh \(224\times224\times3\) có 150,528 giá trị; một lớp ẩn 1,000 nơ-ron đã cần hơn 150 triệu trọng số, và nó cũng không tận dụng hai tính chất của ảnh: <strong>tính cục bộ</strong> (điểm ảnh gần nhau liên quan chặt) và <strong>bất biến tịnh tiến</strong> (một con mèo vẫn là mèo dù nằm ở góc nào). Tích chập đưa hai giả định này vào kiến trúc.</p>
 
 <h2 id="tich-chap">Phép tích chập</h2>
+<p>Hãy nghĩ tới <strong>trung bình trượt</strong> trong phân tích chuỗi thời gian: lấy cửa sổ ba ngày, nhân mỗi ngày với một trọng số, cộng lại, rồi trượt cửa sổ sang ngày kế tiếp. Tích chập làm đúng như vậy; bảng trọng số gọi là <strong>bộ lọc (kernel)</strong>. Xem từng bước trên một chuỗi doanh thu trước, rồi mới sang ảnh hai chiều:</p>
+<div class="viz" data-viz="conv1d1" data-title="Tích chập 1 chiều: cửa sổ trượt trên chuỗi doanh thu">
+  <p class="viz-help">Bấm “Bước tiếp” hoặc “Chạy tự động”. Đổi bộ lọc: trung bình trượt làm mượt, bộ lọc [−1, 0, 1] đo đà thay đổi, bộ lọc [−1, 2, −1] nhấn các ngày nhô lên.</p>
+</div>
 <p>Một bộ lọc (kernel) nhỏ, ví dụ \(3\times3\), trượt trên ảnh; tại mỗi vị trí ta lấy tổng tích từng cặp phần tử. Chính xác hơn, các thư viện học sâu cài đặt <em>tương quan chéo</em> (không lật kernel), nhưng vẫn gọi là “convolution”:</p>
+<details class="derivation">
+  <summary>Xem công thức tích chập</summary>
+  <div class="dv-body">
 $$y_{i,j}=\sum_{a=0}^{k-1}\sum_{b=0}^{k-1}K_{a,b}\;x_{\,si+a-p,\;sj+b-p}$$
+  </div>
+</details>
 <p>với \(s\) là stride (bước trượt) và \(p\) là padding (số hàng/cột 0 thêm vào viền). Kích thước đầu ra theo một chiều là \(\lfloor (n+2p-k)/s\rfloor+1\). Hãy thử các bộ lọc kinh điển: Sobel bắt cạnh, trung bình làm mờ, Laplace làm nổi các thay đổi đột ngột:</p>
 <div class="viz" data-viz="conv1" data-title="Tích chập trên ảnh 8×8">
   <p class="viz-help">Bấm vào ảnh vào để vẽ lại. Rê chuột lên một ô kết quả để thấy ô đó dùng 3×3 điểm ảnh nào. Thử tăng stride và padding rồi quan sát kích thước đầu ra.</p>
 </div>
-<p>Trong CNN, kernel <strong>không do con người thiết kế mà được học</strong> bằng backprop. Một lớp tích chập có \(C_{in}\) kênh vào và \(C_{out}\) kênh ra gồm \(C_{out}\) bộ lọc, mỗi bộ cỡ \(k\times k\times C_{in}\), nên số tham số là \((k^2C_{in}+1)\,C_{out}\), không phụ thuộc kích thước ảnh. Đó là lý do tích chập tiết kiệm tham số hơn rất nhiều so với kết nối đầy đủ.</p>
+<p>Trong CNN, bộ lọc <strong>không do con người thiết kế mà được học</strong> từ dữ liệu. Điều đáng nhớ về chi phí: số tham số của một lớp <em>không phụ thuộc kích thước ảnh</em>. Ví dụ 64 bộ lọc 3×3 trên ảnh 3 kênh chỉ có \((3\cdot3\cdot3+1)\cdot64=1{,}792\) tham số dù ảnh to hay nhỏ, so với hơn 150 triệu trọng số của một lớp kết nối đầy đủ. Đó là lý do tích chập tiết kiệm hơn rất nhiều.</p>
 
 <h3 id="conv-backward">Suy dẫn đạo hàm của lớp tích chập</h3>
+<p>Khi mạng học, nó cần biết nên chỉnh mỗi trọng số của bộ lọc bao nhiêu. Vì <em>cùng một bộ lọc</em> được dùng ở mọi vị trí, mức chỉnh của nó là tổng đóng góp từ mọi vị trí, giống như một khoản chi phí chung được phân bổ cộng dồn cho mọi bộ phận cùng dùng nó. Phần suy dẫn chặt chẽ và mã kiểm tra bằng sai phân hữu hạn nằm trong khối bên dưới; bạn có thể bỏ qua nếu chỉ cần hiểu ý tưởng.</p>
+<details class="derivation">
+  <summary>Xem suy dẫn và mã kiểm tra gradient của lớp tích chập</summary>
+  <div class="dv-body">
 <p>Xét một kênh vào, một kênh ra cho gọn: \(y_{i,j}=\sum_{a,b}K_{a,b}\,x_{si+a,\,sj+b}+\beta\). Giả sử đã có \(g_{i,j}=\partial L/\partial y_{i,j}\) từ tầng sau. Vì cùng một trọng số \(K_{a,b}\) được dùng ở <em>mọi</em> vị trí \((i,j)\), quy tắc dây chuyền cộng dồn đóng góp của từng vị trí (cùng logic với gradient theo thời gian trong BPTT):</p>
 $$\frac{\partial L}{\partial K_{a,b}}=\sum_{i,j}g_{i,j}\;x_{si+a,\,sj+b},\qquad \frac{\partial L}{\partial \beta}=\sum_{i,j}g_{i,j},\qquad \frac{\partial L}{\partial x_{u,v}}=\sum_{\substack{i,j,a,b\\ si+a=u,\ sj+b=v}}g_{i,j}\,K_{a,b}$$
 <p>Đọc thành lời: <strong>gradient của kernel là tương quan chéo giữa ảnh vào và bản đồ gradient</strong> (bản đồ \(g\) đóng vai kernel); <strong>gradient của ảnh vào</strong> là cộng dồn \(g_{i,j}K\) vào đúng vùng \(k\times k\) mà đầu ra \((i,j)\) đã nhìn. Với stride 1, tổng đó chính là phép tích chập “đầy đủ” của \(g\) (đệm \(k-1\) số 0) với kernel <em>lật 180°</em>; đó là lý do tên gọi “convolution” xuất hiện lại ở bước lan truyền ngược. Với nhiều kênh, \(\partial L/\partial W_{o,c}\) dùng cặp (kênh ra \(o\), kênh vào \(c\)) tương ứng, và \(\partial L/\partial x_c=\sum_o\)(đóng góp của kênh ra \(o\)). Một điểm ảnh ở giữa được nhiều đầu ra “nhìn” nên nhận gradient từ nhiều vị trí (ảnh \(5\times5\), kernel \(3\times3\), stride 1: điểm giữa được \(9\) đầu ra dùng, điểm góc chỉ \(1\)).</p>
@@ -86,7 +102,13 @@ for stride, pad in [(1, 0), (2, 1)]:
         idx = tuple(rng.integers(0, s) for s in W.shape); d = np.zeros_like(W); d[idx] = eps
         worst = max(worst, abs((L(x, W + d) - L(x, W - d)) / (2*eps) - dW[idx]))
     print(f"stride={stride}, pad={pad}: y{y.shape}, sai lệch lớn nhất {worst:.1e}")</code></pre>
+  </div>
+</details>
 <h3 id="im2col">im2col: biến tích chập thành một phép nhân ma trận</h3>
+<p>GPU nhân ma trận cực nhanh, nên thư viện thường xếp mọi mảnh ảnh thành các cột của một bảng lớn rồi nhân <em>một lần</em>, như dùng <code>SUMPRODUCT</code> trên cả bảng thay vì tính từng ô. Cái giá là bộ nhớ: mỗi điểm ảnh bị sao chép khoảng k² lần.</p>
+<details class="derivation">
+  <summary>Xem chi tiết im2col và mã kiểm tra</summary>
+  <div class="dv-body">
 <p>GPU rất giỏi nhân ma trận nên nhiều cài đặt (một trong các cách mà thư viện dùng) biến tích chập thành <em>một</em> phép nhân: trải mỗi mảnh \(k\times k\times C_{in}\) thành một cột, xếp các cột cạnh nhau thành ma trận \((C_{in}k^2)\times(H_{out}W_{out})\), rồi nhân với ma trận trọng số \(C_{out}\times(C_{in}k^2)\). Cái giá là bộ nhớ: mỗi điểm ảnh được sao chép khoảng \(k^2\) lần. Các thư viện thực tế còn dùng nhiều thuật toán khác (FFT, Winograd, “implicit GEMM”); mình không nêu chi tiết vì lựa chọn cụ thể phụ thuộc phiên bản và phần cứng.</p>
 <pre><code class="language-python">import numpy as np
 
@@ -116,15 +138,30 @@ for o in range(4):
         for j in range(8):
             y_ref[o, i, j] = (W[o] * xp[:, i:i+3, j:j+3]).sum()
 print(np.allclose(y, y_ref))                             # True</code></pre>
+  </div>
+</details>
 <h3 id="chi-phi-conv">Chi phí của một lớp conv và các cách giảm</h3>
+<p>Hai con số cần phân biệt, giống <strong>chi phí cố định</strong> và <strong>chi phí biến đổi</strong> trong kế toán: <strong>số tham số</strong> (kích thước mô hình, không đổi theo ảnh) và <strong>số phép nhân-cộng (MAC)</strong> (khối lượng tính toán, tỉ lệ với <em>diện tích</em> ảnh: ảnh gấp đôi mỗi chiều thì tính gấp bốn). Hai cách giảm chi phí phổ biến:</p>
+<ul>
+  <li><strong>Tách theo chiều sâu</strong> (MobileNet): thay một lớp trộn cả không gian lẫn kênh bằng hai bước nhẹ hơn, tiết kiệm khoảng 8–9 lần với kernel 3×3 và nhiều kênh.</li>
+  <li><strong>Bottleneck</strong> (ResNet-50 trở lên): nén bớt kênh, xử lý trên ít kênh rồi mở lại.</li>
+</ul>
+<details class="derivation">
+  <summary>Xem công thức tham số, MAC và tỉ lệ tiết kiệm</summary>
+  <div class="dv-body">
 <p>Với đầu ra cỡ \(H_{out}\times W_{out}\): số tham số \(=C_{out}(C_{in}k^2+1)\) (không phụ thuộc kích thước ảnh), số phép nhân-cộng (MAC) \(=H_{out}W_{out}\,C_{out}\,C_{in}\,k^2\) (<em>tỉ lệ với diện tích ảnh</em>). Nhiều bài báo gọi một MAC là một “FLOP”, trong khi cách đếm chặt chẽ coi một MAC là 2 phép toán dấu phẩy động; khi so số liệu giữa các nguồn, hãy xem họ dùng quy ước nào. Hai cách giảm chi phí phổ biến:</p>
 <ul>
   <li><strong>Tách theo chiều sâu</strong> (depthwise-separable, trong MobileNet của Howard và cộng sự, 2017): một bộ lọc \(k\times k\) riêng cho <em>mỗi</em> kênh (không trộn kênh), rồi conv \(1\times1\) (pointwise) trộn kênh. Tham số (và MAC trên mỗi vị trí) là \(C_{in}k^2+C_{in}C_{out}\), nên tỉ lệ so với conv chuẩn là \(\dfrac{C_{in}k^2+C_{in}C_{out}}{C_{in}C_{out}k^2}=\dfrac1{C_{out}}+\dfrac1{k^2}\). Với \(k=3\) và nhiều kênh ra, khoảng \(1/9\).</li>
   <li><strong>Bottleneck</strong> (trong ResNet-50 trở lên): nén kênh bằng \(1\times1\), làm conv \(3\times3\) trên ít kênh, rồi mở lại bằng \(1\times1\).</li>
 </ul>
+  </div>
+</details>
 <div class="viz" data-viz="convcost1" data-title="So sánh chi phí: conv chuẩn, tách theo chiều sâu, bottleneck">
   <p class="viz-help">Chỉnh số kênh, kernel và kích thước bản đồ đặc trưng. Thanh là tỉ lệ so với conv chuẩn (100%). Thử k = 1: không còn gì để tách. Thử C_out nhỏ: tỉ lệ 1/C_out + 1/k² thay đổi thế nào?</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã đếm tham số và MAC</summary>
+  <div class="dv-body">
 <pre><code class="language-python">def conv_cost(cin, cout, k, h, w, groups=1, bias=False):
     """Trả về (tham số, MAC) của một lớp conv với đầu ra cỡ h×w."""
     params = cout * (cin // groups * k * k + (1 if bias else 0))
@@ -145,13 +182,26 @@ for name, L in [("chuẩn 3x3", std), ("tách theo chiều sâu", sep), ("bottle
     p, m = total(L)
     print(f"{name:22s} tham số = {p:&gt;7,d}  MAC = {m/1e6:6.2f} M")
 print("tỉ lệ depthwise-separable:", round(total(sep)[0] / total(std)[0], 4), "so với 1/C_out + 1/k² =", round(1/128 + 1/9, 4))</code></pre>
+  </div>
+</details>
 <div class="callout warn"><span class="callout-title">MAC không bằng độ trễ</span>Số MAC thấp không tự động có nghĩa là chạy nhanh. Lớp depthwise có ít phép tính trên mỗi byte dữ liệu đọc, nên trên nhiều GPU nó bị giới hạn bởi băng thông bộ nhớ thay vì tính toán (mình nhớ đây là quan sát thường gặp, nhưng mức độ phụ thuộc phần cứng và thư viện). Hãy đo trên đúng thiết bị triển khai.</div>
+<h3 id="api-hay-tu-dung">Thuê API hay tự dựng mô hình? Bài toán hòa vốn</h3>
+<p>Trong thực tế, câu hỏi “dùng kiến trúc nào” thường đi sau câu hỏi kinh doanh: <strong>thuê dịch vụ nhận dạng ảnh có sẵn (trả theo ảnh) hay tự huấn luyện và vận hành?</strong> Đây là phân tích hòa vốn kinh điển, chỉ thêm một khoản dễ bị quên: <em>chi phí của sai sót</em> (mỗi ảnh nhận sai phải có người sửa tay).</p>
+<div class="viz" data-viz="cvcost1" data-title="Thuê API hay tự vận hành: chi phí hàng tháng">
+  <p class="viz-help">Kéo “số ảnh mỗi tháng” để dời vạch tím. Các giá có dấu ✱ là giả định minh họa, không phải bảng giá thật: hãy thay bằng số của bạn. Thử tăng độ chính xác của mô hình tự huấn luyện, hoặc đặt kỹ sư vận hành về 0, và xem điểm hòa vốn dịch chuyển.</p>
+</div>
 
 <h2 id="cnn">Kiến trúc CNN</h2>
 <p>Khối cơ bản thường là <strong>Conv → chuẩn hóa (BatchNorm) → ReLU</strong>, xen kẽ với giảm kích thước không gian (pooling hoặc stride 2) và tăng dần số kênh. Các tầng đầu học đặc trưng đơn giản (cạnh, màu, họa tiết), các tầng sau ghép chúng thành bộ phận rồi vật thể. Cuối mạng, gộp trung bình toàn cục (global average pooling) rồi một lớp tuyến tính ra logit.</p>
 <h3 id="truong-nhin">Trường nhìn (receptive field)</h3>
+<p>Mỗi ô ở tầng sâu “nhìn” vào một vùng ảnh gốc gọi là <strong>trường nhìn</strong>, giống một chỉ số tổng hợp bao quát được bao nhiêu chi nhánh. Càng đi sâu, hoặc càng dùng bước trượt lớn và pooling, trường nhìn càng rộng.</p>
+<details class="derivation">
+  <summary>Xem công thức tính trường nhìn</summary>
+  <div class="dv-body">
 <p>Mỗi ô ở tầng sâu “nhìn” vào một vùng ảnh gốc gọi là trường nhìn. Với lớp có nhân \(k\) và stride \(s\), đặt \(j\) là bước nhảy tích lũy (khoảng cách giữa hai ô liền kề tính theo điểm ảnh gốc):</p>
 $$r_l=r_{l-1}+(k_l-1)\,j_{l-1},\qquad j_l=j_{l-1}\,s_l,\qquad r_0=1,\ j_0=1$$
+  </div>
+</details>
 <p>Hai lớp \(3\times3\) xếp chồng có trường nhìn \(5\times5\), giống một lớp \(5\times5\), nhưng chỉ cần \(2\cdot9=18\) trọng số mỗi cặp kênh thay vì 25, lại có thêm một phi tuyến ở giữa. Đó là lý do mạng hiện đại ưa kernel nhỏ.</p>
 <div class="viz" data-viz="rf1" data-title="Máy tính trường nhìn">
   <p class="viz-help">Sửa danh sách lớp để xem trường nhìn tăng thế nào. Pooling và stride lớn làm bước nhảy j tăng nhanh nên các lớp sau “nhìn” rất rộng.</p>
@@ -197,12 +247,22 @@ $$r_l=r_{l-1}+(k_l-1)\,j_{l-1},\qquad j_l=j_{l-1}\,s_l,\qquad r_0=1,\ j_0=1$$
 </svg>
 <figcaption>Cả hai khối đều tính \(y=\mathrm{ReLU}(F(x)+x)\). Khi kích thước hoặc số kênh đổi, đường tắt dùng thêm conv 1×1 (cùng stride) để khớp hình dạng trước khi cộng.</figcaption>
 </figure>
+<p>Ý tưởng: thay vì bắt mỗi khối học lại toàn bộ đầu ra, ta cho đầu vào <em>đi tắt</em> rồi cộng với phần khối học được. Khối chỉ cần học phần <strong>chênh lệch</strong> (phần dư, residual) so với đầu vào, giống dự báo doanh thu kỳ này bằng “kỳ trước + mức thay đổi” thay vì dự báo từ số 0. Nhờ đó tín hiệu sai số khi lan ngược có một “đường cao tốc” thẳng, nên mạng rất sâu vẫn huấn luyện được.</p>
+<details class="derivation">
+  <summary>Xem suy dẫn vì sao đường tắt giữ được gradient</summary>
+  <div class="dv-body">
 <p>Với \(\mathbf{y}=\mathbf{x}+F(\mathbf{x})\) (bỏ qua ReLU sau phép cộng cho gọn; bản “pre-activation” trong He và cộng sự, 2016 làm đúng như vậy), Jacobian là \(\partial\mathbf{y}/\partial\mathbf{x}=I+\partial F/\partial\mathbf{x}\). Xếp chồng \(n\) khối: \(\mathbf{x}_n=\mathbf{x}_0+\sum_{l\lt n}F_l(\mathbf{x}_l)\), nên</p>
 $$\frac{\partial L}{\partial\mathbf{x}_0}=\frac{\partial L}{\partial\mathbf{x}_n}\Big(I+\frac{\partial}{\partial\mathbf{x}_0}\sum_{l\lt n}F_l(\mathbf{x}_l)\Big)$$
-<p>Số hạng \(I\) là một đường đi mà gradient từ tầng cuối đến tầng đầu <em>không bị nhân với bất kỳ ma trận trọng số nào</em>, nên không co về 0 hay nổ chỉ vì độ sâu. So với mạng thường, nơi gradient là tích \(n\) Jacobian \(\prod_l\partial F_l/\partial\mathbf{x}_l\). Một cách nhìn khác: khối chỉ cần học phần <em>dư</em> \(F(\mathbf{x})=\mathbf{y}-\mathbf{x}\), và “không làm gì” (\(F=0\)) rất dễ biểu diễn. Hãy xem chi phí rơi vào đâu khi dựng ResNet-18 (hai khối cơ bản mỗi giai đoạn, kênh \(64\to128\to256\to512\), kích thước không gian giảm một nửa mỗi giai đoạn):</p>
+<p>Số hạng \(I\) là một đường đi mà gradient từ tầng cuối đến tầng đầu <em>không bị nhân với bất kỳ ma trận trọng số nào</em>, nên không co về 0 hay nổ chỉ vì độ sâu. So với mạng thường, nơi gradient là tích \(n\) Jacobian \(\prod_l\partial F_l/\partial\mathbf{x}_l\). Cũng có thể nhìn là khối chỉ cần học phần <em>dư</em> \(F(\mathbf{x})=\mathbf{y}-\mathbf{x}\), và “không làm gì” (\(F=0\)) rất dễ biểu diễn.</p>
+  </div>
+</details>
+<p>Hãy xem chi phí rơi vào đâu khi dựng ResNet-18 (hai khối cơ bản mỗi giai đoạn, kênh tăng từ 64 lên 512, kích thước không gian giảm một nửa mỗi giai đoạn):</p>
 <div class="viz" data-viz="cnnstack1" data-title="Tham số, MAC và bộ nhớ kích hoạt của ResNet-18 theo từng giai đoạn">
   <p class="viz-help">Đổi kích thước ảnh và hệ số độ rộng. Quan sát ba cột: tham số dồn về cuối, kích hoạt dồn về đầu, MAC khá đều.</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã đếm tham số và MAC của ResNet-18</summary>
+  <div class="dv-body">
 <pre><code class="language-python">def conv(cin, cout, k, hw, s=1):
     out = hw // s                      # 'same' padding: kích thước ra = ⌈vào / s⌉ (ở đây các cỡ đều chia hết)
     return cout * cin * k * k, out * out * cout * cin * k * k, out
@@ -232,6 +292,8 @@ print(f"tham số = {P:,d}   MAC = {M/1e9:.3f} G")
 for cout, hw, p, m in stages:
     print(f"  {cout:3d} kênh @ {hw:2d}x{hw:&lt;2d}  tham số {p/1e6:5.2f} M   MAC {m/1e6:6.1f} M")</code></pre>
 <p class="meta">Tổng 11,689,512 tham số khớp con số mình nhớ cho <code>torchvision.models.resnet18</code> (đã tính BN, chưa tính các buffer thống kê chạy); bạn có thể xác nhận bằng <code>sum(p.numel() for p in model.parameters())</code>.</p>
+  </div>
+</details>
 
 <h2 id="transfer">Transfer learning: cách làm thực tế nhất</h2>
 <p>Hiếm khi bạn nên huấn luyện từ đầu. Mạng tiền huấn luyện trên tập ảnh lớn (như ImageNet) đã học các đặc trưng thị giác tổng quát; bạn thay lớp cuối bằng lớp mới cho bài toán của mình rồi tinh chỉnh. Quy trình thường dùng:</p>
@@ -269,7 +331,13 @@ opt = torch.optim.AdamW(params, lr=1e-3)
 <div class="viz" data-viz="aug1" data-title="Xem trước các phép tăng cường dữ liệu">
   <p class="viz-help">Kéo các thanh để thấy ảnh biến đổi ra sao. Chữ R giúp thấy lật ngang làm gì với nhãn; thử xem phép nào là “an toàn” cho bài toán của bạn.</p>
 </div>
-<p><strong>Trộn mẫu.</strong> Mixup (Zhang và cộng sự, 2017) lấy tổ hợp lồi của hai ảnh <em>và nhãn</em>: \(\tilde x=\lambda x_i+(1-\lambda)x_j\), \(\tilde y=\lambda y_i+(1-\lambda)y_j\) với \(\lambda\sim\mathrm{Beta}(\alpha,\alpha)\); ví dụ \(\lambda=0.7\) với nhãn “mèo” và “chó” cho nhãn mềm \((0.7,0.3)\). CutMix (Yun và cộng sự, 2019) dán một mảnh chữ nhật từ ảnh này sang ảnh kia và chia nhãn theo diện tích. Cả hai là điều chuẩn hóa mạnh cho phân loại; không phải lúc nào cũng hợp cho bài toán phát hiện/phân đoạn cần vị trí chính xác. Quy tắc chung: chỉ tăng cường trên tập huấn luyện; tập kiểm tra chỉ áp dụng tiền xử lý tất định (đổi kích thước, chuẩn hóa).</p>
+<p><strong>Trộn mẫu.</strong> Mixup trộn hai ảnh theo tỉ lệ và trộn nhãn theo cùng tỉ lệ: ví dụ 70% ảnh mèo + 30% ảnh chó có nhãn “70% mèo, 30% chó”. CutMix dán một mảnh chữ nhật từ ảnh này sang ảnh kia và chia nhãn theo diện tích. Cả hai là điều chuẩn mạnh cho phân loại; không phải lúc nào cũng hợp cho bài toán phát hiện/phân đoạn cần vị trí chính xác. Quy tắc chung: chỉ tăng cường trên tập huấn luyện; tập kiểm tra chỉ áp dụng tiền xử lý tất định (đổi kích thước, chuẩn hóa).</p>
+<details class="derivation">
+  <summary>Xem công thức Mixup</summary>
+  <div class="dv-body">
+<p>\(\tilde x=\lambda x_i+(1-\lambda)x_j\), \(\tilde y=\lambda y_i+(1-\lambda)y_j\) với \(\lambda\sim\mathrm{Beta}(\alpha,\alpha)\) (Zhang và cộng sự, 2017); ví dụ \(\lambda=0.7\) cho nhãn mềm \((0.7,0.3)\). CutMix: Yun và cộng sự, 2019.</p>
+  </div>
+</details>
 
 <h2 id="vit">Vision Transformer và mô hình ảnh–văn bản</h2>
 <p><strong>ViT</strong> (Dosovitskiy và cộng sự, 2020) coi ảnh như chuỗi: cắt ảnh thành các mảnh \(16\times16\), trải phẳng, chiếu tuyến tính thành vector, thêm mã hóa vị trí rồi đưa vào Transformer chuẩn (xem trang LLM). Một ảnh \(224\times224\) cho \((224/16)^2=196\) mảnh. Do thiếu các giả định tích chập, ViT thường cần nhiều dữ liệu hoặc tiền huấn luyện lớn để thắng CNN, nhưng mở rộng rất tốt.</p>
@@ -299,6 +367,10 @@ opt = torch.optim.AdamW(params, lr=1e-3)
 <div class="viz" data-viz="vit1" data-title="Cắt ảnh thành mảnh và độ dài chuỗi">
   <p class="viz-help">Rê chuột lên ảnh để chọn một mảnh. Đổi cạnh ảnh và cạnh mảnh để thấy độ dài chuỗi và kích thước ma trận attention.</p>
 </div>
+<p>Phần lớn chi phí tính toán của ViT nằm ở các phép chiếu và khối MLP (tỉ lệ với độ dài chuỗi). Phần “attention” tăng theo <em>bình phương</em> độ dài chuỗi chỉ chiếm khoảng 4% ở ảnh 224, nhưng sẽ phình ra khi tăng độ phân giải: chuỗi dài gấp ~3 thì phần này gấp 8–9 lần (Bài 3). Tổng cộng ViT-B/16 cỡ <strong>17,6 G MAC</strong> và khoảng 86,6 triệu tham số.</p>
+<details class="derivation">
+  <summary>Xem cách tính chi phí và mã đếm tham số ViT-B/16</summary>
+  <div class="dv-body">
 <p>Chi phí một khối với chuỗi dài \(N\) và chiều ẩn \(d\) gồm: các phép chiếu Q, K, V, O \(4Nd^2\) MAC, MLP (mở rộng ×4) \(8Nd^2\), và hai phép nhân ma trận attention \(QK^\top\), \(AV\) cộng lại \(2N^2d\). Với ViT-B/16 (\(N=197\), \(d=768\)): \(12Nd^2\approx1.394\) G MAC và \(2N^2d\approx0.060\) G MAC mỗi khối; tổng 12 khối cộng patch-embed và đầu phân loại khoảng <strong>17.6 G MAC</strong> (con số thường được báo cáo cho ViT-B/16 cũng cỡ đó, tính theo quy ước MAC). Ở độ phân giải này số hạng bậc hai chỉ chiếm khoảng 4% mỗi khối; nó chỉ trở thành vấn đề khi \(N\) lớn (ảnh độ phân giải cao, mảnh nhỏ).</p>
 <pre><code class="language-python">import numpy as np
 
@@ -321,14 +393,25 @@ block = (4 * d * d + 4 * d) + (2 * d * mlp + mlp + d) + 2 * (2 * d)   # attentio
 total = patch_embed + cls_pos + L * block + 2 * d + (d * classes + classes)
 print(f"{n_tokens} token, tham số = {total:,d}")                  # 197 token, 86,567,656</code></pre>
 <p class="meta">Tổng 86,567,656 tham số khớp con số mình nhớ cho ViT-B/16 trong thư viện <code>timm</code> (kể cả đầu 1000 lớp); hãy đối chiếu trực tiếp nếu bạn cần độ chắc chắn.</p>
+  </div>
+</details>
 <p><strong>CNN so với ViT.</strong> CNN có sẵn hai thiên kiến quy nạp: tính cục bộ và chia sẻ trọng số tịnh tiến. ViT chỉ giữ cấu trúc “lưới mảnh” ở lớp đầu, còn attention tự học mọi quan hệ không gian. Hệ quả thường được quan sát: ViT cần nhiều dữ liệu hơn hoặc tăng cường/điều chuẩn mạnh hơn để vượt CNN ở quy mô nhỏ, nhưng mở rộng tốt khi có dữ liệu lớn; và các thiết kế lai (conv ở đầu, hoặc attention theo cửa sổ) là một hướng phổ biến để lấy lại tính cục bộ. Đây là nhận xét chung, mức chênh lệch phụ thuộc rất nhiều vào công thức huấn luyện.</p>
 <h3 id="clip-chi-tiet">CLIP: mất mát đối sánh suy dẫn từng bước</h3>
+<p>CLIP học bằng bài tập “nối cột”: trong một lô gồm N cặp (ảnh, chú thích), mạng phải nhận ra chú thích nào thuộc ảnh nào. Nối đúng thì được điểm tốt, nhầm sang cặp khác thì bị phạt. Lô càng lớn thì càng nhiều phương án gây nhiễu, nên lô lớn quan trọng; “nhiệt độ” điều chỉnh mức khắt khe khi chấm; và kết quả zero-shot phụ thuộc cách viết câu mô tả (prompt).</p>
+<details class="derivation">
+  <summary>Xem công thức và suy dẫn mất mát đối sánh</summary>
+  <div class="dv-body">
 <p>Với một lô \(N\) cặp (ảnh, câu), bộ mã hóa ảnh và văn bản cho các vector đã chuẩn hóa \(u_i,v_i\). Ma trận logit \(z_{ij}=u_i^\top v_j/\tau\). Cặp đúng là đường chéo; \(N^2-N\) cặp còn lại <em>trong cùng lô</em> đóng vai âm tính. Mất mát là cross-entropy đối xứng:</p>
 $$L=\tfrac12\big(L_{i\to t}+L_{t\to i}\big),\quad L_{i\to t}=-\frac1N\sum_i\ln\frac{e^{z_{ii}}}{\sum_je^{z_{ij}}},\quad L_{t\to i}=-\frac1N\sum_j\ln\frac{e^{z_{jj}}}{\sum_ie^{z_{ij}}}$$
 <p>Gradient theo logit có dạng quen thuộc của softmax-cross-entropy (giống phần suy dẫn Naive Bayes/logistic): \(\dfrac{\partial L}{\partial z_{ij}}=\dfrac{1}{2N}\big[(P^{\text{row}}_{ij}-\delta_{ij})+(P^{\text{col}}_{ij}-\delta_{ij})\big]\). Nghĩa là kéo cặp đúng lại (nhân \(-1\) ở đường chéo) và đẩy các cặp sai ra, mỗi cặp sai bị đẩy mạnh theo xác suất nó đang được gán. Nhiệt độ \(\tau\) điều chỉnh độ “nhọn”: nhỏ thì phạt rất nặng những cặp sai gần đúng, lớn thì softmax gần đều. Bài báo CLIP học \(\tau\) cùng mạng (tham số hóa qua logarit; mình nhớ giá trị khởi tạo là 0.07, hãy kiểm tra trong bài gốc). Hệ quả thực hành: kích thước lô quyết định số âm tính, nên lô lớn quan trọng; và “zero-shot” phụ thuộc cách viết câu mô tả (prompt).</p>
+  </div>
+</details>
 <div class="viz" data-viz="clip1" data-title="Mất mát đối sánh của CLIP trên 4 cặp (ảnh, câu)">
   <p class="viz-help">Mỗi cặp là hai vector ngẫu nhiên có cùng gốc cộng nhiễu. Tăng nhiễu để cặp đúng khó nhận ra; đổi τ và xem mất mát: nó có cực tiểu ở mức vừa phải, không đơn điệu.</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã tính mất mát CLIP và kiểm tra gradient</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import numpy as np
 
 def clip_loss(img, txt, tau):
@@ -361,12 +444,19 @@ def L_of_z(z):
     return (li + lt) / 2
 e = np.zeros_like(z); e[1, 2] = 1e-6
 print(abs((L_of_z(z + e) - L_of_z(z - e)) / 2e-6 - G[1, 2]) &lt; 1e-8)    # True</code></pre>
+  </div>
+</details>
 
 <h2 id="phat-hien">Phát hiện vật thể</h2>
 <p>Bài toán: với mỗi vật thể, dự đoán hộp bao và nhãn. Hai họ chính: <em>hai giai đoạn</em> (đề xuất vùng rồi phân loại, như Faster R-CNN) và <em>một giai đoạn</em> (dự đoán trực tiếp, như họ YOLO); gần đây có các mô hình dựa trên Transformer như DETR, dự đoán tập hộp mà không cần NMS.</p>
 <h3 id="iou-nms">IoU và NMS</h3>
-<p>Độ chồng lấn giữa hai hộp đo bằng <strong>Intersection over Union</strong>:</p>
+<p>Độ chồng lấn giữa hai hộp đo bằng <strong>IoU</strong> = (diện tích phần chung) ÷ (diện tích phần gộp): 0 là không chạm nhau, 1 là trùng khít, giống tỉ lệ thị phần chồng lấn giữa hai đối thủ.</p>
+<details class="derivation">
+  <summary>Xem công thức IoU</summary>
+  <div class="dv-body">
 $$\text{IoU}(A,B)=\frac{|A\cap B|}{|A\cup B|}$$
+  </div>
+</details>
 <p>Mạng thường đưa ra nhiều hộp quanh cùng một vật thể. <strong>Non-Maximum Suppression</strong> loại bớt: sắp xếp hộp theo điểm tin cậy, giữ hộp cao nhất, loại mọi hộp có IoU với nó vượt ngưỡng, lặp lại. Hãy thử cảnh “hai vật chồng lấn nhiều” và hạ ngưỡng IoU để thấy NMS xóa nhầm vật thật:</p>
 <div class="viz" data-viz="nms1" data-title="NMS: giữ hộp tốt nhất, loại hộp trùng">
   <p class="viz-help">Nhãn trên hộp là điểm tin cậy. Đường liền xanh lá là hộp được giữ; đứt cam là hộp bị loại; đứt xám là hộp bị loại vì điểm thấp.</p>
@@ -375,11 +465,25 @@ $$\text{IoU}(A,B)=\frac{|A\cap B|}{|A\cup B|}$$
 <p>Một dự đoán được tính là đúng nếu đúng lớp và IoU với hộp thật vượt ngưỡng (ví dụ 0.5). Với mỗi lớp, vẽ đường precision–recall khi thay đổi ngưỡng điểm tin cậy, <strong>AP</strong> là diện tích dưới đường đó, <strong>mAP</strong> là trung bình các lớp. Nhiều benchmark còn lấy trung bình trên nhiều ngưỡng IoU. Cách tính cụ thể khác nhau giữa các bộ dữ liệu (ví dụ PASCAL VOC và COCO), nên chỉ so sánh số mAP khi cùng quy ước.</p>
 
 <h3 id="ap-chi-tiet">AP tính từng bước</h3>
+<p>AP đo chất lượng bộ phát hiện qua hai con số: <strong>precision</strong> (trong các cảnh báo đã đưa ra, bao nhiêu phần trăm đúng) và <strong>recall</strong> (trong các vật thật, bắt được bao nhiêu phần trăm). Hạ ngưỡng tin cậy thì bắt được nhiều hơn nhưng cảnh báo nhầm cũng nhiều hơn; AP là diện tích dưới đường precision–recall, càng gần 1 càng tốt.</p>
+<details class="derivation">
+  <summary>Xem thuật toán tính AP từng bước và ví dụ</summary>
+  <div class="dv-body">
 <p>Thuật toán chuẩn cho một lớp: (1) sắp mọi dự đoán theo điểm giảm dần; (2) duyệt lần lượt, một dự đoán là <strong>TP</strong> nếu IoU với một vật thật chưa được khớp vượt ngưỡng, ngược lại là <strong>FP</strong> (kể cả khi nó trùng lặp với vật thật đã khớp trước đó); (3) sau mỗi dự đoán, tính precision \(=TP/(TP+FP)\) và recall \(=TP/\#\text{GT}\); (4) làm đường bao nội suy \(p_{\text{interp}}(r)=\max_{r'\ge r}p(r')\), vì precision cao hơn ở recall lớn hơn không nên bị “phạt”; (5) AP là diện tích dưới đường bao. Bản COCO lấy mẫu đường bao ở 101 mức recall \(0,0.01,\dots,1\) rồi lấy trung bình, và còn trung bình thêm trên các ngưỡng IoU từ 0.5 đến 0.95 (bước 0.05).</p>
 <p>Ví dụ nhỏ: 3 dự đoán (điểm 0.9 TP, 0.8 FP, 0.7 TP), 2 vật thật. Precision \(=(1,\ 0.5,\ 0.667)\), recall \(=(0.5,\ 0.5,\ 1)\); đường bao \(=(1,\ 0.667,\ 0.667)\); \(\mathrm{AP}=0.5\cdot1+0.5\cdot0.667=0.833\). Dữ liệu dưới đây gồm 10 dự đoán và 7 vật thật:</p>
+  </div>
+</details>
+<p>Minh họa dưới đây dùng 10 dự đoán và 7 vật thật:</p>
 <div class="viz" data-viz="pr1" data-title="Đường precision–recall và AP trên 10 dự đoán">
   <p class="viz-help">Đổi ngưỡng IoU và cách tính AP. Chấm xanh lá là TP, cam là FP; chấm to là các dự đoán có điểm vượt ngưỡng tin cậy bạn chọn.</p>
 </div>
+<p>Nhưng chọn ngưỡng không chỉ là chuyện kỹ thuật: nó là <strong>bài toán chi phí–lợi ích</strong>. Trong một dây chuyền kiểm tra sản phẩm bằng camera, cảnh báo nhầm tốn tiền kiểm lại, còn bỏ sót một sản phẩm lỗi tốn tiền bảo hành, thu hồi và uy tín. Thử đặt các khoản chi phí của bạn:</p>
+<div class="viz" data-viz="defect1" data-title="Camera kiểm tra lỗi: ngưỡng nào rẻ nhất?">
+  <p class="viz-help">Chấm tím là ngưỡng bạn chọn, chấm xanh lá là ngưỡng rẻ nhất trong mẫu. Tăng “thiệt hại nếu lọt một sản phẩm lỗi” và xem ngưỡng tối ưu dịch về phía nhiều cảnh báo hơn.</p>
+</div>
+<details class="derivation">
+  <summary>Xem mã tính AP (tất cả điểm và kiểu COCO)</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import numpy as np
 
 # (điểm tin cậy, IoU lớn nhất với một vật thật, chỉ số vật thật đó); có 7 vật thật
@@ -410,8 +514,16 @@ def average_precision(tp, n_gt, mode="all"):
 for thr in (0.5, 0.75):
     tp = match(DET, thr)
     print(f"IoU≥{thr}: TP={tp.sum()}/{len(tp)}  AP(tất cả điểm)={average_precision(tp, N_GT):.4f}  AP(101 điểm)={average_precision(tp, N_GT, '101'):.4f}")</code></pre>
+  </div>
+</details>
 <p><strong>Đầu ra của bộ phát hiện một giai đoạn.</strong> YOLO phiên bản đầu (Redmon và cộng sự, 2015) chia ảnh thành lưới \(S\times S\) và với mỗi ô dự đoán \(B\) hộp (mỗi hộp gồm \(x,y,w,h\) và điểm tin cậy) cùng \(C\) xác suất lớp, nên đầu ra là tensor \(S\times S\times(5B+C)\); với \(S=7,B=2,C=20\) là \(7\times7\times30\). Các phiên bản sau thay đổi khá nhiều (anchor, đầu không anchor, nhiều tỉ lệ đặc trưng), nên hãy đọc đúng phiên bản bạn dùng.</p>
-<p><strong>IoU không có gradient khi hai hộp không giao nhau</strong> (IoU = 0 phẳng). GIoU (Rezatofighi và cộng sự, 2019) thêm hộp bao nhỏ nhất \(C\) của cả hai: \(\mathrm{GIoU}=\mathrm{IoU}-\dfrac{|C\setminus(A\cup B)|}{|C|}\), nên hộp càng xa càng bị phạt. Ví dụ \(A=[0,2]\times[0,2]\), \(B=[3,5]\times[0,2]\): IoU \(=0\); \(C\) có diện tích \(5\cdot2=10\), hợp \(=8\), vậy \(\mathrm{GIoU}=0-2/10=-0.2\). DETR bỏ hẳn NMS bằng cách ghép tối ưu (thuật toán Hungary) giữa tập dự đoán và tập vật thật khi tính mất mát.</p>
+<p><strong>IoU bằng 0 phẳng khi hai hộp không chạm nhau</strong>, nên mạng không biết nên dịch hộp về hướng nào. GIoU thêm một khoản phạt theo khoảng cách để hộp càng xa càng bị phạt. DETR bỏ hẳn NMS bằng cách ghép tối ưu (thuật toán Hungary) giữa tập dự đoán và tập vật thật.</p>
+<details class="derivation">
+  <summary>Xem công thức GIoU và ví dụ</summary>
+  <div class="dv-body">
+<p>\(\mathrm{GIoU}=\mathrm{IoU}-\dfrac{|C\setminus(A\cup B)|}{|C|}\) với \(C\) là hộp bao nhỏ nhất của cả hai (Rezatofighi và cộng sự, 2019). Ví dụ \(A=[0,2]\times[0,2]\), \(B=[3,5]\times[0,2]\): IoU \(=0\); \(C\) có diện tích \(5\cdot2=10\), hợp \(=8\), vậy \(\mathrm{GIoU}=0-2/10=-0.2\).</p>
+  </div>
+</details>
 
 <h2 id="phan-doan">Phân đoạn ảnh</h2>
 <ul>
@@ -419,8 +531,7 @@ for thr in (0.5, 0.75):
   <li><strong>Instance segmentation</strong>: tách riêng từng vật thể (xe 1, xe 2).</li>
   <li><strong>Panoptic</strong>: kết hợp cả hai.</li>
 </ul>
-<p>Kiến trúc kinh điển là <strong>U-Net</strong> (Ronneberger và cộng sự, 2015): nhánh mã hóa thu nhỏ ảnh, nhánh giải mã phóng to lại, có các kết nối tắt nối đặc trưng cùng kích thước để giữ chi tiết biên. Với vùng cần phân đoạn nhỏ so với toàn ảnh (khối u, vết nứt), mất mát cross-entropy theo từng điểm ảnh bị lớp nền áp đảo; người ta thường dùng thêm mất mát dựa trên <strong>Dice</strong>:</p>
-$$\text{Dice}=\frac{2\,|A\cap B|}{|A|+|B|},\qquad L_{\text{Dice}}=1-\text{Dice}$$
+<p>Kiến trúc kinh điển là <strong>U-Net</strong> (Ronneberger và cộng sự, 2015): nhánh mã hóa thu nhỏ ảnh, nhánh giải mã phóng to lại, có các kết nối tắt nối đặc trưng cùng kích thước để giữ chi tiết biên. Với vùng cần phân đoạn nhỏ so với toàn ảnh (khối u, vết nứt), mất mát cross-entropy theo từng điểm ảnh bị lớp nền áp đảo; người ta thường dùng thêm mất mát dựa trên <strong>Dice</strong> (công thức ở khối bên dưới):</p>
 
 <h3 id="unet-chi-tiet">U-Net, phóng to và Dice</h3>
 <figure class="diagram">
@@ -442,7 +553,17 @@ $$\text{Dice}=\frac{2\,|A\cap B|}{|A|+|B|},\qquad L_{\text{Dice}}=1-\text{Dice}$
 </svg>
 <figcaption>Nhánh mã hóa tăng số kênh, giảm kích thước; nhánh giải mã làm ngược lại và nhận thêm đặc trưng chi tiết qua đường nối tắt. Hình này rút gọn còn ba lần thu nhỏ; U-Net gốc có bốn lần thu nhỏ và số kênh tăng đến 1024 (mình nhớ như vậy, hãy đối chiếu bài gốc).</figcaption>
 </figure>
+<p><strong>Phóng to đặc trưng</strong> có hai cách: nội suy (song tuyến) rồi conv, hoặc <em>conv chuyển vị</em> học được. Conv chuyển vị dễ để lại hoa văn “bàn cờ” khi kernel không chia hết cho stride; nội suy rồi conv thường tránh được điều này.</p>
+<details class="derivation">
+  <summary>Xem công thức kích thước đầu ra của conv chuyển vị</summary>
+  <div class="dv-body">
 <p><strong>Phóng to đặc trưng.</strong> Có hai cách: nội suy (song tuyến) rồi conv, hoặc <em>conv chuyển vị</em> (transposed convolution) có thể học. Kích thước đầu ra của conv chuyển vị theo một chiều (dilation 1) là \((n-1)s-2p+k+p_{\text{out}}\) với \(p_{\text{out}}\) là output padding (hãy kiểm tra công thức trong tài liệu PyTorch cho phiên bản bạn dùng). Khi \(k\) không chia hết cho \(s\), conv chuyển vị dễ cho hoa văn “bàn cờ” (checkerboard); nội suy rồi conv thường tránh được điều này.</p>
+  </div>
+</details>
+<p><strong>Dice và IoU</strong> đều đo vùng dự đoán chồng khít vùng thật đến đâu; chúng quy đổi được cho nhau (Dice 0,8 tương ứng IoU 0,667) và Dice luôn lớn hơn hoặc bằng IoU. Điều quan trọng với người làm kinh doanh: <strong>độ chính xác theo điểm ảnh đánh lừa khi vật thể nhỏ</strong>. Dự đoán “toàn nền” cho vật thể chiếm 1% ảnh vẫn đạt 99% accuracy nhưng Dice bằng 0, giống mô hình phát hiện gian lận luôn trả lời “không gian lận” đúng 99% mà hoàn toàn vô dụng.</p>
+<details class="derivation">
+  <summary>Xem công thức Dice, IoU, Dice mềm và mã minh họa</summary>
+  <div class="dv-body">
 <p><strong>Dice và IoU.</strong> Với tập điểm ảnh dự đoán \(A\) và tập thật \(B\): \(\mathrm{Dice}=\dfrac{2|A\cap B|}{|A|+|B|}\), \(J=\mathrm{IoU}=\dfrac{|A\cap B|}{|A|+|B|-|A\cap B|}\). Đặt \(I=|A\cap B|\), \(S=|A|+|B|\): \(D=2I/S\) và \(J=I/(S-I)\), suy ra \(J=\dfrac{D}{2-D}\) và \(D=\dfrac{2J}{1+J}\): hai số đơn điệu theo nhau, Dice luôn lớn hơn hoặc bằng IoU. Khi vật thể nhỏ, độ chính xác theo điểm ảnh rất đánh lừa: dự đoán “toàn nền” cho vật thể chiếm 1% ảnh vẫn đạt 99% accuracy nhưng Dice bằng 0. <strong>Dice mềm</strong> dùng xác suất thay cho nhãn cứng, \(L=1-\dfrac{2\sum_ip_ig_i+\epsilon}{\sum_ip_i+\sum_ig_i+\epsilon}\), khả vi nên làm hàm mất mát được.</p>
 <pre><code class="language-python">import numpy as np
 
@@ -464,6 +585,8 @@ for name, p in [("toàn nền", pred_empty), ("trúng 80, thừa 40", pred)]:
 def soft_dice_loss(p, g, eps=1e-6):                                   # p ∈ [0,1] là xác suất, g ∈ {0,1}
     return 1 - (2 * (p * g).sum() + eps) / (p.sum() + g.sum() + eps)
 print(round(soft_dice_loss(pred.astype(float), gt.astype(float)), 3))</code></pre>
+  </div>
+</details>
 
 <h2 id="thuc-hanh">Thực hành đánh giá và những cái bẫy</h2>
 <ul>
@@ -476,6 +599,10 @@ print(round(soft_dice_loss(pred.astype(float), gt.astype(float)), 3))</code></pr
 </ul>
 
 <h3 id="grad-cam">Grad-CAM: mạng đang nhìn vào đâu?</h3>
+<p>Grad-CAM tô sáng vùng ảnh mà mạng “dựa vào” để quyết định, giống phân tích đóng góp của từng biến trong một mô hình dự báo. Ý tưởng: xem thay đổi nhẹ ở vùng nào thì điểm của lớp đang xét thay đổi nhiều nhất, rồi cộng các bản đồ đặc trưng theo mức quan trọng đó.</p>
+<details class="derivation">
+  <summary>Xem công thức Grad-CAM, đẳng thức với CAM và mã kiểm tra</summary>
+  <div class="dv-body">
 <p>Cho bản đồ đặc trưng cuối \(A^k\in\mathbb{R}^{h\times w}\) (\(k=1..K\)) và điểm \(y^c\) của lớp \(c\). Grad-CAM (Selvaraju và cộng sự, 2016) lấy trung bình gradient của \(y^c\) theo từng kênh làm trọng số rồi cộng có trọng số các bản đồ:</p>
 $$\alpha^c_k=\frac1{hw}\sum_{i,j}\frac{\partial y^c}{\partial A^k_{ij}},\qquad L^c_{\text{Grad-CAM}}=\mathrm{ReLU}\Big(\sum_k\alpha^c_kA^k\Big)$$
 <p>ReLU giữ lại vùng <em>ủng hộ</em> lớp \(c\). Trường hợp đặc biệt đáng nhớ: nếu mạng kết thúc bằng gộp trung bình toàn cục rồi một lớp tuyến tính, \(y^c=\sum_kw^c_k\frac1{hw}\sum_{ij}A^k_{ij}\) nên \(\partial y^c/\partial A^k_{ij}=w^c_k/(hw)\), do đó \(\alpha^c_k=w^c_k/(hw)\) và Grad-CAM <em>bằng</em> CAM gốc \(\sum_kw^c_kA^k\) (Zhou và cộng sự, 2015) chia cho \(hw\) (một hằng số, không đổi dạng bản đồ). Mã dưới kiểm tra đúng đẳng thức này bằng gradient số học.</p>
@@ -499,6 +626,8 @@ alpha = g.mean(axis=(1, 2))                               # Grad-CAM: α_k = tru
 gradcam = np.maximum(0, np.tensordot(alpha, A, axes=(0, 0)))
 cam = np.maximum(0, np.tensordot(Wfc, A, axes=(0, 0)))    # CAM gốc: Σ_k w_k A_k
 print(np.allclose(gradcam * (h * w), cam, atol=1e-8))     # True: với GAP + tuyến tính, Grad-CAM = CAM / (h·w)</code></pre>
+  </div>
+</details>
 <div class="callout warn"><span class="callout-title">Bản đồ nhiệt không phải bằng chứng nhân quả</span>Grad-CAM có độ phân giải thô (bằng bản đồ đặc trưng, rồi nội suy lên ảnh) và chỉ cho biết vùng mà <em>gradient</em> ủng hộ lớp, không chứng minh mạng “dựa vào” vùng đó. Hãy kết hợp với kiểm tra can thiệp (che vùng đó rồi đo lại điểm số) trước khi kết luận về shortcut learning.</div>
 
 <h2 id="doc-paper">Đọc nhanh các bài báo nền tảng</h2>
