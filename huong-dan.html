@@ -134,6 +134,21 @@
     <tr><td>Nối chuỗi và SQL Injection</td><td><a href="cyber-security.html#sql-injection">An ninh mạng</a></td><td>Điền ví dụ kinh điển và so hai câu lệnh được dựng ra.</td></tr>
     <tr><td>Ma trận rủi ro và ALE</td><td><a href="cyber-security.html#ale">An ninh mạng</a></td><td>Đổi khả năng xảy ra và mức ảnh hưởng, xem mức rủi ro và gợi ý xử lý.</td></tr>
     <tr><td>Cyber Kill Chain</td><td><a href="cyber-security.html#kill-chain">An ninh mạng</a></td><td>Bấm qua từng giai đoạn và đọc biện pháp phòng thủ tương ứng.</td></tr>
+    <tr><td>Đuôi dày của lợi suất</td><td><a href="quant-trading.html#loi-suat">Quant Trading</a></td><td>Hạ df từ 50 xuống 3 và đếm số ngày lệch quá 3σ.</td></tr>
+    <tr><td>AR(1) và bước ngẫu nhiên</td><td><a href="quant-trading.html#ar-quan-tinh">Quant Trading</a></td><td>Kéo φ từ 0 lên 1 và xem nửa chu kỳ quay về dài ra.</td></tr>
+    <tr><td>Giao dịch cặp</td><td><a href="quant-trading.html#pairs">Quant Trading</a></td><td>Đặt φ = 1 rồi bấm “Mẫu nhiễu mới”: lãi lỗ chỉ là may rủi.</td></tr>
+    <tr><td>GARCH</td><td><a href="quant-trading.html#bien-dong">Quant Trading</a></td><td>Tăng α + β và xem biến động đi thành cụm.</td></tr>
+    <tr><td>Sai số của Sharpe</td><td><a href="quant-trading.html#loi-the">Quant Trading</a></td><td>Giảm số năm dữ liệu từ 20 xuống 1 với Sharpe thật = 1.</td></tr>
+    <tr><td>Quy luật cơ bản IR = IC·√breadth</td><td><a href="quant-trading.html#luat-co-ban">Quant Trading</a></td><td>IC = 0.02, tăng breadth từ 100 lên 2500.</td></tr>
+    <tr><td>Overfitting khi thử nhiều chiến lược</td><td><a href="quant-trading.html#overfit">Quant Trading</a></td><td>Tăng N lên 1000 và nhìn Sharpe ngoài mẫu của chấm được chọn.</td></tr>
+    <tr><td>Chi phí và vòng quay</td><td><a href="quant-trading.html#chi-phi">Quant Trading</a></td><td>Tăng vòng quay lên 100 lần/năm ở chi phí 10 bps.</td></tr>
+    <tr><td>Đường biên hai tài sản</td><td><a href="quant-trading.html#markowitz">Quant Trading</a></td><td>Kéo ρ từ 1 xuống −1.</td></tr>
+    <tr><td>Kelly</td><td><a href="quant-trading.html#kelly">Quant Trading</a></td><td>Xem đường vốn khi cược gấp đôi Kelly.</td></tr>
+    <tr><td>Drawdown và đòn bẩy</td><td><a href="quant-trading.html#drawdown">Quant Trading</a></td><td>So đòn bẩy 1× và 3× ở Sharpe 0.5.</td></tr>
+    <tr><td>Sổ lệnh và trượt giá</td><td><a href="quant-trading.html#vi-cau-truc">Quant Trading</a></td><td>Tăng khối lượng đơn mua và giảm độ sâu thanh khoản.</td></tr>
+    <tr><td>Biên độ giá</td><td><a href="quant-trading.html#vn">Quant Trading</a></td><td>Cú sốc −20% cần mấy phiên để phản ánh hết.</td></tr>
+    <tr><td>Đòn bẩy và thanh lý (crypto)</td><td><a href="quant-trading.html#crypto">Quant Trading</a></td><td>So xác suất thanh lý ở 10× và 3×.</td></tr>
+    <tr><td>Giá quyền chọn và Greeks</td><td><a href="quant-trading.html#quyen-chon">Quant Trading</a></td><td>Tăng σ rồi giảm thời gian đến hạn.</td></tr>
   </tbody>
 </table>
 <div class="callout note"><span class="callout-title">Minh họa là mô hình đồ chơi</span>Chúng giúp thấy cơ chế, không đại diện cho hiệu năng hệ thống thật. Chẳng hạn bảng logit trong minh họa giải mã do mình tự đặt, và trọng số attention dùng vector ngẫu nhiên nên không mang nghĩa ngôn ngữ. Phần mô tả của từng minh họa luôn nói rõ điều này.</div>
@@ -163,6 +178,7 @@ pip install mlflow fastapi uvicorn joblib pytest scipy   # bài MLOps</code></pr
     <tr><td>4. Hệ thống</td><td>Agentic AI, MLOps</td><td>Một agent chỉ đọc có phê duyệt của con người; dịch vụ FastAPI + Docker + CI + giám sát drift.</td></tr>
     <tr><td>5. Làm việc hiệu quả</td><td>Kết hợp AI (đọc song song với các giai đoạn trên)</td><td>Một <code>AGENTS.md</code> dùng chung và một quy trình review chéo cho dự án của bạn.</td></tr>
     <tr><td>6. An toàn hệ thống</td><td>An ninh mạng (đọc độc lập, không phụ thuộc các bước trên)</td><td>Một checklist phòng thủ cơ bản áp dụng cho chính máy/dự án của bạn.</td></tr>
+    <tr><td>7. Ứng dụng tài chính</td><td>Quant Trading (nên đọc sau Machine Learning; phần học máy cần nền đánh giá mô hình)</td><td>Một backtest giả lập có chi phí, kiểm định walk-forward và đếm số lần đã thử.</td></tr>
   </tbody>
 </table>
 <p>Quan trọng hơn thứ tự là vòng lặp: <strong>đọc → thử minh họa → làm bài tập → dựng dự án nhỏ và đưa lên GitHub</strong>.</p>

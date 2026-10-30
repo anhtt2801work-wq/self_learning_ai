@@ -116,7 +116,8 @@ img, svg, canvas { max-width: 100%; }
 
 @media (min-width: 861px) {
   .nav-tabs { margin-left: 2px; }
-  .nav-tabs a { padding: 8px 6px; font-size: .86rem; }
+  .nav-tabs a { padding: 8px 5px; font-size: .8rem; }
+  .icon-btn kbd, .icon-btn .btn-text { display: none; }   /* nhường chỗ cho 12 tab trên một hàng */
 }
 
 /* ===== Layout ===== */

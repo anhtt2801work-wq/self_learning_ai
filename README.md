@@ -15,6 +15,7 @@ Website tự học AI bằng tiếng Việt: từ công cụ làm việc (Git v�
 | MLOps | `mlops.html` | Tái lập, MLflow/DVC, kiểm thử, FastAPI/Docker, hàng đợi, A/B test, canary, PSI/drift, huấn luyện lại, LLMOps |
 | Kết hợp AI | `ket-hop-cong-cu-ai.html` | Kết hợp Claude, Gemini, Antigravity, Cursor, Copilot, Codex, Perplexity, Consensus: vai trò, AGENTS.md, MCP, review chéo, chi phí và bảo mật |
 | An ninh mạng | `cyber-security.html` | Khái niệm và phòng thủ: mạng/TCP, tường lửa, IDS/IPS, OWASP Top 10, pentest, Red/Blue Team, MITRE ATT&CK, mã độc, DFIR, quản trị rủi ro, kỹ thuật xã hội, mật mã học, 3 sự cố nổi tiếng |
+| Quant Trading | `quant-trading.html` | Học tập bằng trực giác và minh họa: đuôi dày, AR/GARCH, Sharpe nhiễu, backtest và overfitting, chi phí, Markowitz/Kelly, drawdown, học máy tài chính, vi cấu trúc, chứng khoán VN, crypto, quyền chọn |
 | Cách dùng | `huong-dan.html` | Hướng dẫn dùng website: chạy, phím tắt, minh họa, thêm nội dung, xuất bản |
 
 ## Chạy trên máy
@@ -34,7 +35,7 @@ Mở thẳng `index.html` bằng trình duyệt cũng chạy được (đã th�
 index.html, *.html          các trang nội dung
 assets/css/style.css        giao diện (sáng/tối)
 assets/js/site.js           header, tìm kiếm, mục lục, tô màu code, render công thức, khung minh họa
-assets/js/viz-*.js          minh họa tương tác theo từng chủ đề (git, ml, dl, cv, nlp, llm, agent, mlops, combo, cyber)
+assets/js/viz-*.js          minh họa tương tác theo từng chủ đề (git, ml, dl, cv, nlp, llm, agent, mlops, combo, cyber, quant)
 assets/js/search-index.js   chỉ mục tìm kiếm (được sinh tự động, đừng sửa tay)
 assets/vendor/katex/        KaTeX (MIT) để hiển thị công thức, đã đóng gói sẵn
 tools/                      kiểm tra, sinh chỉ mục, đặt mật khẩu
