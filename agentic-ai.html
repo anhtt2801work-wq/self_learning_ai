@@ -17,6 +17,8 @@
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-agent.js"></script>
 <script defer src="assets/js/viz-agent2.js"></script>
+<script defer src="assets/js/viz-econ-core.js"></script>
+<script defer src="assets/js/viz-econ-agent.js"></script>
 </head>
 <body data-page="agent">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -27,6 +29,7 @@
 <h1>Agentic AI</h1>
 <p class="lead">Một LLM thuần túy chỉ nhận văn bản và trả văn bản. Agentic AI đặt LLM vào một hệ thống có công cụ, bộ nhớ và vòng lặp để nó có thể hành động: tra cứu, chạy code, gọi API, sửa file, rồi nhìn kết quả và tiếp tục cho đến khi hoàn thành mục tiêu. Trang này tập trung vào cấu trúc kỹ thuật, độ tin cậy và an toàn.</p>
 <div class="callout warn"><span class="callout-title">Lĩnh vực mới và thay đổi rất nhanh</span>Thuật ngữ, framework và giao thức quanh agent thay đổi từng tháng. Nội dung ở đây nhấn vào các nguyên lý bền vững; hãy kiểm tra tài liệu chính thức của công cụ bạn chọn, và coi các tên cụ thể là ví dụ chứ không phải khuyến nghị.</div>
+<div class="callout tip"><span class="callout-title">Đọc trang này với nền kinh tế</span>Công thức và mã kiểm chứng được <strong>gập vào các khối “Xem công thức / Xem suy dẫn”</strong>. Các phép tương tự: ngữ cảnh gửi lại mỗi vòng = <em>phí phải trả cho mọi thứ đã tích lũy</em>; chuỗi nhiều bước = <em>first pass yield</em> trong sản xuất; bước kiểm chứng = <em>kiểm soát chất lượng/kiểm toán nội bộ</em>; phê duyệt của con người = <em>hạn mức phê duyệt theo giá trị giao dịch</em>; nhiều agent = <em>thuê thêm nhân sự cho dự án</em>.</div>
 
 <h2 id="agent-la-gi">Agent là gì? Workflow khác agent ra sao</h2>
 <p>Không có định nghĩa duy nhất. Một cách phân biệt hữu ích (theo bài viết “Building effective agents” của Anthropic, bạn nên đọc bản gốc):</p>
@@ -260,7 +263,7 @@ print(ans, "|", tr[0]["result"])</code></pre>
 </svg>
 <figcaption>Năm mẫu có cấu trúc, xếp từ đơn giản đến linh hoạt. Càng về sau càng khó dự đoán chi phí và độ trễ.</figcaption>
 </figure>
-<p><strong>Chi phí so sánh.</strong> Chaining: \(n\) lời gọi nối tiếp nên độ trễ cộng dồn. Parallelization: độ trễ gần bằng lời gọi chậm nhất nhưng chi phí nhân với số nhánh; bỏ phiếu đa số cho câu hỏi hai đáp án với mỗi mẫu đúng độc lập xác suất \(p=0.7\) cho \(0.784\) (3 mẫu), \(0.837\) (5 mẫu), \(0.901\) (9 mẫu), nhưng đó là cận trên vì lỗi của cùng một mô hình thường <em>tương quan</em>. Evaluator–optimizer: tối đa \(m\) vòng nên chi phí \(\le2m\) lời gọi. Orchestrator–workers: số lời gọi không biết trước, cần giới hạn cứng.</p>
+<p><strong>Chi phí so sánh.</strong> Chaining: các lời gọi nối tiếp nên độ trễ cộng dồn. Parallelization: độ trễ gần bằng lời gọi chậm nhất nhưng chi phí nhân với số nhánh; bỏ phiếu đa số cho câu hỏi hai đáp án, mỗi mẫu đúng 70% và độc lập, cho 78,4% (3 mẫu), 83,7% (5 mẫu), 90,1% (9 mẫu), nhưng đó là cận trên vì lỗi của cùng một mô hình thường <em>tương quan</em>. Evaluator–optimizer: tối đa m vòng nên chi phí không quá 2m lời gọi. Orchestrator–workers: số lời gọi không biết trước, cần giới hạn cứng.</p>
 <h2 id="bo-nho">Ngữ cảnh, bộ nhớ và lập kế hoạch</h2>
 <p>Với agent, việc quan trọng nhất của bạn là quyết định <strong>cái gì nằm trong ngữ cảnh ở mỗi vòng</strong> (đôi khi gọi là <em>context engineering</em>): chỉ dẫn hệ thống, định nghĩa công cụ, lịch sử, thông tin truy xuất, ghi chú tạm. Ngữ cảnh có giới hạn và càng dài càng đắt, chậm và dễ nhiễu.</p>
 <ul>
@@ -271,12 +274,20 @@ print(ans, "|", tr[0]["result"])</code></pre>
 </ul>
 
 <h3 id="chi-phi-ngu-canh">Chi phí ngữ cảnh: vì sao tăng bậc hai</h3>
+<p>Mỗi vòng agent gửi lại <em>toàn bộ</em> lịch sử, nên tổng số token phải xử lý tăng gần như <strong>bình phương</strong> theo số bước dù ngữ cảnh chỉ dài thêm đều đặn, giống tính phí trên một khối lượng ngày càng phình ra: mỗi kỳ bạn lại trả cho mọi thứ đã tích lũy. Ví dụ chỉ dẫn 6.000 token, mỗi bước thêm 200 token mô hình sinh và 1.500 token kết quả công cụ, chạy 30 bước: tổng cộng 919.500 token đầu vào dù ngữ cảnh ở bước cuối chỉ 55.300. Nhiều nhà cung cấp có <em>bộ nhớ đệm tiền tố</em> tính phần đã gửi ở vòng trước với giá đọc cache rẻ hơn nhiều; điều kiện là phần đầu ngữ cảnh phải giống hệt từng byte, nên nếu bạn sửa lịch sử cũ (rút gọn, tóm tắt) thì phần sau chỗ sửa mất cache. Hãy xem đánh đổi này:</p>
+<details class="derivation">
+  <summary>Xem công thức tổng token đầu vào</summary>
+  <div class="dv-body">
 <p>Vì mỗi vòng gửi lại toàn bộ lịch sử, ở bước \(t\) mô hình đọc \(I_t=S_0+(t-1)(a+r)\) token, với \(S_0\) là chỉ dẫn và định nghĩa công cụ, \(a\) là văn bản mô hình sinh mỗi bước, \(r\) là kết quả công cụ mỗi bước. Tổng token đầu vào phải xử lý sau \(T\) bước là</p>
 $$\sum_{t=1}^{T}I_t=T\,S_0+(a+r)\frac{T(T-1)}{2}$$
-<p>nên <strong>chi phí tăng gần như bình phương theo số bước</strong> dù ngữ cảnh chỉ tăng tuyến tính. Ví dụ \(S_0=6000\), \(a=200\), \(r=1500\), \(T=30\): \(180{,}000+1700\cdot435=919{,}500\) token đầu vào, dù ngữ cảnh ở bước cuối chỉ \(55{,}300\). Nhiều nhà cung cấp có <em>bộ nhớ đệm tiền tố</em> (prompt caching) tính phần đã gửi ở vòng trước với giá đọc cache rẻ hơn nhiều; điều kiện là phần đầu ngữ cảnh phải <em>giống hệt</em> byte-by-byte, nên nếu bạn sửa lịch sử cũ (rút gọn, tóm tắt) thì phần sau chỗ sửa mất cache. Hãy xem đánh đổi này:</p>
+  </div>
+</details>
 <div class="viz" data-viz="ctx1" data-title="Ngữ cảnh và chi phí đầu vào theo ba cách quản lý lịch sử">
   <p class="viz-help">Kéo số bước, kích thước kết quả công cụ và hệ số giá đọc cache. Đặt hệ số = 1 để mô phỏng không có cache. Quan sát khi nào “giữ toàn bộ” vượt cửa sổ, và khi nào việc rút gọn thật sự rẻ hơn.</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã mô phỏng ba cách quản lý ngữ cảnh</summary>
+  <div class="dv-body">
 <pre><code class="language-python">def context_sizes(T, S0, a, r, strategy="full", K=3, stub=30, M=10, summary=800):
     """Kích thước ngữ cảnh (token) gửi vào mô hình ở bước t = 1..T, kèm phần tiền tố giống hệt bước trước (cache được)."""
     sizes, cached = [], []
@@ -303,6 +314,8 @@ T, S0, a, r = 30, 6000, 200, 1500
 for s in ("full", "trim", "summary"):
     sz, ca = context_sizes(T, S0, a, r, s)
     print(f"{s:8s} bước cuối={sz[-1]:&gt;7,d}  tổng token đầu vào={sum(sz):&gt;9,d}  chi phí không cache={sum(sz):&gt;9,d}  chi phí cache 10%={input_cost(sz, ca):&gt;9,.0f}")</code></pre>
+  </div>
+</details>
 <p>Kết quả mô hình trên: không cache, rút gọn và tóm tắt cắt token đầu vào hơn một nửa; nhưng khi có cache 10%, “giữ toàn bộ” rẻ hơn rút gọn kết quả cũ (vì rút gọn làm vỡ cache mỗi bước) và tóm tắt theo chu kỳ vẫn rẻ nhất vì chỉ vỡ cache mỗi 10 bước. Đây là mô hình có chủ đích đơn giản (bỏ qua phụ phí ghi cache và chi phí gọi tóm tắt); hãy đo trên hệ thống thật và đọc bảng giá hiện hành.</p>
 <h3 id="so-sanh-bo-nho">So sánh các lựa chọn bộ nhớ và lập kế hoạch</h3>
 <table>
@@ -314,17 +327,26 @@ for s in ("full", "trim", "summary"):
     <tr><td>Ghi chú ngoài ngữ cảnh (file, DB, kho vector)</td><td>Bền qua các phiên, tra cứu có chọn lọc</td><td>Phải thiết kế khi nào ghi/đọc; có thể lỗi thời hoặc sai</td><td>Tác vụ nhiều phiên, tri thức tích lũy</td></tr>
     <tr><td>ReAct (suy luận từng bước)</td><td>Thích nghi tức thì với kết quả công cụ</td><td>Dễ lạc hướng ở tác vụ dài, mỗi bước tốn một lời gọi</td><td>Việc ngắn, nhiều bất định</td></tr>
     <tr><td>Plan-and-execute</td><td>Có kế hoạch rõ, dễ theo dõi, người xem duyệt được</td><td>Kế hoạch ban đầu có thể sai nên cần cơ chế lập lại kế hoạch</td><td>Tác vụ nhiều bước có cấu trúc</td></tr>
-    <tr><td>Tìm kiếm trên cây suy luận (như Tree of Thoughts)</td><td>Khám phá nhiều hướng, quay lui được</td><td>Chi phí nhân với hệ số nhánh: \(b^d\) nút nếu mở rộng đủ</td><td>Bài toán có bộ chấm điểm trạng thái tin cậy</td></tr>
+    <tr><td>Tìm kiếm trên cây suy luận (như Tree of Thoughts)</td><td>Khám phá nhiều hướng, quay lui được</td><td>Chi phí nhân với hệ số nhánh: <em>b</em><sup><em>d</em></sup> nút nếu mở rộng đủ</td><td>Bài toán có bộ chấm điểm trạng thái tin cậy</td></tr>
   </tbody>
 </table>
 <h2 id="da-agent">Hệ nhiều agent</h2>
 <p>Chia việc cho nhiều agent chuyên biệt (một agent nghiên cứu, một viết code, một kiểm tra) có lợi khi các nhánh việc độc lập có thể chạy song song, hoặc khi mỗi nhánh cần ngữ cảnh riêng để không làm “ô nhiễm” ngữ cảnh chung. Cái giá: số token và chi phí tăng, thêm lỗi phối hợp (hiểu sai yêu cầu giữa các agent), khó gỡ lỗi hơn. Hãy chứng minh bằng đo đạc rằng thiết kế nhiều agent thắng giải pháp một agent trước khi chọn nó.</p>
 
 <h3 id="da-agent-chi-phi">Mô hình hóa lợi ích và chi phí</h3>
+<p>Thêm worker giống <strong>thuê thêm nhân sự cho một dự án</strong>: phần việc làm song song được thì xong nhanh hơn, nhưng phần tuần tự giới hạn tốc độ tối đa (luật Amdahl), và mỗi người mới phải được “đào tạo” lại bối cảnh chung nên tốn thêm token. Ví dụ 100.000 token công việc, 80% song song hóa được, bối cảnh chung 8.000 token, tổng hợp 4.000 token, 4 worker: nhanh khoảng 2,27 lần trong khi token tăng 1,36 lần. Lỗi phối hợp giữa các agent không có trong phép tính này.</p>
+<details class="derivation">
+  <summary>Xem công thức tăng tốc và chi phí token</summary>
+  <div class="dv-body">
 <p>Giả sử công việc đòi hỏi \(W\) token xử lý. Một agent làm tuần tự: độ trễ tương đối \(\propto W\), chi phí \(\propto W\). Với \(k\) worker, nếu một tỉ lệ \(P\) của việc song song hóa được, độ trễ còn \((1-P)W+PW/k+S\) (\(S\) là token tổng hợp tuần tự), tức tăng tốc \(\dfrac{W}{(1-P)W+PW/k+S}\) (định luật Amdahl khi \(S=0\), giới hạn \(1/(1-P)\) dù thêm bao nhiêu worker). Nhưng mỗi worker thường phải <em>nạp lại ngữ cảnh chung</em> \(C\), nên tổng token là \(W+kC+S\). Ví dụ \(W=100{,}000\), \(P=0.8\), \(C=8000\), \(S=4000\), \(k=4\): tăng tốc \(100/(20+20+4)\approx2.27\times\) trong khi token gấp \(1.36\times\). Đó mới là lợi thế “thuần số học”; lỗi phối hợp giữa các agent thì không có trong công thức.</p>
+  </div>
+</details>
 <div class="viz" data-viz="multi1" data-title="Tăng tốc và chi phí token khi thêm worker">
   <p class="viz-help">Thử P thấp (ít việc song song hóa được) và C lớn (ngữ cảnh chung nặng): thêm worker gần như chỉ tốn thêm token mà không nhanh hơn.</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã tính tăng tốc và chi phí nhiều agent</summary>
+  <div class="dv-body">
 <pre><code class="language-python">def multi_agent(W, P, k, C, S):
     """W: tổng token làm việc; P: tỉ lệ có thể song song; k: số worker; C: ngữ cảnh chung mỗi worker phải nạp lại; S: token tổng hợp."""
     t1 = W                                             # độ trễ ~ số token tuần tự (đơn vị tương đối)
@@ -336,9 +358,17 @@ for k in (1, 2, 4, 8):
     sp, cr = multi_agent(W=100_000, P=0.8, k=k, C=8_000, S=4_000)
     print(f"k={k}: tăng tốc {sp:.2f}x, token gấp {cr:.2f}x")
 print("giới hạn Amdahl khi P=0.8:", round(1 / (1 - 0.8), 2))</code></pre>
+  </div>
+</details>
 <p>Kết luận thực dụng: nhiều agent đáng giá khi (1) việc chia nhỏ thật sự độc lập (tìm tài liệu ở nhiều nguồn song song), (2) từng nhánh cần ngữ cảnh riêng hoặc quyền riêng (cách ly rủi ro), hoặc (3) độ trễ quan trọng hơn chi phí. Với việc phụ thuộc chặt (sửa một hàm trong codebase), một agent mạnh thường đơn giản và rẻ hơn.</p>
+
+<h3 id="don-vi-kinh-te">Đơn vị kinh tế của một tác vụ: agent hay người?</h3>
+<p>Câu hỏi kinh doanh không phải “agent có làm được không” mà là <strong>chi phí kỳ vọng để hoàn thành một tác vụ</strong> thấp hơn làm bằng người hay không. Chi phí đó gồm tiền token (tăng gần bậc hai theo số bước), tiền người duyệt, số lần phải chạy lại khi thất bại, và phần tác vụ cuối cùng vẫn phải chuyển cho người. Đây là tính đơn vị kinh tế (unit economics) quen thuộc:</p>
+<div class="viz" data-viz="agentroi1" data-title="Agent hay người: chi phí mỗi tác vụ hoàn thành">
+  <p class="viz-help">Kéo tỉ lệ thành công và số lần thử lại, rồi thử tăng chi phí người duyệt. Vạch đen là chi phí làm bằng người; chỗ đường cong cắt vạch đen là ngưỡng đáng dùng agent. Các giá có dấu ✱ là giả định minh họa.</p>
+</div>
 <h2 id="do-tin-cay">Độ tin cậy: sai số tích lũy</h2>
-<p>Nếu mỗi bước đúng với xác suất \(p\) và các bước độc lập, thì cả chuỗi \(n\) bước đúng với xác suất \(p^n\). Con số này giảm nhanh một cách đáng lo:</p>
+<p>Nếu mỗi bước đúng với xác suất p và các bước độc lập, cả chuỗi n bước đúng với xác suất p lũy thừa n. Ví dụ p = 95%, n = 20: chỉ còn khoảng 36%. Đây giống <strong>tỉ lệ đạt ngay lần đầu (first pass yield)</strong> của một dây chuyền: 20 công đoạn, mỗi công đoạn đạt 95%, thì chỉ khoảng 36% sản phẩm đi hết dây chuyền mà không phải làm lại. Con số này giảm nhanh một cách đáng lo:</p>
 <div class="viz" data-viz="err1" data-title="Xác suất cả chuỗi thành công = pⁿ"></div>
 <p>Từ đó rút ra các nguyên tắc thiết kế:</p>
 <ul>
@@ -348,15 +378,23 @@ print("giới hạn Amdahl khi P=0.8:", round(1 / (1 - 0.8), 2))</code></pre>
   <li><strong>Đưa con người vào đúng chỗ</strong> (phê duyệt trước hành động không thể hoàn tác).</li>
 </ul>
 <h3 id="kiem-chung-thu-lai">Kiểm chứng và thử lại: mô hình xác suất</h3>
+<p>Thêm một bước kiểm chứng (chạy kiểm thử, kiểm tra schema, đối chiếu cơ sở dữ liệu) giống thêm <strong>kiểm soát chất lượng hoặc kiểm toán nội bộ</strong>: nó bắt được phần lớn sai sót (xác suất d), đôi khi từ chối nhầm hàng tốt (xác suất f), và vẫn để lọt một phần lỗi. Ví dụ mỗi bước đúng 95%, chuỗi 20 bước, bộ kiểm chứng bắt được 80% lỗi và từ chối nhầm 5% bước đúng, cho thử lại tối đa 2 lần: không kiểm chứng thì cả chuỗi đúng 35,9%; có kiểm chứng thì đúng 79,2%, nhưng <strong>vẫn có 19,7% lỗi lọt qua</strong> và chỉ 1,2% dừng để người xử lý. Chất lượng của bộ kiểm chứng (d) mới là yếu tố quyết định, và giả định các bước độc lập là rất mạnh.</p>
+<details class="derivation">
+  <summary>Xem mô hình xác suất kiểm chứng và thử lại</summary>
+  <div class="dv-body">
 <p>Thêm một bước kiểm chứng (chạy kiểm thử, kiểm tra schema, đối chiếu cơ sở dữ liệu) thay đổi hình dạng của lỗi chứ không xóa nó. Mô hình mỗi bước: một lần thử đúng với xác suất \(p\); bộ kiểm chứng bắt được đáp án sai với xác suất \(d\) và từ chối nhầm đáp án đúng với xác suất \(f\); cho phép tối đa \(r\) lần thử lại. Trong một lần thử:</p>
 $$a_c=p(1-f),\qquad a_w=(1-p)(1-d),\qquad \rho=pf+(1-p)d$$
-<p>Ở đây \(a_c\) là xác suất chấp nhận đáp án đúng, \(a_w\) là xác suất chấp nhận đáp án sai (lỗi lọt qua), \(
-ho\) là xác suất bị từ chối. Sau tối đa \(r+1\) lần thử, với \(G=\sum_{i=0}^{r}\rho^i=\dfrac{1-\rho^{r+1}}{1-\rho}\) (cũng là số lần thử kỳ vọng):</p>
+<p>Ở đây \(a_c\) là xác suất chấp nhận đáp án đúng, \(a_w\) là xác suất chấp nhận đáp án sai (lỗi lọt qua), \(\rho\) là xác suất bị từ chối. Sau tối đa \(r+1\) lần thử, với \(G=\sum_{i=0}^{r}\rho^i=\dfrac{1-\rho^{r+1}}{1-\rho}\) (cũng là số lần thử kỳ vọng):</p>
 $$P_{\mathrm{ok}}=a_c\,G,\qquad P_{\mathrm{slip}}=a_w\,G,\qquad P_{\mathrm{stop}}=\rho^{\,r+1}$$
 <p>(ba xác suất cộng lại bằng 1). Với chuỗi \(n\) bước, xét <em>sự kiện bất thường đầu tiên</em> (không phải “đúng”): xác suất cả chuỗi đúng \(=P_{\mathrm{ok}}^n\); lỗi đầu tiên là lỗi lọt qua \(=P_{\mathrm{slip}}\dfrac{1-P_{\mathrm{ok}}^n}{1-P_{\mathrm{ok}}}\); lỗi đầu tiên được phát hiện rồi dừng để con người xử lý \(=P_{\mathrm{stop}}\dfrac{1-P_{\mathrm{ok}}^n}{1-P_{\mathrm{ok}}}\). Ví dụ \(p=0.95\), \(n=20\), \(d=0.8\), \(f=0.05\), \(r=2\): không kiểm chứng đúng \(0.359\); có kiểm chứng đúng \(0.792\), nhưng <strong>vẫn có \(0.197\) lỗi lọt qua</strong> vì \(d<1\) và chỉ \(0.012\) dừng để người xử lý. Bài học: kiểm chứng rất đáng làm, nhưng chất lượng của bộ kiểm chứng (\(d\)) mới là yếu tố quyết định, và các giả định độc lập là rất mạnh.</p>
+  </div>
+</details>
 <div class="viz" data-viz="rel2" data-title="Kiểm chứng và thử lại làm thay đổi độ tin cậy của chuỗi như thế nào">
   <p class="viz-help">Đặt d = 0 để thấy kiểm chứng vô dụng; đặt f lớn để thấy chi phí của việc từ chối nhầm; tăng số lần thử lại để xem lợi ích giảm dần.</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã tính và mô phỏng Monte Carlo kiểm chứng + thử lại</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import numpy as np
 
 def step_outcomes(p, d, f, r):
@@ -401,6 +439,8 @@ print("mô phỏng:", {k: round(res.count(k) / len(res), 4) for k in "CWV"})
 from math import comb
 vote = lambda p, k: sum(comb(k, j) * p**j * (1 - p)**(k - j) for j in range(k // 2 + 1, k + 1))
 print([round(vote(0.7, k), 3) for k in (1, 3, 5, 9)])      # lưu ý: lỗi thực tế thường tương quan nên kém hơn con số này</code></pre>
+  </div>
+</details>
 <h3 id="danh-gia">Đánh giá agent</h3>
 <ul>
   <li>Xây <strong>bộ tác vụ kiểm thử</strong> có tiêu chí thành công kiểm tra được tự động (file đúng được tạo, bản ghi đúng được cập nhật). Chạy mỗi tác vụ nhiều lần vì đầu ra ngẫu nhiên.</li>
@@ -410,8 +450,17 @@ print([round(vote(0.7, k), 3) for k in (1, 3, 5, 9)])      # lưu ý: lỗi th�
 </ul>
 
 <h3 id="danh-gia-so">Đo đạc đánh giá cho đúng</h3>
+<p>Chạy một tác vụ n lần và thấy k lần thành công cho ước lượng k/n, nhưng với n nhỏ sai số rất lớn, như một khảo sát mẫu nhỏ có biên sai số rộng: 14/20 thành công cho khoảng tin cậy 95% khoảng 48%–86%, còn 140/200 (cùng tỉ lệ 70%) thu hẹp còn khoảng 63%–76%. Nếu hai phiên bản agent chỉ khác nhau vài điểm phần trăm trên vài chục lần chạy, bạn chưa biết bản nào tốt hơn. Cũng nhớ <strong>năng lực và độ tin cậy là hai thước đo khác nhau</strong>: với tác vụ thành công 80% mỗi lần, ít nhất một trong 5 lần thành công (hợp khi chọn kết quả tốt nhất) là gần 99,97%, nhưng cả 5 lần đều thành công (hợp với dịch vụ phải đáng tin mọi lần) chỉ khoảng 32,8%. Chi phí hiệu dụng của một thành công bằng chi phí mỗi lần chạy chia cho tỉ lệ thành công.</p>
+<details class="derivation">
+  <summary>Xem công thức khoảng Wilson, pass@k và pass^k</summary>
+  <div class="dv-body">
 <p><strong>Khoảng tin cậy.</strong> Chạy một tác vụ \(n\) lần và thấy \(k\) lần thành công cho ước lượng \(\hat p=k/n\), nhưng với \(n\) nhỏ sai số rất lớn. Khoảng Wilson 95%: \(\dfrac{\hat p+\frac{z^2}{2n}\pm z\sqrt{\frac{\hat p(1-\hat p)}{n}+\frac{z^2}{4n^2}}}{1+z^2/n}\) với \(z=1.96\). 14/20 thành công cho khoảng khoảng \([0.48,\,0.86]\); 140/200 (cùng tỉ lệ 0.7) thu hẹp còn \([0.63,\,0.76]\). Nếu hai phiên bản agent chỉ khác nhau vài điểm phần trăm trên vài chục lần chạy, bạn chưa biết bản nào tốt hơn.</p>
 <p><strong>Năng lực và độ tin cậy là hai thước đo khác nhau.</strong> Nếu mỗi lần chạy một tác vụ thành công độc lập với xác suất \(p\): \(\text{pass@}k=1-(1-p)^k\) (ít nhất một trong \(k\) lần thành công, hợp khi bạn chọn kết quả tốt nhất), còn \(\text{pass}^k=p^k\) (cả \(k\) lần đều thành công, hợp với dịch vụ phải đáng tin mọi lần; thước đo này được dùng trong một số benchmark agent như τ-bench, mình nhớ vậy, hãy kiểm tra bài gốc). Với \(p=0.8\), \(k=5\): pass@5 \(\approx0.9997\) nhưng pass\(^5\approx0.328\). Một agent “có thể làm được” chưa chắc “làm được ổn định”. Cuối cùng, chi phí hiệu dụng của một thành công là chi phí mỗi lần chạy chia cho tỉ lệ thành công (thử lại cho đến khi thành công tốn \(1/p\) lần chạy kỳ vọng).</p>
+  </div>
+</details>
+<details class="derivation">
+  <summary>Xem mã tính khoảng Wilson, pass@k và pass^k</summary>
+  <div class="dv-body">
 <pre><code class="language-python">from math import sqrt
 
 def wilson(k, n, z=1.96):
@@ -429,6 +478,8 @@ p, k = 0.8, 5                                            # mỗi lần chạy t�
 print("pass@5 =", round(1 - (1 - p)**k, 4), "  pass^5 =", round(p**k, 4))
 # pass@k: "ít nhất một trong k lần thành công" (hợp với việc người dùng chọn kết quả tốt nhất)
 # pass^k: "cả k lần đều thành công" (hợp với dịch vụ phải đáng tin mọi lần)</code></pre>
+  </div>
+</details>
 <h2 id="an-toan">An toàn và kiểm soát</h2>
 <p>Agent có thể hành động trong thế giới thật, nên sai sót không chỉ là câu trả lời xấu mà có thể là xóa dữ liệu, gửi nhầm email, tiêu tiền.</p>
 <h3 id="prompt-injection">Prompt injection gián tiếp</h3>
@@ -458,9 +509,17 @@ print("pass@5 =", round(1 - (1 - p)**k, 4), "  pass^5 =", round(p**k, 4))
   <li><strong>Coi nội dung truy xuất là dữ liệu</strong>, không phải mệnh lệnh; đánh dấu rõ ranh giới trong prompt (giảm nhưng không loại bỏ rủi ro).</li>
   <li><strong>Ghi log kiểm toán</strong> mọi hành động có tác dụng phụ.</li>
 </ul></div>
+<h3 id="kiem-soat-noi-bo">Phê duyệt như kiểm soát nội bộ: duyệt cái gì, bỏ qua cái gì?</h3>
+<p>Phê duyệt của con người tốn tiền và làm chậm, nên không thể duyệt mọi hành động. Cách nghĩ của kiểm soát nội bộ: <strong>hạn mức theo giá trị</strong>. Hành động nhỏ để agent tự làm, hành động lớn cần người ký, và ngưỡng đúng được quyết định bằng so sánh phí duyệt với lỗi kỳ vọng tránh được:</p>
+<div class="viz" data-viz="approval1" data-title="Hạn mức phê duyệt cho agent: ngưỡng nào rẻ nhất?">
+  <p class="viz-help">Kéo ngưỡng giá trị. Thử tăng tỉ lệ agent làm sai hoặc giảm phí duyệt: ngưỡng tối ưu dịch xuống (duyệt nhiều hơn). Chấm xanh lá là ngưỡng rẻ nhất trong mẫu mô phỏng.</p>
+</div>
 
 <h3 id="chinh-sach-quyen">Chính sách quyền hạn bằng code</h3>
 <p>Đừng chỉ viết “hãy cẩn thận” trong prompt; hãy đặt rào chắn trong code mà mô hình không thể thương lượng. Ví dụ: công cụ có tác dụng phụ cần người phê duyệt, và tham số quan trọng phải nằm trong danh sách cho phép; danh sách cho phép áp dụng <em>kể cả khi</em> có người bấm duyệt (người duyệt cũng có thể bị đánh lừa bởi nội dung hiển thị).</p>
+<details class="derivation">
+  <summary>Xem mã chính sách quyền hạn (phê duyệt + allowlist)</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import functools
 
 def tool(side_effects=False, allow=None):
@@ -487,6 +546,8 @@ print(read_email(msg_id=7))
 print(send_email(to="attacker@evil.test", body="...", approve=lambda d: True))     # bị chặn bởi allowlist, kể cả khi có người bấm duyệt
 print(send_email(to="boss@example.com", body="..."))                               # chưa duyệt
 print(send_email(to="boss@example.com", body="...", approve=lambda d: True))       # hợp lệ</code></pre>
+  </div>
+</details>
 
 <h2 id="du-an">Lộ trình dự án gợi ý</h2>
 <ol>

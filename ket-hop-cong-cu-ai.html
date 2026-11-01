@@ -16,6 +16,8 @@
 <script defer src="assets/js/search-index.js"></script>
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-combo.js"></script>
+<script defer src="assets/js/viz-econ-core.js"></script>
+<script defer src="assets/js/viz-econ-combo.js"></script>
 </head>
 <body data-page="combo">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -35,6 +37,7 @@
   <li><span class="conf low">✱</span> nguồn thứ cấp hoặc chưa xác nhận. Hãy kiểm tra bằng <code>--help</code> hoặc tài liệu hiện hành trước khi dựa vào.</li>
 </ul>
 <p>Hai điều mình chưa biết: <strong>Evose</strong> là sản phẩm nào (tìm kiếm chỉ ra các sản phẩm tên gần giống nhưng không khớp rõ ràng, xem phần cuối mục 1), và bạn có <strong>gói Copilot</strong> hay <strong>gói Cursor</strong> nào (bạn nêu gói Claude Pro, Gemini Pro, Perplexity Pro). Phần gợi ý bên dưới không giả định hai điều đó.</p></div>
+<div class="callout tip"><span class="callout-title">Đọc trang này với nền kinh tế</span>Chọn bộ công cụ AI là <strong>bài toán đầu tư</strong>: mỗi thuê bao chỉ đáng tiền nếu số giờ nó tiết kiệm nhân với giá một giờ của bạn lớn hơn phí (và công cụ thứ hai chỉ được tính phần <em>giá trị biên</em>); review chéo giống <strong>kiểm toán độc lập</strong>, chỉ đáng trả thêm khi người kiểm tra nhìn theo cách khác. Công thức được <strong>gập vào các khối “Xem …”</strong>.</div>
 
 <h2 id="ban-do">1. Bản đồ công cụ: ai làm vai gì</h2>
 <p>Cách nghĩ hữu ích: chia công cụ theo <strong>vai</strong> hơn là theo thương hiệu. Có công cụ <em>hỗ trợ khi gõ</em> (gợi ý từng dòng), công cụ <em>tác tử trong kho mã</em> (đọc cả dự án, sửa nhiều file, chạy lệnh), công cụ <em>nghiên cứu có trích dẫn</em> và công cụ <em>làm việc trên nguồn của bạn</em>. Một công cụ có thể giữ nhiều vai, nhưng bạn nên chọn <strong>một công cụ chính cho mỗi vai</strong> và thêm công cụ thứ hai chỉ để kiểm tra chéo.</p>
@@ -90,12 +93,25 @@
   <li><strong>Một người điều phối</strong>: bạn (hoặc một tác tử) chia việc cho công cụ khác, ví dụ Claude Code gọi CLI khác bằng lệnh không tương tác. Hợp để tự động hóa, nhưng chú ý chi phí và an toàn (mục 6).</li>
 </ol>
 <h3 id="toan-review">Vì sao review chéo hữu ích, và giới hạn của nó</h3>
+<p>Review chéo giống <strong>kiểm toán độc lập</strong>: hai người kiểm tra bắt được nhiều lỗi hơn một người, nhưng chỉ khi họ sai <em>khác kiểu</em> nhau. Nếu cả hai hay bỏ sót đúng cùng những lỗi (tương quan cao), người thứ hai gần như không thêm gì, như thuê hai kiểm toán viên cùng trường phái và cùng quy trình. Ví dụ giả định (không phải số đo): người 1 bắt được 60% lỗi, người 2 bắt được 50%. Nếu độc lập, xác suất bắt được ít nhất một người là 80%; nếu tương quan 0,5 thì còn 67,75%; nếu tương quan 1 (luôn sót cùng lỗi) thì chỉ 60%, đúng bằng người giỏi hơn làm một mình.</p>
+<details class="derivation">
+  <summary>Xem công thức xác suất cả hai cùng bỏ sót</summary>
+  <div class="dv-body">
 <p>Giả sử người review 1 bắt được một lỗi với xác suất \(d_1\), người 2 với \(d_2\). Đặt \(m_i=1-d_i\) là xác suất bỏ sót. Nếu hai lần bỏ sót là độc lập, xác suất <em>cả hai cùng sót</em> là \(m_1m_2\), nên xác suất bắt được ít nhất một người là \(1-m_1m_2\). Với \(d_1=0.6\), \(d_2=0.5\): \(1-0.4\cdot0.5=0.8\). Nhưng hai mô hình thường sai theo cùng một kiểu. Gọi \(\rho\) là tương quan giữa hai biến “bỏ sót” (Bernoulli); khi đó</p>
 $$P_{\mathrm{both}}=m_1m_2+\rho\sqrt{m_1(1-m_1)\,m_2(1-m_2)}$$
 <p>(bị chặn trong miền khả dĩ \([\max(0,m_1+m_2-1),\ \min(m_1,m_2)]\)). Với cùng \(d_1,d_2\): \(\rho=0.5\) cho 0.6775; \(\rho=1\) (luôn sót cùng lỗi) cho 0.6, đúng bằng người giỏi hơn một mình, tức thêm người thứ hai không mang lại gì. Các giá trị này là <strong>giả định minh họa</strong>, không phải số đo của công cụ nào; mức \(\rho\) thật phải đo trên lỗi thật của bạn. Kết luận thực dụng: cho thêm một người review chỉ có giá trị khi nó <em>sai khác kiểu</em> với người kia, và kiểm thử chạy thật là “người review” có \(\rho\) thấp nhất vì nó kiểm tra bằng cách thực thi.</p>
+  </div>
+</details>
 <div class="viz" data-viz="xrev1" data-title="Hai người review: xác suất bắt được lỗi theo mức tương quan">
   <p class="viz-help">Kéo ρ từ 0 lên 1 và quan sát: lợi ích so với người giỏi hơn biến mất. Thử đặt d₂ rất thấp: người review yếu gần như không thêm gì dù độc lập.</p>
 </div>
+<p>Còn một câu hỏi thực tế hơn: người review thứ hai có <strong>đáng tiền</strong> không? Lợi ích là số lỗi lọt giảm đi nhân với thiệt hại mỗi lỗi, so với chi phí một lần review thêm; mức tương quan quyết định lợi ích đó:</p>
+<div class="viz" data-viz="review2roi1" data-title="Người review thứ hai: đáng trả tiền khi nào?">
+  <p class="viz-help">Kéo ρ từ 0 lên 1 và xem giá trị ròng mỗi tháng đổi dấu ở đâu (vạch xanh lá). Thử tăng thiệt hại mỗi lỗi lọt hoặc giảm chi phí review. Mọi con số là giả định minh họa.</p>
+</div>
+<details class="derivation">
+  <summary>Xem mã tính xác suất cả hai cùng sót và kiểm tra bằng mô phỏng</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import numpy as np
 
 def both_miss(m1, m2, rho):
@@ -118,6 +134,8 @@ draws = rng.choice(4, size=400_000, p=[p11, p10, p01, p00])      # 0: cả hai b
 print("mô phỏng bắt được ít nhất một:", round(float(np.mean(draws != 0)), 4))
 x1, x2 = (draws == 0) | (draws == 1), (draws == 0) | (draws == 2)
 print("tương quan mẫu:", round(float(np.corrcoef(x1, x2)[0, 1]), 3))</code></pre>
+  </div>
+</details>
 
 <h2 id="keo-dinh">3. Keo dính: tệp chỉ dẫn, MCP và Git</h2>
 <p>Muốn nhiều công cụ phối hợp mà không ép bạn chép tay ngữ cảnh, cần ba thứ dùng chung: <strong>chỉ dẫn dự án</strong>, <strong>công cụ/dữ liệu bên ngoài</strong> (MCP) và <strong>kho mã làm trung tâm</strong>.</p>
@@ -282,6 +300,11 @@ jobs:
   <li><strong>Đặt trần cho chạy tự động</strong>: số lượt, thời gian, ngân sách (Claude Code có <code>--max-budget-usd</code> <span class="conf ok">✔</span>); với CI đặt timeout.</li>
   <li><strong>Đo xem có đáng không</strong>: theo dõi trong vài tuần thời gian hoàn thành, số vòng sửa, lỗi lọt sau khi merge, chi phí. Nếu so hai cách làm, nhớ rằng cần đủ số mẫu mới kết luận được (xem phần A/B test ở trang <a href="mlops.html#ab-suy-dan">MLOps</a>).</li>
 </ul>
+<h3 id="roi-cong-cu">Có đáng trả tiền không? Bài toán hoàn vốn của bộ công cụ</h3>
+<p>“Tránh trả hai lần cho cùng một vai” là lời khuyên nghe hợp lý, nhưng con số mới thuyết phục. Công cụ đầu tiên cho một vai thường dễ có lãi; công cụ thứ hai cho cùng vai chỉ được tính phần <em>tiết kiệm thêm</em> (giá trị biên) so với công cụ đã có:</p>
+<div class="viz" data-viz="toolroi1" data-title="Thuê bao công cụ AI: giá trị ròng mỗi tháng">
+  <p class="viz-help">Hai đường là giá trị ròng của công cụ chính và công cụ thứ hai theo tỉ lệ thời gian tiết kiệm; chấm là mức bạn đặt, vạch đứt là điểm hòa vốn. Mọi giá có dấu ✱ là giả định, hãy thay bằng giá thật và số giờ bạn tự đo.</p>
+</div>
 
 <h2 id="bao-mat">6. Bảo mật và an toàn khi nhiều công cụ cùng làm</h2>
 <ul>
