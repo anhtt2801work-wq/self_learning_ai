@@ -17,6 +17,8 @@
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-git.js"></script>
 <script defer src="assets/js/viz-git2.js"></script>
+<script defer src="assets/js/viz-econ-core.js"></script>
+<script defer src="assets/js/viz-econ-git.js"></script>
 </head>
 <body data-page="github">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -26,6 +28,7 @@
 
 <h1>Hướng dẫn Git và GitHub</h1>
 <p class="lead">Mọi dự án AI nghiêm túc đều cần quản lý phiên bản: code thí nghiệm thay đổi liên tục, bạn cần quay lại bản chạy tốt, làm việc nhóm và chia sẻ kết quả. Trang này đưa bạn từ con số 0 đến quy trình làm việc thực tế trên GitHub.</p>
+<div class="callout tip"><span class="callout-title">Đọc trang này với nền kinh tế</span>Git là một <strong>sổ cái bất biến</strong>: mỗi commit như một bút toán có “dấu vân tay” riêng, sửa quá khứ thì lộ ngay; <code>git bisect</code> là <strong>kiểm toán chọn điểm giữa sổ</strong> để tìm bút toán sai đầu tiên; GitHub Actions là bài toán <strong>chi phí máy so với thời gian chờ của nhân sự</strong>. Các lệnh kiểm chứng chi tiết được <strong>gập vào khối “Xem …”</strong>.</div>
 
 <h2 id="tong-quan">Git và GitHub khác nhau thế nào?</h2>
 <ul>
@@ -107,6 +110,10 @@ git diff --staged                # thay đổi đã staged</code></pre>
     <tr><td>tag</td><td>Nhãn có chú thích, trỏ tới một đối tượng khác.</td><td><code>git tag -a v1.0</code></td></tr>
   </tbody>
 </table>
+<p>Ý tưởng cốt lõi giống một sổ cái: mỗi đối tượng có một “dấu vân tay” (mã băm SHA-1) tính từ chính nội dung của nó, nên đổi một ký tự là dấu vân tay đổi hoàn toàn. Bạn có thể kiểm chứng điều này bằng tay; các lệnh và kết quả thật (chạy với Git 2.43) nằm trong khối bên dưới, đoạn sau đó rút ra hai hệ quả quan trọng.</p>
+<details class="derivation">
+  <summary>Xem lệnh kiểm chứng mã băm, commit và tree bằng tay</summary>
+  <div class="dv-body">
 <p>Mã băm của một đối tượng là SHA-1 của chuỗi “<code>&lt;loại&gt; &lt;số byte&gt;</code>”, một byte 0, rồi nội dung. Bạn có thể kiểm chứng bằng tay (kết quả dưới đây là thật, chạy với Git 2.43):</p>
 <pre><code class="language-bash">$ echo 'hello' | git hash-object --stdin
 ce013625030ba8dba906f756967f9e9ca394464a
@@ -135,6 +142,8 @@ $ git rev-parse HEAD
 $ cat .git/HEAD .git/refs/heads/main        # nhánh chỉ là một file 41 byte chứa mã băm
 ref: refs/heads/main
 472eca784fb3683d9c703b700d50e136afc1a3c4</code></pre>
+  </div>
+</details>
 <p>Hai điều rút ra. (1) <strong>Một nhánh chỉ là con trỏ</strong>: tạo nhánh gần như miễn phí vì chỉ ghi thêm một file nhỏ. <code>HEAD</code> là file nói “tôi đang ở nhánh nào”. (2) <strong>Mã băm commit phụ thuộc vào mã băm cha</strong>: đổi bất cứ thứ gì trong một commit (nội dung, thông điệp, tác giả, giờ) sẽ đổi mã băm của nó, và vì commit sau chứa mã băm commit trước, mọi commit hậu duệ cũng đổi theo. Cấu trúc này gọi là cây Merkle; nó bảo đảm lịch sử không bị sửa lặng lẽ. Hãy thử:</p>
 <div class="viz" data-viz="hash1" data-title="SHA-1 của một đối tượng blob và hiệu ứng tuyết lở">
   <p class="viz-help">Gõ nội dung file bất kỳ. Với “hello” và dấu xuống dòng ở cuối, kết quả phải đúng là ce01362… như ở trên (JavaScript trong trang tự tính SHA-1, không gọi Git). Ô cam là các bit khác nhau khi đổi ký tự đầu.</p>
@@ -145,12 +154,17 @@ ref: refs/heads/main
 <p>Từ đây dễ hiểu vì sao <code>git rebase</code>, <code>git commit --amend</code> và <code>git reset</code> được gọi là “viết lại lịch sử”: chúng tạo ra commit <em>mới</em> với mã băm mới, và vì vậy làm hỏng bản sao của những người đã kéo về commit cũ.</p>
 <h3 id="goi-pack">Kho đối tượng, nén delta và vì sao file nhị phân lớn là vấn đề</h3>
 <p>Mỗi phiên bản của một file là một blob riêng. Khi dọn dẹp (<code>git gc</code>) Git gói các đối tượng vào <em>packfile</em> và lưu các phiên bản gần giống nhau dưới dạng <strong>delta</strong> (phần khác biệt so với một bản gốc) rồi nén bằng zlib. Với text thay đổi ít, kho tăng rất chậm; với dữ liệu nhị phân có entropy cao (trọng số mô hình, ảnh nén sẵn), mỗi phiên bản gần như là một bản mới hoàn toàn. Phép đo mình chạy thật:</p>
+<details class="derivation">
+  <summary>Xem lệnh đo dung lượng kho với file nhị phân và file text</summary>
+  <div class="dv-body">
 <pre><code class="language-bash"># (a) 5 phiên bản của một file "trọng số" ngẫu nhiên 1 MiB, mỗi lần commit một nội dung khác
 for i in 1 2 3 4 5; do head -c 1048576 /dev/urandom &gt; model.bin; git add model.bin; git commit -q -m "v$i"; done
 git gc -q; git count-objects -vH | grep size-pack          # size-pack: 5.00 MiB
 
 # (b) file text 385 KB (20 000 dòng số), sửa đúng 1 dòng ở mỗi phiên bản, 6 phiên bản
 git gc -q; git count-objects -vH | grep size-pack          # size-pack: 176.23 KiB</code></pre>
+  </div>
+</details>
 <p>Con số cụ thể phụ thuộc dữ liệu và phiên bản Git, nhưng xu hướng thì ổn định: (a) tăng đúng bằng 5 lần dung lượng một phiên bản, (b) 6 phiên bản chỉ tốn vài chục phần trăm của một phiên bản vì delta và nén hiệu quả. Đó là lý do trọng số mô hình nên để ở Git LFS, DVC hay kho đối tượng, còn trong Git chỉ giữ con trỏ.</p>
 
 <h2 id="nhanh">Nhánh, merge, rebase và xung đột</h2>
@@ -325,7 +339,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pipx run ruff check .</code></pre>
-<p>Hai job <code>test</code> và <code>lint</code> chạy song song; ma trận nhân <code>test</code> thành 3 job (mỗi phiên bản Python một job). Tổng phút chạy \(\approx\) số job \(\times\) thời lượng trung bình, ví dụ 3 job \(\times\) 4 phút \(+\) 1 job \(\times\) 1 phút \(=13\) phút máy (phút này tính vào hạn mức; hệ số tính tiền khác nhau giữa các hệ điều hành, hãy xem bảng giá hiện hành). Mẹo: cache phụ thuộc, hủy lượt chạy cũ bằng <code>concurrency</code>, và để huấn luyện nặng chạy theo lịch (<code>on: schedule</code>) hoặc thủ công (<code>workflow_dispatch</code>) thay vì trên mỗi commit.</p>
+<p>Hai job <code>test</code> và <code>lint</code> chạy song song; ma trận nhân <code>test</code> thành 3 job (mỗi phiên bản Python một job). Tổng phút chạy bằng số job nhân thời lượng trung bình, ví dụ 3 job × 4 phút + 1 job × 1 phút = 13 phút máy (phút này tính vào hạn mức; hệ số tính tiền khác nhau giữa các hệ điều hành, hãy xem bảng giá hiện hành). Mẹo: cache phụ thuộc, hủy lượt chạy cũ bằng <code>concurrency</code>, và để huấn luyện nặng chạy theo lịch (<code>on: schedule</code>) hoặc thủ công (<code>workflow_dispatch</code>) thay vì trên mỗi commit.</p>
+<h4 id="chi-phi-ci">CI cũng là một quyết định chi phí</h4>
+<p>Chia CI thành nhiều job chạy song song làm lập trình viên chờ ít hơn, nhưng mỗi job tốn thêm thời gian khởi động và tiền máy. Nên chạy song song bao nhiêu? Đây là phép so sánh <strong>lương lãng phí khi chờ</strong> với <strong>tiền thuê máy</strong>:</p>
+<div class="viz" data-viz="cidecision1" data-title="Bao nhiêu job song song thì rẻ nhất?">
+  <p class="viz-help">Kéo số job song song và quan sát hai phần chi phí. Thử tăng thời gian CI, tăng số lập trình viên hoặc bật cache: điểm tối ưu thay đổi ra sao. Các giá có dấu ✱ là giả định, không phải bảng giá của GitHub.</p>
+</div>
 <div class="callout warn"><span class="callout-title">Bảo mật Actions</span>
 <ul>
   <li>Đặt <code>permissions</code> tối thiểu; chỉ cấp thêm quyền ghi cho job cần.</li>
@@ -457,7 +476,16 @@ Nếu lỡ commit khóa API hay mật khẩu, hãy <strong>thu hồi (revoke) v�
   <p class="viz-help">Commit mờ là commit không còn nhánh nào trỏ tới (nhưng vẫn cứu được qua reflog). Mô phỏng không có file thật, không xử lý xung đột, và chỉ rebase được đường thẳng (không qua merge commit).</p>
 </div>
 <h3 id="bisect">git bisect: tìm commit gây lỗi bằng tìm kiếm nhị phân</h3>
+<p>Khi một kết quả (độ chính xác, kiểm thử) đột nhiên tệ đi và có nhiều commit giữa bản tốt và bản xấu, đừng thử từng commit: mỗi lần hãy kiểm tra commit <strong>ở giữa</strong> khoảng nghi vấn để loại một nửa. Giống kiểm toán: thay vì rà từng chứng từ, bạn chọn điểm giữa sổ để xem số dư còn khớp không rồi thu hẹp dần. Với 100 commit chỉ cần tối đa 7 lần kiểm tra, với 1000 commit tối đa 10 lần.</p>
+<details class="derivation">
+  <summary>Xem công thức số lần kiểm tra</summary>
+  <div class="dv-body">
 <p>Khi một kết quả (độ chính xác, kiểm thử) đột nhiên tệ đi và bạn có \(n\) commit giữa bản tốt và bản xấu, tìm kiếm nhị phân tìm ra commit đầu tiên gây lỗi sau tối đa \(\lceil\log_2n\rceil\) lần kiểm tra thay vì \(n\). Với \(n=100\): tối đa 7 lần; \(n=1000\): 10 lần.</p>
+  </div>
+</details>
+<div class="viz" data-viz="bisect1" data-title="git bisect từng bước: chia đôi khoảng nghi vấn">
+  <p class="viz-help">Chọn commit gây lỗi bằng thanh “Lỗi bắt đầu từ commit số”, rồi bấm “Kiểm tra commit giữa” hoặc “Chạy tự động”. Với 100 commit và lỗi ở commit 63 cần 6 lần kiểm tra, đúng như thí nghiệm Git thật bên dưới.</p>
+</div>
 <pre><code class="language-bash">git bisect start HEAD HEAD~99                 # HEAD đang xấu, HEAD~99 còn tốt
 git bisect run sh -c '! test -f flag.txt'     # lệnh trả 0 = tốt, khác 0 = xấu (ở đây "xấu" nếu file flag.txt tồn tại)
 # → "... is the first bad commit"; thí nghiệm thật với 100 commit và lỗi bắt đầu ở commit 63 chạy 6 lần kiểm tra

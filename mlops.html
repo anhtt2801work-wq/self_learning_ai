@@ -17,6 +17,8 @@
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-mlops.js"></script>
 <script defer src="assets/js/viz-mlops2.js"></script>
+<script defer src="assets/js/viz-econ-core.js"></script>
+<script defer src="assets/js/viz-econ-mlops.js"></script>
 </head>
 <body data-page="mlops">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -27,6 +29,7 @@
 <h1>MLOps</h1>
 <p class="lead">Huấn luyện được một mô hình tốt trong notebook mới chỉ là phần nhỏ của công việc. MLOps là tập hợp thực hành để đưa mô hình vào vận hành thật và giữ cho nó đáng tin cậy: tái lập được, kiểm thử được, triển khai và quay lui an toàn, được giám sát và cập nhật khi dữ liệu thay đổi.</p>
 <div class="callout note"><span class="callout-title">Cần biết trước</span>Trang GitHub (Git, CI), Machine Learning (đánh giá mô hình) và Python. Các công cụ cụ thể (MLflow, DVC, FastAPI, Docker) chỉ là ví dụ; hệ sinh thái thay đổi nhanh, nguyên lý thì bền hơn.</div>
+<div class="callout tip"><span class="callout-title">Đọc trang này với nền kinh tế</span>MLOps vốn là <strong>quản trị vận hành</strong>, nên rất gần nghề của bạn: hàng đợi = hàng chờ ở quầy thu ngân; A/B test = thử nghiệm ngẫu nhiên có đối chứng (RCT); drift = thay đổi cấu trúc của dữ liệu; chu kỳ huấn luyện lại = bài toán đặt hàng tối ưu (EOQ). Công thức được <strong>gập vào các khối “Xem công thức / Xem suy dẫn”</strong>.</div>
 
 <h2 id="vong-doi">Vòng đời của một hệ thống ML</h2>
 <div class="flow">
@@ -200,12 +203,21 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code></p
 <p>Các đòn bẩy khác để giảm chi phí và độ trễ: lượng tử hóa (quantization), chưng cất (distillation), biên dịch/tối ưu đồ thị (ví dụ xuất sang ONNX), bộ nhớ đệm cho yêu cầu lặp, và mô hình nhỏ hơn cho các ca dễ. Luôn đo độ trễ theo phân vị (p50, p95, p99), không chỉ trung bình.</p>
 
 <h3 id="hang-doi">Hàng đợi: vì sao độ trễ vọt lên khi gần đầy tải</h3>
+<p>Hãy hình dung <strong>quầy thu ngân siêu thị</strong>: khi quầy bận khoảng một nửa thì hầu như không phải chờ; lên tới 90% thì hàng dài bất thường; sát 100% thì hàng cứ dài mãi. Máy chủ suy luận cũng vậy. Với thời gian xử lý trung bình 20 ms: ở mức sử dụng 50% độ trễ trung bình là 40 ms và p99 ≈ 184 ms; ở 90% là 200 ms và p99 ≈ 921 ms, gấp 46 lần thời gian xử lý. Hệ quả vận hành: muốn p99 ≤ 200 ms thì chỉ nên dùng khoảng <strong>54% công suất</strong>, nên chi phí mỗi dự đoán cao hơn lý tưởng khoảng 1,86 lần: đó là “giá của độ tin cậy”, giống để dư công suất trong sản xuất. Mở thêm nhiều bản sao dùng chung một hàng đợi (như nhiều quầy chung một hàng chờ) thì thời gian chờ giảm nhiều so với một máy.</p>
+<details class="derivation">
+  <summary>Xem mô hình hàng đợi M/M/1, M/M/c và các công thức</summary>
+  <div class="dv-body">
 <p>Mô hình đơn giản nhất: yêu cầu đến theo quá trình Poisson với tốc độ \(\lambda\), một máy phục vụ với thời gian xử lý mũ có tốc độ \(\mu\) (M/M/1), mức sử dụng \(\rho=\lambda/\mu<1\). Thời gian ở trong hệ thống (chờ + xử lý) có phân phối mũ với tốc độ \(\mu-\lambda\), nên</p>
 $$\bar W=\frac{1}{\mu-\lambda}=\frac{1/\mu}{1-\rho},\qquad q\text{-quantile}:\ \ t_q=\frac{-\ln(1-q)}{\mu-\lambda}$$
 <p>Với thời gian xử lý trung bình 20 ms (\(\mu=50\)/giây): \(\rho=0.5\) cho độ trễ trung bình 40 ms và p99 \(=4.605/25\approx184\) ms; \(\rho=0.9\) cho trung bình 200 ms và p99 \(\approx921\) ms, gấp 46 lần thời gian xử lý. Đường cong có dạng \(1/(1-\rho)\) nên <strong>chỉ vài phần trăm tải thêm ở vùng gần đầy tải làm độ trễ tăng gấp bội</strong>. Hệ quả vận hành: muốn p99 \(\le200\) ms với thời gian xử lý 20 ms trên một máy, cần \(\mu-\lambda\ge23.03\), tức \(\rho\le0.539\): bạn chỉ dùng được khoảng 54% công suất, nên chi phí mỗi dự đoán lớn hơn lý tưởng khoảng \(1/0.539\approx1.86\) lần. Với \(c\) bản sao dùng chung một hàng đợi (M/M/c), công thức Erlang C cho xác suất phải chờ \(C(c,a)\) với \(a=\lambda/\mu\) và thời gian chờ trung bình \(C(c,a)/(c\mu-\lambda)\); cùng mức sử dụng, nhiều bản sao chờ ít hơn.</p>
+  </div>
+</details>
 <div class="viz" data-viz="queue1" data-title="Độ trễ theo mức sử dụng: một máy hay nhiều bản sao">
   <p class="viz-help">Kéo ρ lên gần 1 để thấy độ trễ bùng nổ. Tăng số bản sao c ở cùng ρ: thời gian chờ giảm nhiều so với một máy.</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã công thức Erlang C và mô phỏng hàng đợi</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import heapq
 import math
 import numpy as np
@@ -242,6 +254,8 @@ for c, rho in [(1, 0.5), (1, 0.9), (10, 0.9)]:
     f = mmc(lam, mu, c); wq_sim, p95_sim = simulate(lam, mu, c)
     print(f"c={c:&gt;2}, ρ={rho}: chờ TB {f['Wq']*1000:6.1f} ms (mô phỏng {wq_sim*1000:6.1f}), p95 chờ {f['p95 chờ']*1000:6.1f} ms (mô phỏng {p95_sim*1000:6.1f}), "
           f"độ trễ TB {f['W']*1000:6.1f} ms")</code></pre>
+  </div>
+</details>
 <p>Mô phỏng ở ρ cao dao động quanh công thức (độ lệch vài phần trăm là nhiễu mô phỏng vì các lần chờ liên tiếp tương quan mạnh). Giới hạn của mô hình: đến Poisson và xử lý mũ hiếm khi đúng; tải theo đợt, thời gian xử lý đuôi dài và khởi động nguội còn làm độ trễ tệ hơn. Đo thật, và đặt cảnh báo trên p95/p99, không phải trung bình.</p>
 <h2 id="trien-khai">Triển khai an toàn và CI/CD cho ML</h2>
 <p>Pipeline điển hình: thay đổi mã hoặc dữ liệu → CI (lint, kiểm thử đơn vị, kiểm tra dữ liệu) → huấn luyện tái lập được → đánh giá <em>so với mô hình đang chạy</em> trên cùng tập kiểm tra → đăng ký phiên bản → triển khai dần → giám sát. Điều kiện “tốt hơn” cần định nghĩa trước (chỉ số, ngưỡng, các nhóm con không được tệ đi).</p>
@@ -276,12 +290,25 @@ for c, rho in [(1, 0.5), (1, 0.9), (10, 0.9)]:
   </tbody>
 </table>
 <h3 id="ab-suy-dan">A/B test: cỡ mẫu, công suất và những cái bẫy</h3>
+<p>A/B test chính là <strong>thử nghiệm ngẫu nhiên có đối chứng (RCT)</strong>: chia người dùng ngẫu nhiên thành hai nhóm, chỉ khác nhau ở một thay đổi, rồi so chỉ số. Cỡ mẫu cần thiết phụ thuộc bốn thứ: hiệu ứng nhỏ nhất bạn muốn phát hiện (nhỏ một nửa thì cần gấp 4 lần mẫu), tỉ lệ nền, mức ý nghĩa và công suất. Ví dụ từ 10% lên 11% cần khoảng 14.750 mẫu mỗi nhóm. Bốn cái bẫy: (1) hiệu ứng nhỏ cần mẫu rất lớn; (2) tỉ lệ nền khác nhau cho cỡ mẫu khác nhau (5%→6% cần ≈ 8.155, nhưng 5%→5,5% cần ≈ 31.231); (3) <strong>nhìn trộm</strong> kết quả giữa chừng làm sai kiểm định (mô phỏng bên dưới); (4) <strong>sample ratio mismatch</strong>: chia nhóm lệch kế hoạch thường báo hiệu lỗi ghi log hay gán nhóm.</p>
+<details class="derivation">
+  <summary>Xem công thức cỡ mẫu và phép tính chi tiết</summary>
+  <div class="dv-body">
 <p>So sánh tỉ lệ \(p_1\) (đối chứng) với \(p_2=p_1+\delta\). Với \(n\) mẫu mỗi nhóm, hiệu \(\hat p_2-\hat p_1\) xấp xỉ chuẩn với phương sai \((p_1q_1+p_2q_2)/n\) (\(q=1-p\)). Muốn bác bỏ \(H_0\) ở mức \(\alpha\) (hai phía) và có công suất \(1-\beta\) trước hiệu ứng \(\delta\), cần \(\delta/\mathrm{SE}\ge z_{1-\alpha/2}+z_{1-\beta}\), suy ra (xấp xỉ, coi SE dưới \(H_0\) và \(H_1\) gần nhau)</p>
 $$n\;\approx\;\frac{(z_{1-\alpha/2}+z_{1-\beta})^2\,(p_1q_1+p_2q_2)}{\delta^2}$$
 <p>Ví dụ \(p_1=10\%\), \(\delta=1\) điểm phần trăm, \(\alpha=0.05\), công suất 80%: \((1.960+0.842)^2\cdot0.1879/0.0001\approx14{,}750\) mẫu mỗi nhóm (mô phỏng cho công suất \(\approx0.79\), khớp). Bốn điều đáng nhớ: (1) \(n\propto1/\delta^2\): phát hiện hiệu ứng nhỏ <em>một nửa</em> tốn gấp 4 lần mẫu. (2) Cỡ mẫu phụ thuộc tỉ lệ nền: \(5\%\to6\%\) cần khoảng 8,155 mẫu mỗi nhóm, nhưng \(5\%\to5.5\%\) cần khoảng 31,231. (3) <strong>Nhìn trộm</strong>: dừng ngay khi \(p<0.05\) ở một trong 5 lần kiểm tra giữa chừng nâng tỉ lệ dương tính giả từ 5% lên khoảng 14% (mô phỏng bên dưới); hãy cố định cỡ mẫu từ đầu hoặc dùng kiểm định tuần tự có hiệu chỉnh (alpha spending). (4) <strong>Sample ratio mismatch</strong>: nếu tỉ lệ chia nhóm quan sát lệch kế hoạch (10,200 so với 9,800 thay vì 50/50 trên 20,000, \(\chi^2=8.0\), \(p\approx0.0047\)) thì thường có lỗi gán nhóm hoặc ghi log, và kết quả không đáng tin cho đến khi tìm ra nguyên nhân.</p>
+  </div>
+</details>
 <div class="viz" data-viz="ab1" data-title="Cỡ mẫu và công suất của A/B test">
   <p class="viz-help">Đổi tỉ lệ nền và hiệu ứng nhỏ nhất cần phát hiện. Chấm cam là cỡ mẫu đạt công suất mục tiêu.</p>
 </div>
+<p>Cái bẫy nhìn trộm đáng đem ra thử thật. Dưới đây mỗi thí nghiệm chia hai nhóm cùng tỉ lệ thật (tức là <em>không có</em> hiệu ứng) và ta “nhìn” kết quả năm lần; bạn có thể thấy kết luận sai xảy ra bao nhiêu lần và nó tốn bao nhiêu tiền:</p>
+<div class="viz" data-viz="peek1" data-title="Nhìn trộm A/B test: bao nhiêu kết luận sai?">
+  <p class="viz-help">Bấm “Chạy 200 thí nghiệm” vài lần. Nhìn một lần ở cuối thì sai khoảng 5% (đúng như danh nghĩa); được phép dừng ngay khi “có ý nghĩa” ở một trong 5 lần nhìn thì sai gần 14%.</p>
+</div>
+<details class="derivation">
+  <summary>Xem mã cỡ mẫu, công suất, nhìn trộm và kiểm tra SRM</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import numpy as np
 from scipy.stats import norm
 
@@ -320,14 +347,25 @@ from scipy.stats import chi2
 obs, total = np.array([10200, 9800]), 20000
 stat = float(((obs - total / 2)**2 / (total / 2)).sum())
 print("SRM: χ² =", stat, ", p =", round(float(chi2.sf(stat, 1)), 4))</code></pre>
+  </div>
+</details>
 <p>Cũng nhớ: kiểm định nhiều chỉ số hoặc nhiều biến thể mà không hiệu chỉnh làm tăng kết quả “có ý nghĩa” do ngẫu nhiên; chọn trước một chỉ số chính và các chỉ số bảo vệ (guardrail: độ trễ, tỉ lệ lỗi). Sách <em>Trustworthy Online Controlled Experiments</em> (Kohavi, Tang, Xu) là tài liệu tham khảo thực hành về chủ đề này.</p>
 <h3 id="canary-toan">Canary: cần bao nhiêu bằng chứng?</h3>
+<p>Canary giống <strong>bán thử một lô nhỏ</strong> trước khi tung ra toàn bộ. Muốn phát hiện một suy giảm nhẹ thì cần rất nhiều yêu cầu; sự cố nặng thì chỉ cần vài chục. Ví dụ lỗi nền 1% mà bản mới là 1,5% cần khoảng 2.829 yêu cầu; với lưu lượng 5.000 yêu cầu/giờ, canary 1% mất ≈ 57 giờ, 5% mất ≈ 11,3 giờ, 25% mất ≈ 2,3 giờ; còn nếu bản mới lỗi tới 10% thì chỉ cần ≈ 21 yêu cầu. Hai điểm hay hiểu nhầm: số yêu cầu bị ảnh hưởng trước khi đủ bằng chứng xấp xỉ <em>bằng nhau</em> bất kể tỉ lệ canary (tỉ lệ chỉ đổi thời gian chờ), và canary nhỏ không bắt được suy giảm nhẹ trong thời gian ngắn, nên cần thêm theo dõi dài hạn.</p>
+<details class="derivation">
+  <summary>Xem công thức cỡ mẫu cho canary</summary>
+  <div class="dv-body">
 <p>Giả sử bản hiện tại có tỉ lệ lỗi \(p_0\) đã biết chính xác từ lượng lớn lưu lượng, và bạn lo bản mới có tỉ lệ \(p_1>p_0\). Với kiểm định một phía mức \(\alpha\) và công suất \(1-\beta\), số yêu cầu qua canary cần là</p>
 $$n\approx\frac{\big(z_{1-\alpha}\sqrt{p_0q_0}+z_{1-\beta}\sqrt{p_1q_1}\big)^2}{(p_1-p_0)^2}$$
 <p>Với \(p_0=1\%\), \(p_1=1.5\%\), \(\alpha=0.05\), công suất 0.8: \(n\approx2829\) yêu cầu. Nếu tổng lưu lượng là 5000 yêu cầu/giờ thì canary 1% mất khoảng 57 giờ, 5% mất 11.3 giờ, 25% mất 2.3 giờ. Một sự cố nặng (\(p_1=10\%\)) chỉ cần khoảng 21 yêu cầu. Hai điểm hay bị hiểu nhầm: số yêu cầu bị ảnh hưởng trước khi đủ bằng chứng xấp xỉ \(n\) <em>bất kể</em> tỉ lệ canary, tỉ lệ chỉ đổi thời gian; và canary nhỏ không phát hiện nổi suy giảm nhẹ trong thời gian ngắn. Vì vậy cần cả hai lớp: canary để bắt sự cố lớn nhanh, và theo dõi dài hạn cho suy giảm nhẹ.</p>
+  </div>
+</details>
 <div class="viz" data-viz="canary1" data-title="Bằng chứng cần thiết để phát hiện bản mới tệ hơn">
   <p class="viz-help">Kéo p₁ lại gần p₀ (suy giảm nhẹ) và thấy số yêu cầu cần thiết tăng vọt; kéo p₁ lên cao để thấy sự cố nặng được phát hiện gần như tức thì.</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã tính số yêu cầu cần cho canary</summary>
+  <div class="dv-body">
 <pre><code class="language-python">from scipy.stats import norm
 
 def requests_needed(p0, p1, alpha=0.05, power=0.8):
@@ -342,6 +380,8 @@ for p1 in (0.012, 0.015, 0.02, 0.05, 0.10):
     print(f"{p1:.3f}  {n:&gt;10,.0f}  " + "  ".join(f"{n / (traffic * f):&gt;8.1f}" for f in (0.01, 0.05, 0.25)))
 # Số yêu cầu bị ảnh hưởng trước khi đủ bằng chứng ≈ n, KHÔNG phụ thuộc tỉ lệ canary.
 # Tỉ lệ canary chỉ quyết định thời gian trôi qua (và tốc độ lan rộng nếu bản mới thực sự xấu).</code></pre>
+  </div>
+</details>
 <p>Luôn chuẩn bị <strong>quay lui</strong> (rollback) về phiên bản trước chỉ bằng một thao tác, và nhớ rằng quay lui mô hình đôi khi cũng cần quay lui các đặc trưng hoặc lược đồ dữ liệu đi kèm.</p>
 <div class="callout tip"><span class="callout-title">Lệch giữa huấn luyện và phục vụ (training–serving skew)</span>Nguồn lỗi âm thầm phổ biến bậc nhất: đặc trưng được tính một cách khi huấn luyện (SQL/pandas hàng loạt) và một cách khác khi phục vụ (code thời gian thực). Giảm thiểu bằng cách dùng chung mã tiền xử lý, hoặc kho đặc trưng (feature store); ghi log đặc trưng thực tế lúc phục vụ và so sánh với phân phối lúc huấn luyện; kiểm thử tương đương đầu ra giữa hai đường tính.</div>
 
@@ -353,12 +393,21 @@ for p1 in (0.012, 0.015, 0.02, 0.05, 0.10):
   <li><strong>Chất lượng mô hình</strong>: các chỉ số thật, khi có nhãn. Nhãn thường đến muộn (khoản vay có thể mất vài tháng mới biết vỡ nợ), nên cần chỉ báo sớm như drift và so sánh với mô hình tham chiếu.</li>
 </ul>
 <h3 id="drift">Data drift: PSI và KS</h3>
+<p><strong>PSI</strong> (chỉ số ổn định dân số) vốn được dùng trong chấm điểm tín dụng: so tỉ trọng khách hàng theo từng nhóm lúc xây mô hình với hiện tại. Quy ước ngón tay cái: dưới 0,1 là ổn định, 0,1 đến 0,25 cần theo dõi, trên 0,25 là dịch chuyển lớn (đây là heuristic, không phải định lý). <strong>KS</strong> đo khoảng cách lớn nhất giữa hai đường phân phối tích lũy. Hãy dịch chuyển phân phối và quan sát cả hai, kể cả cảnh báo giả khi lấy ít mẫu:</p>
+<details class="derivation">
+  <summary>Xem công thức PSI và KS</summary>
+  <div class="dv-body">
 <p>Hai thước đo phổ biến để so sánh phân phối một đặc trưng giữa lúc huấn luyện (tham chiếu \(p\)) và lúc đang chạy (\(q\)). <strong>PSI</strong> (Population Stability Index) chia đặc trưng thành các khoảng (thường theo phân vị của tập tham chiếu):</p>
 $$\text{PSI}=\sum_{i=1}^{B}\,(q_i-p_i)\,\ln\frac{q_i}{p_i}$$
 <p>Quy ước ngón tay cái lưu hành trong ngành tài chính: dưới 0.1 là ổn định, 0.1 đến 0.25 cần theo dõi, trên 0.25 là dịch chuyển lớn. Đó là heuristic chứ không phải định lý, hãy hiệu chỉnh theo bài toán của bạn. <strong>KS</strong> (Kolmogorov–Smirnov) là khoảng cách lớn nhất giữa hai hàm phân phối tích lũy: \(D=\sup_x|F_p(x)-F_q(x)|\). Hãy dịch chuyển phân phối và quan sát cả hai, kể cả hiện tượng cảnh báo giả khi lấy ít mẫu:</p>
+  </div>
+</details>
 <div class="viz" data-viz="drift1" data-title="Phát hiện drift bằng PSI và KS">
   <p class="viz-help">Phân phối lúc huấn luyện cố định là N(0,1). Kéo μ và σ như thể dữ liệu thật đã đổi. Mẫu nhỏ làm PSI dao động ngay cả khi không có drift thật.</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã tính PSI và KS</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import numpy as np
 from scipy.stats import ks_2samp
 
@@ -375,13 +424,24 @@ ref = rng.normal(0, 1, 10_000)
 cur = rng.normal(0.5, 1, 2_000)
 print("PSI:", psi(ref, cur))
 print("KS :", ks_2samp(ref, cur))        # (statistic, pvalue)</code></pre>
+  </div>
+</details>
 <h3 id="psi-suy-dan">PSI suy dẫn: đối xứng, xấp xỉ χ² và sàn nhiễu</h3>
+<p>PSI thực chất là <strong>KL đối xứng</strong> giữa hai phân phối, và với lệch nhỏ nó xấp xỉ thống kê χ². Hệ quả quan trọng: ngay cả khi <em>không có drift</em>, PSI tính trên mẫu vẫn dương do nhiễu lấy mẫu, và nhiễu này lớn khi mẫu nhỏ, như biên sai số của một cuộc khảo sát. Với 10 khoảng và tham chiếu 10.000 mẫu: ngưỡng 95% của nhiễu ≈ 0,086 khi dữ liệu đang chạy có 200 mẫu (sát ngưỡng 0,1!), ≈ 0,010 với 2.000 mẫu và ≈ 0,0025 với 20.000 mẫu. Nghĩa là <strong>ngưỡng cố định 0,1 vô nghĩa nếu bạn tính PSI trên vài trăm mẫu</strong>.</p>
+<details class="derivation">
+  <summary>Xem suy dẫn: đối xứng, xấp xỉ χ² và sàn nhiễu</summary>
+  <div class="dv-body">
 <p>Công thức \((q-p)\ln(q/p)\) trông tùy tiện, nhưng nó là <strong>KL đối xứng</strong>: \(\sum_i(q_i-p_i)\ln\frac{q_i}{p_i}=\sum_iq_i\ln\frac{q_i}{p_i}+\sum_ip_i\ln\frac{p_i}{q_i}=D_{KL}(q\|p)+D_{KL}(p\|q)\). Mỗi số hạng \((q_i-p_i)\ln(q_i/p_i)\ge0\) vì hai thừa số luôn cùng dấu, nên PSI \(\ge0\) và bằng 0 khi \(q=p\). Với lệch nhỏ, \(\ln(q/p)\approx(q-p)/p\), suy ra</p>
 $$\mathrm{PSI}\approx\sum_i\frac{(q_i-p_i)^2}{p_i}$$
 <p>là thống kê χ² của Pearson (chia cho cỡ mẫu). Ví dụ ở Bài 1: PSI \(=0.1099\), xấp xỉ \(0.100\). Hệ quả quan trọng cho vận hành: nếu dữ liệu đang chạy gồm \(n\) mẫu <em>không</em> drift, \(n\cdot\sum(q_i-p_i)^2/p_i\) xấp xỉ phân phối \(\chi^2_{B-1}\), nên kỳ vọng nhiễu lấy mẫu là \((B-1)/n\); nếu tham chiếu cũng chỉ là mẫu cỡ \(n_{ref}\) thì thay \(1/n\) bằng \(1/n_{ref}+1/n\). Ngưỡng 95% của PSI khi không drift \(\approx\chi^2_{0.95,B-1}\,(1/n_{ref}+1/n)\). Với \(B=10\) (\(\chi^2_{0.95,9}=16.92\)): \(n=200\) cho ngưỡng \(\approx0.086\) (sát 0.1!), \(n=2000\) cho \(\approx0.010\), \(n=20{,}000\) cho \(\approx0.0025\). Nghĩa là <strong>ngưỡng cố định 0.1 vô nghĩa nếu bạn tính PSI trên vài trăm mẫu</strong>.</p>
+  </div>
+</details>
 <div class="viz" data-viz="psi2" data-title="PSI theo từng khoảng và sàn nhiễu lấy mẫu">
   <p class="viz-help">Đặt μ = 0, σ = 1 (không drift) rồi giảm n: PSI vẫn dương nhờ nhiễu. Sau đó dịch μ hoặc đổi σ để xem khoảng nào đóng góp nhiều nhất vào PSI.</p>
 </div>
+<details class="derivation">
+  <summary>Xem mã kiểm chứng PSI, sàn nhiễu và KS</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import numpy as np
 from scipy.stats import chi2, norm, ks_2samp
 
@@ -420,18 +480,33 @@ n, m = 10_000, 2_000
 print("ngưỡng KS xấp xỉ:", round(1.358 * np.sqrt((n + m) / (n * m)), 4))
 rej = np.mean([ks_2samp(rng.normal(size=n), rng.normal(size=m)).pvalue &lt; 0.05 for _ in range(400)])
 print("tỉ lệ cảnh báo giả của KS ở mức 5% khi không drift:", round(float(rej), 3))</code></pre>
+  </div>
+</details>
 <p>Với KS, ngưỡng bác bỏ xấp xỉ \(c(\alpha)\sqrt{(n+m)/(nm)}\) với \(c(0.05)\approx1.358\); \(n=10{,}000\), \(m=2000\) cho \(\approx0.033\). Cỡ mẫu lớn làm KS rất nhạy với chênh lệch cực nhỏ: hãy cặp với một thước đo độ lớn tác động.</p>
 <p>Hai lưu ý quan trọng. (1) Với lượng dữ liệu lớn, kiểm định thống kê phát hiện cả những thay đổi nhỏ không có ý nghĩa thực tế, nên hãy xét <em>độ lớn</em> và tác động lên chỉ số mô hình chứ không chỉ p-value. (2) Drift không đồng nghĩa mô hình hỏng, và mô hình có thể hỏng khi không có drift đặc trưng nào (thay đổi quan hệ giữa đặc trưng và nhãn, gọi là concept drift). Cảnh báo cần dẫn tới một hành động đã thỏa thuận (xem xét, huấn luyện lại, quay lui), kèm sổ tay xử lý (runbook).</p>
 <h3 id="vong-phan-hoi">Vòng phản hồi và huấn luyện lại</h3>
 <p>Huấn luyện lại có thể theo lịch, theo ngưỡng giám sát hoặc theo sự kiện, nhưng mô hình mới phải qua cùng cổng đánh giá như mọi bản phát hành. Hãy cảnh giác với <em>vòng phản hồi</em>: khi dự đoán của mô hình ảnh hưởng dữ liệu tương lai (hệ thống gợi ý chỉ cho thấy những gì nó đã gợi ý), dữ liệu mới bị lệch theo chính mô hình.</p>
 
 <h3 id="chu-ky-huan-luyen">Bao lâu nên huấn luyện lại?</h3>
+<p>Đây là bài toán quen thuộc <strong>đặt hàng tối ưu (EOQ)</strong>: mỗi lần huấn luyện lại tốn một khoản cố định (như chi phí đặt hàng), còn mô hình càng cũ càng mất độ chính xác (như chi phí tồn kho). Huấn luyện quá thưa thì thiệt hại tích lũy, quá dày thì tốn phí. Ví dụ phí một lần C = 2.000, mỗi điểm chính xác mất tốn V = 100.000 mỗi ngày, độ chính xác tụt 0,1 điểm % mỗi ngày: chu kỳ tối ưu ≈ 6,3 ngày, chi phí ≈ 632/ngày, so với 2.050/ngày nếu huấn luyện lại mỗi ngày và 1.567/ngày nếu mỗi 30 ngày. Đáy rất phẳng nên lệch khỏi tối ưu gấp đôi mới tốn thêm đáng kể. Thực tế suy giảm có thể đột ngột, nên cần giám sát kích hoạt bên cạnh lịch.</p>
+<details class="derivation">
+  <summary>Xem suy dẫn công thức chu kỳ tối ưu T*</summary>
+  <div class="dv-body">
 <p>Một mô hình đơn giản cho quyết định này (cùng dạng bài toán lô hàng kinh tế EOQ): độ chính xác giảm tuyến tính \(r\) mỗi ngày kể từ lần huấn luyện gần nhất; mỗi đơn vị độ chính xác mất đi tốn \(V\) mỗi ngày; mỗi lần huấn luyện lại tốn \(C\). Huấn luyện lại sau mỗi \(T\) ngày: thiệt hại trung bình mỗi ngày là \(\frac1T\int_0^T Vrt\,dt=\frac{VrT}{2}\), chi phí huấn luyện trung bình là \(C/T\). Tổng \(f(T)=\frac{VrT}2+\frac CT\). Đạo hàm \(f'(T)=\frac{Vr}{2}-\frac{C}{T^2}=0\) cho</p>
 $$T^*=\sqrt{\frac{2C}{V\,r}},\qquad f(T^*)=\sqrt{2CVr}$$
 <p>Ví dụ \(C=2000\), \(V=100{,}000\), \(r=0.001\): \(T^*=\sqrt{40}\approx6.3\) ngày, chi phí \(\approx632\)/ngày, so với 2050/ngày nếu huấn luyện lại mỗi ngày và 1567/ngày nếu mỗi 30 ngày. Đáy phẳng: lệch khỏi \(T^*\) khoảng 2 lần mới tốn thêm đáng kể. Mô hình giả định suy giảm tuyến tính, đều, và đo được; thực tế suy giảm có thể đột ngột nên cần giám sát kích hoạt bên cạnh lịch.</p>
+  </div>
+</details>
 <div class="viz" data-viz="retrain1" data-title="Chu kỳ huấn luyện lại tối ưu">
   <p class="viz-help">Tăng chi phí mỗi lần huấn luyện C hoặc giảm tốc độ suy giảm r: chu kỳ tối ưu dài ra. Chấm là T*.</p>
 </div>
+<p>Bây giờ so ba <em>chính sách</em> bằng cách phát lại từng ngày: không bao giờ huấn luyện lại, huấn luyện theo lịch cố định, và huấn luyện khi hệ thống giám sát báo động. Bật hoặc tắt “sự cố dữ liệu đột ngột” để thấy chính sách nào thắng trong từng hoàn cảnh:</p>
+<div class="viz" data-viz="retrainsim1" data-title="Ba chính sách huấn luyện lại: ai tốn ít tiền nhất?">
+  <p class="viz-help">Kéo thanh “Phát lại đến ngày” hoặc bấm “Chạy tự động”. Chấm xanh/cam trên đồ thị trên là độ chính xác từng chính sách; đồ thị dưới là tiền tích lũy. Các giá có dấu ✱ là giả định minh họa.</p>
+</div>
+<details class="derivation">
+  <summary>Xem mã tính chi phí theo chu kỳ huấn luyện lại</summary>
+  <div class="dv-body">
 <pre><code class="language-python">import numpy as np
 
 def total_cost_rate(T, C, V, r):
@@ -444,6 +519,8 @@ T_star = np.sqrt(2 * C / (V * r))
 print(f"T* = {T_star:.2f} ngày, chi phí/ngày = {total_cost_rate(T_star, C, V, r):.1f}")
 for T in (1, 3, 6.3, 14, 30):
     print(f"  huấn luyện lại mỗi {T:&gt;4} ngày → {total_cost_rate(T, C, V, r):7.1f} / ngày")</code></pre>
+  </div>
+</details>
 <h3 id="kiem-tra-du-lieu">Kiểm tra dữ liệu và lệch huấn luyện–phục vụ bằng code</h3>
 <p>Hai kiểm tra rẻ mà bắt được nhiều lỗi thực tế: xác thực lược đồ, miền giá trị và tỉ lệ thiếu ngay khi dữ liệu vào pipeline; và kiểm thử rằng cùng một hàm đặc trưng cho kết quả giống hệt khi tính hàng loạt (huấn luyện) và từng yêu cầu (phục vụ).</p>
 <pre><code class="language-python">import numpy as np
@@ -478,7 +555,13 @@ serve_path = pd.concat([features(good.iloc[[i]]) for i in range(len(good))], ign
 pd.testing.assert_frame_equal(train_path, serve_path)                # nếu hai đường lệch nhau, dòng này báo lỗi
 print("hai đường tính đặc trưng khớp nhau")</code></pre>
 <h3 id="chi-phi-du-doan">Chi phí mỗi dự đoán</h3>
-<p>Chi phí mỗi 1000 dự đoán \(=\dfrac{G}{3.6\,X}\), với \(G\) là giá một giờ máy và \(X\) là thông lượng hiệu dụng (yêu cầu/giây). Thông lượng hiệu dụng thấp hơn công suất đỉnh vì bạn không chạy ở \(\rho=1\) (xem phần hàng đợi) và vì tải thay đổi theo giờ. Ở ví dụ batching của bài tập 2, \(b=16\) cho 307.7 yêu cầu/giây so với 45.5 khi \(b=1\), tức rẻ hơn khoảng 6.8 lần mỗi dự đoán nếu độ trễ chấp nhận được. Hãy tính chi phí theo <em>dự đoán hữu ích</em>, không phải theo giờ máy.</p>
+<p>Chi phí mỗi dự đoán bằng giá một giờ máy chia cho số dự đoán xử lý được trong giờ đó. Số này thấp hơn công suất đỉnh vì bạn không chạy ở mức sử dụng 100% (xem phần hàng đợi) và vì tải thay đổi theo giờ. Ở ví dụ batching của bài tập 2, b = 16 cho 307,7 yêu cầu/giây so với 45,5 khi b = 1, tức rẻ hơn khoảng 6,8 lần mỗi dự đoán nếu độ trễ chấp nhận được. Hãy tính chi phí theo <em>dự đoán hữu ích</em>, không phải theo giờ máy.</p>
+<details class="derivation">
+  <summary>Xem công thức chi phí mỗi 1.000 dự đoán</summary>
+  <div class="dv-body">
+<p>Chi phí mỗi 1000 dự đoán \(=\dfrac{G}{3.6\,X}\), với \(G\) là giá một giờ máy và \(X\) là thông lượng hiệu dụng (yêu cầu/giây).</p>
+  </div>
+</details>
 <h2 id="llmops">LLMOps: điều gì khác với ML truyền thống</h2>
 <p>Ứng dụng dựa trên LLM (trang LLM, Agentic AI) giữ nguyên các nguyên tắc trên nhưng đối tượng cần quản lý đổi khác:</p>
 <ul>

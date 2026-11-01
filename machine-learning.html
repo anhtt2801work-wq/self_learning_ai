@@ -17,6 +17,8 @@
 <script defer src="assets/js/site.js"></script>
 <script defer src="assets/js/viz-ml.js"></script>
 <script defer src="assets/js/viz-ml2.js"></script>
+<script defer src="assets/js/viz-econ-core.js"></script>
+<script defer src="assets/js/viz-econ-ml.js"></script>
 </head>
 <body data-page="ml">
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -27,18 +29,39 @@
 <h1>Machine Learning</h1>
 <p class="lead">Machine Learning (ML, học máy) là việc để máy tự tìm quy luật từ dữ liệu thay vì lập trình từng quy tắc. Trang này đi từ mô hình đơn giản nhất đến cách đánh giá một hệ thống ML một cách trung thực. Đây là nền móng cho Deep Learning, NLP và LLM ở các trang sau.</p>
 
-<div class="callout note"><span class="callout-title">Cần biết trước</span>Python cơ bản, NumPy ở mức cộng trừ nhân ma trận, đạo hàm của hàm một biến. Mọi kiến thức còn lại được giới thiệu tại chỗ.</div>
+<div class="callout note"><span class="callout-title">Cần biết trước</span>Python cơ bản và NumPy ở mức cộng trừ nhân ma trận. Nếu bạn có nền kinh tế lượng thì phần lớn khái niệm đã quen thuộc dưới tên khác (xem bảng dưới). Công thức và suy dẫn đầy đủ được <strong>gập sẵn</strong> trong các khối “Xem công thức/suy dẫn”: đọc phần diễn giải và minh họa trước, mở công thức khi cần.</div>
+
+<div class="callout tip"><span class="callout-title">Từ điển cho người có nền kinh tế</span>Phần lớn ML là những thứ bạn đã biết dưới tên khác. Bảng dưới ánh xạ thuật ngữ; các công thức được <strong>gập sẵn</strong> trong khối “Xem công thức/suy dẫn”.</div>
+<table>
+  <thead><tr><th>Thuật ngữ ML</th><th>Bạn đã biết dưới tên</th></tr></thead>
+  <tbody>
+    <tr><td>Đặc trưng (feature) / nhãn (label)</td><td>Biến giải thích (X) / biến phụ thuộc (Y)</td></tr>
+    <tr><td>Huấn luyện</td><td>Ước lượng mô hình</td></tr>
+    <tr><td>Hồi quy tuyến tính, hồi quy logistic</td><td>OLS, mô hình logit</td></tr>
+    <tr><td>Hàm mất mát</td><td>Hàm tổn thất, sai số dự báo (thường là bình phương)</td></tr>
+    <tr><td>Overfitting</td><td>Khớp quá mức trong mẫu, “khai thác dữ liệu” (data mining): đẹp trong mẫu, tệ ngoài mẫu</td></tr>
+    <tr><td>Tập kiểm tra, kiểm định chéo</td><td>Dự báo ngoài mẫu, backtest có kỷ luật</td></tr>
+    <tr><td>Điều chuẩn (L1/L2)</td><td>Phạt độ phức tạp, shrinkage (ridge, lasso)</td></tr>
+    <tr><td>Chọn ngưỡng theo chi phí</td><td>Phân tích chi phí–lợi ích biên</td></tr>
+    <tr><td>Ensemble (bagging)</td><td>Đa dạng hóa danh mục</td></tr>
+  </tbody>
+</table>
 
 <h2 id="gioi-thieu">ML là gì? Ba nhóm bài toán</h2>
-<p>Ta có dữ liệu và muốn một hàm \(f\) “đủ tốt” trên dữ liệu <em>chưa từng thấy</em>. Tùy dạng dữ liệu mà phân ra:</p>
+<p>Ta có dữ liệu và muốn một công thức dự đoán “đủ tốt” trên dữ liệu <em>chưa từng thấy</em>. Tùy dạng dữ liệu mà phân ra:</p>
 <ul>
-  <li><strong>Học có giám sát (supervised)</strong>: có cặp \((x, y)\). <em>Hồi quy</em> dự đoán số thực (giá nhà), <em>phân loại</em> dự đoán nhãn (thư rác hay không).</li>
-  <li><strong>Học không giám sát (unsupervised)</strong>: chỉ có \(x\). Gom cụm, giảm chiều, phát hiện bất thường.</li>
+  <li><strong>Học có giám sát (supervised)</strong>: có cả đầu vào lẫn đáp án. <em>Hồi quy</em> dự đoán một con số (doanh thu tháng sau, giá nhà), <em>phân loại</em> dự đoán một nhãn (khoản vay có vỡ nợ không, thư rác hay không).</li>
+  <li><strong>Học không giám sát (unsupervised)</strong>: chỉ có đầu vào, không có đáp án. Gom cụm (phân khúc khách hàng), giảm chiều, phát hiện bất thường (giao dịch lạ).</li>
   <li><strong>Học tăng cường (reinforcement)</strong>: tác tử hành động trong môi trường và nhận phần thưởng. (Nền tảng của một phần quá trình hậu huấn luyện LLM, xem trang LLM.)</li>
 </ul>
-<p>Quy trình chung gồm bốn thành phần: <strong>mô hình</strong> \(f_\theta\) với tham số \(\theta\), <strong>hàm mất mát</strong> \(J(\theta)\) đo mức sai, <strong>thuật toán tối ưu</strong> để tìm \(\theta\) làm \(J\) nhỏ, và <strong>cách đánh giá</strong> trên dữ liệu giữ riêng.</p>
+<p>Quy trình chung gồm bốn thành phần: <strong>mô hình</strong> (công thức dự đoán có các “núm chỉnh” gọi là tham số), <strong>hàm mất mát</strong> (đo mức sai, như tổng bình phương sai số dự báo), <strong>thuật toán tối ưu</strong> để vặn các núm sao cho mất mát nhỏ, và <strong>cách đánh giá</strong> trên dữ liệu giữ riêng (giống dự báo ngoài mẫu).</p>
 
 <h2 id="tuyen-tinh">Hồi quy tuyến tính</h2>
+<p>Ý tưởng quen thuộc: dự đoán một con số bằng <strong>tổng có trọng số</strong> của các yếu tố đầu vào, ví dụ <em>doanh thu tháng = hệ số × chi phí quảng cáo + doanh thu nền</em>. Ta chọn các hệ số sao cho <strong>sai số bình phương trung bình</strong> (MSE) trên dữ liệu đã có là nhỏ nhất. Đây chính là hồi quy bình phương tối thiểu (OLS) trong kinh tế lượng.</p>
+<div class="callout tip"><span class="callout-title">Ví dụ bằng tiền (đã kiểm bằng code)</span>Một cửa hàng có 6 tháng dữ liệu: chi quảng cáo 10, 20, 30, 40, 50, 60 triệu đồng và doanh thu tương ứng 120, 150, 200, 210, 260, 280 triệu đồng. Hồi quy cho <strong>doanh thu ≈ 89,3 + 3,26 × quảng cáo</strong>: mỗi triệu quảng cáo thêm đi kèm khoảng 3,26 triệu doanh thu, và mô hình giải thích khoảng 98% biến động doanh thu (R² ≈ 0,98). Dự báo cho tháng chi 70 triệu: khoảng 317 triệu. Lưu ý đây là <em>tương quan trong mẫu</em>, chưa chứng minh quảng cáo <em>gây ra</em> doanh thu, và dự báo ngoài vùng 10–60 triệu cần thận trọng.</div>
+<details class="derivation">
+  <summary>Xem công thức hồi quy tuyến tính và nghiệm đóng</summary>
+  <div class="dv-body">
 <p>Với vector đặc trưng \(\mathbf{x}\in\mathbb{R}^d\), mô hình dự đoán</p>
 $$\hat{y} = \mathbf{w}^\top \mathbf{x} + b$$
 <p>và ta chọn \(\mathbf{w}, b\) để cực tiểu hóa sai số bình phương trung bình (MSE) trên \(n\) mẫu:</p>
@@ -46,8 +69,14 @@ $$J(\mathbf{w}, b) = \frac{1}{n}\sum_{i=1}^{n}\left(\hat{y}_i - y_i\right)^2$$
 <p>Gộp \(b\) vào \(\mathbf{w}\) bằng cách thêm cột toàn số 1 vào ma trận dữ liệu \(X\), bài toán có <strong>nghiệm đóng</strong> (phương trình chuẩn):</p>
 $$\mathbf{w}^\star = (X^\top X)^{-1} X^\top \mathbf{y}$$
 <p>Nghiệm đóng đẹp nhưng tốn khoảng \(O(d^3)\) thời gian và không tồn tại nếu \(X^\top X\) suy biến. Với dữ liệu lớn hoặc mô hình phức tạp (mạng nơ-ron), ta dùng phương pháp lặp: gradient descent.</p>
+  </div>
+</details>
 
 <h3 id="suy-dan-ols">Suy dẫn phương trình chuẩn từng bước</h3>
+<p>Nếu bạn đã học OLS thì có thể bỏ qua phần này: đó là chứng minh vì sao công thức nghiệm đúng, cùng ý nghĩa hình học (phần dư vuông góc với các biến giải thích). Chỉ cần nhớ: <strong>bài toán này lồi nên chỉ có một “đáy” và máy tìm được nó</strong>; thư viện dùng <code>lstsq</code> thay vì tự nghịch đảo ma trận.</p>
+<details class="derivation">
+  <summary>Xem suy dẫn đầy đủ (ma trận, hình học, ví dụ tính tay, code)</summary>
+  <div class="dv-body">
 <p>Viết lại mất mát bằng ký hiệu ma trận và khai triển:</p>
 $$J(\mathbf{w})=\frac1n\lVert X\mathbf{w}-\mathbf{y}\rVert^2=\frac1n\Big(\mathbf{w}^\top X^\top X\,\mathbf{w}-2\,\mathbf{y}^\top X\mathbf{w}+\mathbf{y}^\top\mathbf{y}\Big)$$
 <p>Dùng hai quy tắc đạo hàm \(\nabla_{\mathbf w}(\mathbf{w}^\top A\mathbf{w})=2A\mathbf{w}\) (với \(A\) đối xứng) và \(\nabla_{\mathbf w}(\mathbf{b}^\top\mathbf{w})=\mathbf{b}\):</p>
@@ -85,21 +114,29 @@ print(w_normal, w_lstsq)                           # cả hai: [0.6667 0.5]
 r = y - X @ w_lstsq
 print(X.T @ r)                                     # xấp xỉ [0, 0]: phần dư vuông góc với các cột của X</code></pre>
 <div class="callout tip"><span class="callout-title">Vì sao không tự nghịch đảo \(X^\top X\)?</span>Số điều kiện của \(X^\top X\) bằng bình phương số điều kiện của \(X\), nên sai số làm tròn bị khuếch đại. Các thư viện giải bài toán bằng QR hoặc SVD trực tiếp trên \(X\) (<code>lstsq</code>), ổn định hơn và vẫn cho nghiệm khi các cột phụ thuộc tuyến tính. Khi đặc trưng tương quan mạnh (đa cộng tuyến), nghiệm rất nhạy với nhiễu; điều chuẩn L2 cải thiện đúng điểm này.</div>
+  </div>
+</details>
 
 <h2 id="gradient-descent">Gradient descent</h2>
+<p>Hình dung bạn đứng trên sườn đồi trong sương mù và muốn xuống thung lũng (nơi sai số thấp nhất). Mỗi bước, bạn nhìn xem hướng nào dốc xuống nhất rồi bước một đoạn nhỏ; độ dài mỗi bước là <strong>tốc độ học</strong>. Giống như chỉnh giá từng chút một theo phản ứng của thị trường: chỉnh quá tay thì dao động, chỉnh quá nhẹ thì mất rất lâu mới tới mức giá hợp lý. Đây là cách hầu hết mô hình hiện đại được huấn luyện.</p>
+<details class="derivation">
+  <summary>Xem công thức cập nhật và đạo hàm</summary>
+  <div class="dv-body">
 <p>Ý tưởng: đứng ở \(\theta\), đi một bước ngược hướng đạo hàm vì đó là hướng làm \(J\) giảm nhanh nhất tại chỗ:</p>
 $$\theta \leftarrow \theta - \eta\,\nabla_\theta J(\theta)$$
 <p>với \(\eta\) là <strong>tốc độ học</strong> (learning rate). Với MSE của hồi quy tuyến tính:</p>
 $$\frac{\partial J}{\partial w} = \frac{2}{n}\sum_{i}\left(\hat{y}_i - y_i\right)x_i, \qquad \frac{\partial J}{\partial b} = \frac{2}{n}\sum_{i}\left(\hat{y}_i - y_i\right)$$
+  </div>
+</details>
 
 <h3 id="gd-1d">Tốc độ học quyết định mọi thứ</h3>
-<p>Thử kéo \(\eta\) trong minh họa dưới đây. Với \(f(w)=(w-2)^2\), mỗi bước nhân khoảng cách tới đáy với \(1-2\eta\), nên hội tụ khi \(0\lt\eta\lt1\), dao động khi \(\eta>0.5\) và phân kỳ khi \(\eta>1\). Chuyển sang hàm hai đáy để thấy gradient descent chỉ tìm được cực tiểu <em>cục bộ</em> gần điểm xuất phát.</p>
+<p>Thử kéo tốc độ học trong minh họa dưới đây. Mỗi bước, khoảng cách tới đáy được nhân với một hệ số: tốc độ học nhỏ thì tiến dần tới đáy; ở mức vừa thì nhảy qua lại quanh đáy nhưng vẫn tiến vào; quá lớn thì mỗi bước văng xa hơn bước trước và phân kỳ (với hàm \((w-2)^2\), các ngưỡng rơi đúng vào 0,5 và 1; xem Bài 1). Chuyển sang hàm hai đáy để thấy gradient descent chỉ tìm được đáy <em>cục bộ</em> gần điểm xuất phát.</p>
 <div class="viz" data-viz="gd1" data-title="Gradient descent trên hàm một biến">
   <p class="viz-help">Bấm “Một bước” nhiều lần hoặc “Chạy tự động”. Bấm vào đồ thị để đặt lại điểm xuất phát.</p>
 </div>
 
 <h3 id="gd-hoi-quy">Huấn luyện hồi quy tuyến tính bằng gradient descent</h3>
-<p>Bây giờ có hai tham số \(w, b\). Hãy thử tăng \(\eta\) lên khoảng 0.03–0.04 khi <em>chưa</em> chuẩn hóa \(x\): mô hình dễ phân kỳ vì \(x\) có thang đo lớn làm đường mất mát rất dốc theo hướng \(w\). Bật “Chuẩn hóa x” và cùng \(\eta\) sẽ ổn định hơn nhiều. Đó là lý do ta luôn chuẩn hóa đặc trưng.</p>
+<p>Bây giờ có hai tham số (độ dốc và hằng số). Hãy thử tăng tốc độ học lên khoảng 0.03–0.04 khi <em>chưa</em> chuẩn hóa biến đầu vào: mô hình dễ phân kỳ vì biến có thang đo lớn làm bề mặt sai số rất dốc theo một hướng. Bật “Chuẩn hóa x” và cùng tốc độ học sẽ ổn định hơn nhiều. Đó là lý do ta luôn chuẩn hóa đặc trưng, như quy mọi chỉ tiêu về cùng thang đo trước khi so sánh.</p>
 <div class="viz" data-viz="reg1" data-title="Hồi quy tuyến tính học bằng gradient descent">
   <p class="viz-help">Bấm vào đồ thị để thêm điểm dữ liệu. Đường chấm xanh lá là nghiệm đóng (OLS) để so sánh.</p>
 </div>
@@ -125,31 +162,62 @@ print(a, c)                          # gần 0.7 và 2 (lệch một chút do nh
 <strong>Batch GD</strong> dùng toàn bộ dữ liệu cho mỗi bước; <strong>SGD</strong> dùng một mẫu; <strong>mini-batch</strong> dùng một lô nhỏ (phổ biến nhất). Lô nhỏ cho gradient nhiễu nhưng rẻ và thường giúp thoát điểm kẹt. Các bộ tối ưu như momentum và Adam được giải thích ở trang Deep Learning.</div>
 
 <h2 id="logistic">Phân loại với hồi quy logistic</h2>
+<p>Khi cần dự đoán <strong>có/không</strong> (khoản vay có vỡ nợ không, giao dịch có gian lận không), ta muốn đầu ra là <strong>xác suất</strong> từ 0 đến 1. Hồi quy logistic lấy cùng tổng có trọng số như hồi quy tuyến tính rồi đưa qua một “bộ nén” hình chữ S (sigmoid) để ra xác suất; bạn đã gặp nó dưới tên mô hình logit trong kinh tế lượng. Ranh giới giữa hai quyết định là một đường thẳng (hoặc mặt phẳng) trong không gian đặc trưng. Nhiều lớp thì dùng softmax (xem trang Deep Learning).</p>
+<details class="derivation">
+  <summary>Xem công thức sigmoid, cross-entropy và gradient</summary>
+  <div class="dv-body">
 <p>Với bài toán hai lớp \(y\in\{0,1\}\), ta muốn đầu ra là xác suất. Hàm sigmoid ép một số thực về khoảng \((0,1)\):</p>
 $$p = \sigma(z) = \frac{1}{1+e^{-z}}, \qquad z = \mathbf{w}^\top\mathbf{x} + b$$
 <p>Mất mát phù hợp là <strong>cross-entropy nhị phân</strong> (âm log-likelihood của Bernoulli):</p>
 $$J = -\frac{1}{n}\sum_{i}\Big[y_i\log p_i + (1-y_i)\log(1-p_i)\Big]$$
 <p>Kết quả đạo hàm gọn đáng ngạc nhiên: \(\partial J/\partial z_i = (p_i - y_i)/n\), nên \(\nabla_{\mathbf w}J = \frac1n X^\top(\mathbf{p}-\mathbf{y})\), có cùng dạng với hồi quy tuyến tính. Ranh giới quyết định \(\mathbf{w}^\top\mathbf{x}+b=0\) là một siêu phẳng. Với nhiều lớp, dùng softmax (xem trang Deep Learning).</p>
+  </div>
+</details>
 
 <h3 id="suy-dan-logistic">Suy dẫn gradient của hồi quy logistic</h3>
+<p>Chỉ dành cho ai muốn biết vì sao công thức gradient gọn như vậy. Điều đáng nhớ: gradient của logistic có cùng dạng “sai số dự đoán × đầu vào” như hồi quy tuyến tính, bài toán vẫn lồi, và khi hai lớp tách hoàn toàn thì cần điều chuẩn.</p>
+<details class="derivation">
+  <summary>Xem suy dẫn gradient của hồi quy logistic</summary>
+  <div class="dv-body">
 <p>Đạo hàm của sigmoid có dạng gọn \(\sigma'(z)=\sigma(z)\big(1-\sigma(z)\big)\) (suy ra từ \(\sigma=(1+e^{-z})^{-1}\)). Với một mẫu, \(L=-[y\ln p+(1-y)\ln(1-p)]\) và \(p=\sigma(z)\). Quy tắc chuỗi:</p>
 $$\frac{\partial L}{\partial p}=-\frac{y}{p}+\frac{1-y}{1-p}=\frac{p-y}{p(1-p)},\qquad \frac{\partial p}{\partial z}=p(1-p)\ \Longrightarrow\ \frac{\partial L}{\partial z}=p-y$$
 <p>Vì \(z=\mathbf{w}^\top\mathbf{x}+b\), ta có \(\nabla_{\mathbf w}J=\frac1n\sum_i(p_i-y_i)\mathbf{x}_i\). Hessian là \(\frac1n X^\top S X\) với \(S=\mathrm{diag}\big(p_i(1-p_i)\big)\), nửa xác định dương, nên \(J\) vẫn lồi; nhưng không có nghiệm đóng như hồi quy tuyến tính. Người ta giải bằng gradient descent hoặc phương pháp Newton (IRLS, mỗi bước là một bài toán bình phương tối thiểu có trọng số). Lưu ý: nếu hai lớp <em>tách tuyến tính hoàn toàn</em>, mất mát tiếp tục giảm khi \(\lVert\mathbf w\rVert\to\infty\), nên không có cực tiểu hữu hạn; điều chuẩn L2 (mặc định trong scikit-learn) giải quyết việc này.</p>
+  </div>
+</details>
 
 <h2 id="tong-quat-hoa">Overfitting, bias–variance và điều chuẩn</h2>
 <p>Mục tiêu thật sự của ML là <strong>tổng quát hóa</strong>: tốt trên dữ liệu mới. Mô hình quá linh hoạt sẽ “học thuộc” nhiễu của tập huấn luyện (overfitting); mô hình quá đơn giản không bắt được quy luật (underfitting). Với mất mát bình phương, sai số kỳ vọng phân rã thành</p>
+<p>Với mất mát bình phương, sai số dự báo trên dữ liệu mới gồm ba phần cộng lại:</p>
+<ul>
+  <li><strong>Sai lệch hệ thống (bias)</strong>: do mô hình quá đơn giản, như dự báo doanh thu mọi tháng bằng một con số trung bình năm.</li>
+  <li><strong>Độ nhạy với mẫu (phương sai)</strong>: mô hình quá “nhạy”, chỉ cần đổi vài tháng dữ liệu là dự báo đổi hẳn.</li>
+  <li><strong>Nhiễu vốn có</strong>: biến động ngẫu nhiên của thị trường mà không mô hình nào dự đoán được.</li>
+</ul>
+<p>Hai phần đầu là thứ ta điều khiển được, và làm giảm phần này thường làm tăng phần kia: đó là “đánh đổi bias–phương sai”.</p>
+<p><strong>Điều chuẩn (regularization)</strong> là một khoản “phạt” cho độ phức tạp: muốn dùng hệ số lớn phải “trả phí”, nên mô hình chỉ giữ hệ số khi thật sự có ích, giống một loại thuế đánh vào độ phức tạp. Phạt theo bình phương hệ số (L2, ridge) co đều các hệ số; phạt theo trị tuyệt đối (L1, lasso) đưa nhiều hệ số về đúng 0, tức tự chọn biến.</p>
+<details class="derivation">
+  <summary>Xem công thức bias–phương sai và điều chuẩn</summary>
+  <div class="dv-body">
 $$\mathbb{E}\big[(y-\hat f(x))^2\big] = \text{Bias}^2 + \text{Var} + \sigma^2$$
 <p>Trong đó \(\text{Bias}^2\) là sai số do mô hình quá đơn giản, \(\text{Var}\) là độ nhạy của mô hình với mẫu huấn luyện cụ thể, và \(\sigma^2\) là nhiễu vốn có của dữ liệu, không thể giảm.</p>
 <p><strong>Điều chuẩn (regularization)</strong> thêm một khoản phạt vào mất mát để kiềm chế độ phức tạp. Với L2 (ridge): \(J_\lambda = J + \lambda\lVert\mathbf{w}\rVert_2^2\), nghiệm đóng \(\mathbf{w}=(X^\top X+\lambda I)^{-1}X^\top\mathbf{y}\). L1 (lasso) phạt \(\lVert\mathbf{w}\rVert_1\) và có xu hướng đưa nhiều trọng số về đúng 0.</p>
+  </div>
+</details>
 <p>Trong minh họa sau, 15 điểm huấn luyện được sinh từ \(\sin(2\pi x)\) cộng nhiễu. Hãy tăng bậc đa thức khi \(\lambda=0\) và quan sát: sai số huấn luyện luôn giảm, còn sai số kiểm tra giảm rồi tăng vọt. Sau đó bật \(\lambda\) để “kéo” đường cong trơn lại.</p>
 <div class="viz" data-viz="poly1" data-title="Overfitting và điều chuẩn L2">
   <p class="viz-help">Đường cam là mô hình, đường xanh lá nét đứt là hàm thật. Biểu đồ dưới so sánh sai số trên dữ liệu đã thấy và dữ liệu mới theo từng bậc.</p>
 </div>
 
 <h3 id="phan-ra-bv">Phân rã bias–variance: chứng minh và quan sát</h3>
+<p>Ý chính, không cần công thức: sai số dự báo luôn tách được thành bias², phương sai và nhiễu vì phần nhiễu độc lập với mô hình. Minh họa dưới đây cho thấy điều đó bằng mô phỏng.</p>
+<details class="derivation">
+  <summary>Xem chứng minh phân rã bias–phương sai</summary>
+  <div class="dv-body">
 <p>Giả sử nhãn sinh ra theo \(y=f(x)+\varepsilon\) với \(\mathbb{E}[\varepsilon]=0\), \(\mathrm{Var}(\varepsilon)=\sigma^2\), và \(\varepsilon\) độc lập với tập huấn luyện. Mô hình \(\hat f\) học từ tập huấn luyện ngẫu nhiên nên bản thân \(\hat f(x)\) là biến ngẫu nhiên. Tại một điểm \(x\) cố định, kỳ vọng lấy theo cả nhiễu và tập huấn luyện:</p>
 $$\begin{aligned}\mathbb{E}\big[(y-\hat f)^2\big]&=\mathbb{E}\big[(f-\hat f)^2\big]+2\,\mathbb{E}[\varepsilon]\,\mathbb{E}[f-\hat f]+\mathbb{E}[\varepsilon^2]=\mathbb{E}\big[(f-\hat f)^2\big]+\sigma^2\\ \mathbb{E}\big[(f-\hat f)^2\big]&=\big(f-\mathbb{E}[\hat f]\big)^2+\mathbb{E}\big[(\hat f-\mathbb{E}[\hat f])^2\big]=\text{Bias}^2+\text{Var}\end{aligned}$$
 <p>Dòng đầu bỏ được số hạng chéo vì \(\varepsilon\) độc lập, kỳ vọng 0. Dòng hai cộng và trừ \(\mathbb{E}[\hat f]\), số hạng chéo \(2(f-\mathbb{E}\hat f)\,\mathbb{E}[\mathbb{E}\hat f-\hat f]\) bằng 0. Kết quả: <strong>sai số = bias² + phương sai + nhiễu</strong>, và chỉ hai số hạng đầu là thứ mô hình điều khiển được.</p>
+  </div>
+</details>
 <p>Minh họa dưới đây <em>mô phỏng đúng định nghĩa</em>: lặp lại 200 lần việc “lấy một tập huấn luyện mới, huấn luyện lại mô hình”, rồi đo đường trung bình (tính bias) và độ tản mát của các đường (tính phương sai). Với bậc thấp, các đường gần nhau nhưng trung bình lệch xa hàm thật (bias cao). Với bậc cao, trung bình sát hàm thật nhưng từng đường dao động dữ dội (phương sai cao). Tăng số mẫu N làm phương sai giảm; tăng λ đổi một ít bias lấy nhiều phương sai.</p>
 <div class="viz" data-viz="bv1" data-title="Bias và phương sai bằng mô phỏng">
   <p class="viz-help">Thử: bậc 1 (bias lớn), bậc 3 (cân bằng), bậc 9 với λ = 0 (phương sai nổ tung), rồi giữ bậc 9 và bật λ = 10^-3, hoặc tăng N lên 60.</p>
@@ -164,11 +232,23 @@ $$\begin{aligned}\mathbb{E}\big[(y-\hat f)^2\big]&=\mathbb{E}\big[(f-\hat f)^2\b
   <li><strong>Rò rỉ dữ liệu (data leakage)</strong>: mọi bước học từ dữ liệu (chuẩn hóa, chọn đặc trưng, điền giá trị thiếu) phải được “fit” chỉ trên tập train. Dùng <code>Pipeline</code> để tránh lỗi này.</li>
   <li>Với dữ liệu theo thời gian, chia theo thời gian (quá khứ để train, tương lai để test), không xáo trộn ngẫu nhiên.</li>
 </ul>
+<p>Hình dưới chạy k-fold <em>từng bước</em>: mỗi lượt giấu một phần dữ liệu, học trên phần còn lại rồi chấm điểm trên phần bị giấu. Đây là bản “dự báo ngoài mẫu” có kỷ luật.</p>
+<div class="viz" data-viz="cvstep1" data-title="Kiểm định chéo 5 phần, từng bước">
+  <p class="viz-help">Bấm “Bước tiếp” năm lần. Rồi đổi bậc đa thức: bậc 9 khớp rất sát dữ liệu đã dùng nhưng điểm kiểm định chéo xấu đi nhiều.</p>
+</div>
 <h3 id="chi-so">Các chỉ số phân loại</h3>
 <p>Từ ma trận nhầm lẫn gồm TP, FP, FN, TN:</p>
-$$\text{Precision}=\frac{TP}{TP+FP},\quad \text{Recall}=\frac{TP}{TP+FN},\quad F_1=\frac{2\cdot \text{Precision}\cdot\text{Recall}}{\text{Precision}+\text{Recall}}$$
+<ul>
+  <li><strong>Precision</strong> (độ chính xác của cảnh báo): trong các ca mô hình báo “dương tính”, bao nhiêu phần trăm là đúng.</li>
+  <li><strong>Recall</strong> (độ phủ): trong các ca thật sự dương tính, mô hình bắt được bao nhiêu phần trăm.</li>
+  <li><strong>F1</strong>: trung bình điều hòa của hai số trên, cao khi cả hai cùng cao. Mỗi chỉ số chỉ là tỉ số các ô TP, FP, FN, TN (Bài 2 có ví dụ tính tay).</li>
+</ul>
 <p>Độ chính xác (accuracy) dễ gây hiểu lầm khi lớp mất cân bằng: nếu chỉ 1% mẫu là dương tính thì mô hình luôn đoán “âm tính” đạt 99% accuracy mà vô dụng. Khi đó hãy xem precision/recall, PR-AUC hoặc ROC-AUC. ROC-AUC có thể hiểu là xác suất một mẫu dương ngẫu nhiên được chấm điểm cao hơn một mẫu âm ngẫu nhiên.</p>
 <div class="callout warn"><span class="callout-title">Chọn ngưỡng theo chi phí</span>Mặc định ngưỡng 0.5 hiếm khi tối ưu. Trong chẩn đoán bệnh, bỏ sót (FN) thường đắt hơn báo nhầm (FP); trong lọc thư rác thì ngược lại. Hãy chọn ngưỡng theo chi phí thực tế của bài toán.</div>
+<p>Ngưỡng “từ chối khi nào” là bài toán kinh tế thuần túy: so <strong>lãi biên</strong> của việc duyệt một khoản tốt với <strong>lỗ biên</strong> của việc duyệt nhầm một khoản vỡ nợ. Thử trong kịch bản duyệt vay dưới đây (tính bằng triệu đồng, dữ liệu mô phỏng):</p>
+<div class="viz" data-viz="loan1" data-title="Duyệt vay: ngưỡng nào có lợi nhuận cao nhất?">
+  <p class="viz-help">Kéo ngưỡng (vạch tím) để duyệt nhiều hay ít hơn; chấm xanh lá là ngưỡng có lợi nhuận cao nhất trong mẫu. Rồi tăng “lỗ mỗi khoản vỡ nợ” hoặc giảm độ phân biệt của mô hình và xem ngưỡng tối ưu dịch chuyển.</p>
+</div>
 
 <h2 id="mo-hinh-khac">Một số mô hình kinh điển khác</h2>
 <h3 id="knn">k láng giềng gần nhất (k-NN)</h3>
@@ -177,13 +257,18 @@ $$\text{Precision}=\frac{TP}{TP+FP},\quad \text{Recall}=\frac{TP}{TP+FN},\quad F
   <p class="viz-help">Bấm vào đồ thị để thêm điểm. Tăng k để ranh giới trơn hơn; thử bộ dữ liệu XOR và so sánh với mô hình tuyến tính.</p>
 </div>
 <h3 id="cay">Cây quyết định và rừng ngẫu nhiên</h3>
-<p>Cây chia dữ liệu bằng chuỗi câu hỏi “đặc trưng nào ≤ ngưỡng?”, chọn phép chia làm giảm độ “lẫn tạp” nhiều nhất, ví dụ Gini \(G=1-\sum_k p_k^2\) hoặc entropy \(H=-\sum_k p_k\log_2 p_k\). Một cây sâu dễ overfit; <strong>rừng ngẫu nhiên</strong> (random forest) huấn luyện nhiều cây trên các mẫu bootstrap với tập đặc trưng ngẫu nhiên rồi lấy trung bình, giảm phương sai. Với dữ liệu dạng bảng, các mô hình cây tăng cường gradient (gradient boosting) thường là baseline rất mạnh.</p>
+<p>Cây chia dữ liệu bằng chuỗi câu hỏi “đặc trưng nào ≤ ngưỡng?”, giống sơ đồ quyết định “nếu thu nhập &gt; X thì … nếu không thì …”. Mỗi lần chọn phép chia làm giảm nhiều nhất độ “lẫn tạp” của nhóm (đo bằng Gini hoặc entropy, càng lẫn thì giá trị càng lớn). Một cây sâu dễ overfit; <strong>rừng ngẫu nhiên</strong> (random forest) huấn luyện nhiều cây trên các mẫu bootstrap với tập đặc trưng ngẫu nhiên rồi lấy trung bình, giảm phương sai. Với dữ liệu dạng bảng, các mô hình cây tăng cường gradient (gradient boosting) thường là baseline rất mạnh.</p>
 <h4 id="cay-chi-tiet">Cách cây chọn phép chia: ví dụ số</h4>
+<details class="derivation">
+  <summary>Xem ví dụ tính Gini cho một phép chia</summary>
+  <div class="dv-body">
 <p>Tại mỗi nút, thuật toán (CART) thử mọi đặc trưng và mọi ngưỡng, chọn phép chia làm <em>độ tạp trung bình có trọng số</em> của hai nút con nhỏ nhất. Ví dụ một nút có 6 mẫu dương và 4 mẫu âm: \(G=1-0.6^2-0.4^2=0.48\). Một phép chia cho nút trái (5 dương, 1 âm) và nút phải (1 dương, 3 âm):</p>
 $$G_L=1-\big(\tfrac56\big)^2-\big(\tfrac16\big)^2\approx0.278,\quad G_R=1-\big(\tfrac14\big)^2-\big(\tfrac34\big)^2=0.375,\quad G_{\text{chia}}=\tfrac{6}{10}G_L+\tfrac{4}{10}G_R\approx0.317$$
 <p>Độ giảm Gini là \(0.48-0.317\approx0.163\). Nếu dùng entropy thay vì Gini, độ tăng thông tin tương ứng là khoảng 0.256 bit; hai tiêu chí thường chọn ra phép chia gần giống nhau. Quá trình lặp đệ quy cho đến khi nút thuần, đạt độ sâu tối đa hoặc quá ít mẫu.</p>
+  </div>
+</details>
 <ul>
-  <li><strong>Cây luôn có thể khớp hoàn hảo tập huấn luyện</strong> (mỗi lá một mẫu) nên độ sâu và số mẫu tối thiểu mỗi lá là các núm điều chuẩn chính. Một cách khác là <em>tỉa</em> cây theo chi phí–độ phức tạp: \(R_\alpha(T)=R(T)+\alpha\,|T|\), với \(|T|\) là số lá.</li>
+  <li><strong>Cây luôn có thể khớp hoàn hảo tập huấn luyện</strong> (mỗi lá một mẫu) nên độ sâu và số mẫu tối thiểu mỗi lá là các núm điều chuẩn chính. Một cách khác là <em>tỉa</em> cây: mỗi lá thêm vào phải “trả phí”, chỉ giữ lá nếu nó giảm sai số đủ nhiều.</li>
   <li>Các phép chia song song với trục nên ranh giới chéo cần nhiều “bậc thang”. Quan sát trên dữ liệu hai vầng trăng.</li>
   <li>Cây không nhạy với thang đo đặc trưng, nhưng rất <strong>không ổn định</strong>: thay vài mẫu có thể đổi hẳn cấu trúc. Đó là động lực của rừng ngẫu nhiên (phần Ensemble).</li>
 </ul>
@@ -192,15 +277,20 @@ $$G_L=1-\big(\tfrac56\big)^2-\big(\tfrac16\big)^2\approx0.278,\quad G_R=1-\big(\
 </div>
 
 <h3 id="kmeans">k-means (gom cụm)</h3>
-<p>Tìm \(k\) tâm cụm \(\boldsymbol\mu_1,\dots,\boldsymbol\mu_k\) cực tiểu hóa \(\sum_i \lVert \mathbf{x}_i-\boldsymbol\mu_{c(i)}\rVert^2\) bằng cách lặp hai bước: (1) gán mỗi điểm cho tâm gần nhất, (2) cập nhật mỗi tâm bằng trung bình của cụm. Thuật toán hội tụ về cực tiểu cục bộ, nên cần khởi tạo nhiều lần và chuẩn hóa đặc trưng; chọn \(k\) bằng phương pháp khuỷu tay (elbow) hoặc hệ số silhouette.</p>
+<p>Gom khách hàng (hoặc giao dịch, sản phẩm) thành \(k\) nhóm giống nhau mà không cần nhãn, ví dụ phân khúc khách theo tần suất và giá trị mua. Mỗi nhóm có một “khách hàng điển hình” (tâm cụm). Thuật toán lặp hai bước: (1) gán mỗi điểm cho tâm gần nhất, (2) dời mỗi tâm về trung bình nhóm của nó, cho tới khi không đổi. Kết quả phụ thuộc điểm xuất phát nên cần khởi tạo nhiều lần và chuẩn hóa đặc trưng; chọn \(k\) bằng đồ thị khuỷu tay (elbow), hệ số silhouette hoặc theo nhu cầu nghiệp vụ.</p>
 
 <h4 id="kmeans-chi-tiet">Vì sao k-means luôn dừng, và vì sao có thể kém</h4>
+<details class="derivation">
+  <summary>Xem vì sao k-means luôn dừng và vì sao có thể kém</summary>
+  <div class="dv-body">
 <p>Mục tiêu là \(J=\sum_i\lVert\mathbf{x}_i-\boldsymbol\mu_{c(i)}\rVert^2\). Mỗi vòng có hai bước, và <strong>mỗi bước đều không làm \(J\) tăng</strong>:</p>
 <ol>
   <li><em>Gán</em>: giữ nguyên tâm, gán mỗi điểm cho tâm gần nhất. Với tâm cố định, đây là cách gán làm từng số hạng nhỏ nhất.</li>
   <li><em>Cập nhật</em>: giữ nguyên phép gán, với một cụm \(S_j\) hàm \(\sum_{i\in S_j}\lVert\mathbf{x}_i-\boldsymbol\mu\rVert^2\) đạt cực tiểu tại \(\boldsymbol\mu=\frac1{|S_j|}\sum_{i\in S_j}\mathbf{x}_i\) (đặt gradient bằng 0).</li>
 </ol>
 <p>Vì chỉ có hữu hạn cách chia \(n\) điểm vào \(k\) cụm và \(J\) không tăng, thuật toán chắc chắn dừng; nhưng nó chỉ đảm bảo cực tiểu <em>cục bộ</em>. Hãy chạy từng bước, rồi khởi tạo lại nhiều lần với “chọn ngẫu nhiên”: thỉnh thoảng hai tâm rơi vào cùng một cụm thật và kết quả kém hẳn. <strong>k-means++</strong> (Arthur và Vassilvitskii, 2007) chọn tâm thứ \(j\) với xác suất tỉ lệ với bình phương khoảng cách tới tâm gần nhất đã chọn, nên các tâm đầu rải đều hơn; đây là mặc định của scikit-learn. Chọn \(k\): đồ thị khuỷu tay, hệ số silhouette, hoặc theo nhu cầu nghiệp vụ; \(J\) luôn giảm khi tăng \(k\) nên không thể chọn \(k\) bằng cách cực tiểu hóa \(J\).</p>
+  </div>
+</details>
 <div class="viz" data-viz="kmeans1" data-title="k-means từng bước">
   <p class="viz-help">Đặt k = 3 (đúng với cách dữ liệu được sinh), bấm “Một bước” và quan sát luân phiên gán/cập nhật. Sau đó đặt k = 5 hoặc khởi tạo lại vài lần với cách chọn ngẫu nhiên.</p>
 </div>
@@ -226,6 +316,10 @@ print("inertia:", best[2])</code></pre>
 <h2 id="pca">Giảm chiều với PCA</h2>
 <p>PCA (principal component analysis) tìm các hướng trong không gian đặc trưng mà dữ liệu biến thiên nhiều nhất, rồi biểu diễn dữ liệu bằng ít hướng hơn. Dùng để nén, khử nhiễu, vẽ biểu đồ 2D, và làm bước tiền xử lý khi các đặc trưng tương quan mạnh.</p>
 <h3 id="pca-suy-dan">Suy dẫn từ bài toán cực đại phương sai</h3>
+<p>Ý chính: nhiều chỉ tiêu tương quan với nhau (lãi suất, lạm phát, tăng trưởng, tỉ giá…) có thể gộp thành vài “chỉ số tổng hợp” giữ lại phần lớn thông tin. Thành phần chính đầu tiên (PC1) là hướng dữ liệu biến thiên nhiều nhất, như một “chỉ số điều kiện kinh tế chung”. Cái giá của việc bỏ bớt thành phần là phần thông tin bị mất, và ta đo được chính xác nó.</p>
+<details class="derivation">
+  <summary>Xem suy dẫn PCA (nhân tử Lagrange, giá trị riêng, SVD)</summary>
+  <div class="dv-body">
 <p>Cho \(X\in\mathbb{R}^{n\times d}\) đã trừ trung bình từng cột, và ma trận hiệp phương sai \(S=\frac1n X^\top X\). Chiếu lên hướng đơn vị \(\mathbf{w}\) cho phương sai \(\mathrm{Var}(X\mathbf{w})=\mathbf{w}^\top S\mathbf{w}\). Cực đại hóa với ràng buộc \(\mathbf{w}^\top\mathbf{w}=1\) bằng nhân tử Lagrange:</p>
 $$\mathcal{L}=\mathbf{w}^\top S\mathbf{w}-\lambda\big(\mathbf{w}^\top\mathbf{w}-1\big),\qquad \nabla_{\mathbf w}\mathcal{L}=2S\mathbf{w}-2\lambda\mathbf{w}=0\ \Longrightarrow\ S\mathbf{w}=\lambda\mathbf{w}$$
 <p>Vậy \(\mathbf{w}\) là một <strong>vector riêng</strong> của \(S\), và phương sai đạt được chính là \(\mathbf{w}^\top S\mathbf{w}=\lambda\). Để lớn nhất, chọn vector riêng ứng với giá trị riêng lớn nhất \(\lambda_1\). Vì \(S\) đối xứng nên các vector riêng trực giao, và thành phần thứ hai (cực đại phương sai trong phần còn lại) là vector riêng của \(\lambda_2\), v.v. Hệ quả:</p>
@@ -235,6 +329,8 @@ $$\mathcal{L}=\mathbf{w}^\top S\mathbf{w}-\lambda\big(\mathbf{w}^\top\mathbf{w}-
   <li>Liên hệ SVD: nếu \(X=U\Sigma V^\top\) thì \(S=V\,\tfrac{\Sigma^2}{n}\,V^\top\); các cột của \(V\) là thành phần chính và \(\lambda_i=\sigma_i^2/n\). Thực tế người ta tính PCA bằng SVD để ổn định số học.</li>
 </ul>
 <p><strong>Ví dụ số.</strong> Với \(S=\begin{pmatrix}2&1\\1&2\end{pmatrix}\): \(\det(S-\lambda I)=(2-\lambda)^2-1=0\Rightarrow\lambda=3\) hoặc \(1\). Vector riêng tương ứng là \((1,1)/\sqrt2\) và \((1,-1)/\sqrt2\). PC1 giải thích \(3/(3+1)=75\%\) phương sai, và giữ riêng PC1 để lại sai số tái tạo bằng \(\lambda_2=1\).</p>
+  </div>
+</details>
 <div class="viz" data-viz="pca1" data-title="PCA trên đám mây hai chiều">
   <p class="viz-help">Xoay đám mây và thay đổi hai độ lệch chuẩn: PC1 luôn nằm dọc trục dài. Bật chiếu để thấy các khoảng cách ngắn (nét cam nhạt) có bình phương trung bình đúng bằng λ₂. Rồi thêm ngoại lai: λ₂ luôn tăng, còn PC1 xoay nhiều hay ít tùy đám mây dài hay gần tròn (thử đặt hai σ gần nhau, ví dụ 0.6 và 0.5, rồi thêm ngoại lai).</p>
 </div>
@@ -264,12 +360,18 @@ print(((Z - Zk) ** 2).sum(1).mean(), vals[1])  # sai số tái tạo xấp xỉ 
 </ul></div>
 
 <h2 id="svm">SVM và thủ thuật kernel</h2>
+<p>SVM (support vector machine) tìm đường ranh giới phân tách hai nhóm sao cho <strong>khoảng cách an toàn (lề) tới điểm gần nhất ở mỗi phía là lớn nhất</strong>, giống chừa “biên an toàn” rộng nhất giữa nhóm khách tốt và nhóm khách rủi ro. Chỉ những điểm sát ranh giới (<em>support vector</em>) quyết định đường ranh giới; các điểm xa không ảnh hưởng. Nhờ <strong>thủ thuật kernel</strong>, SVM vẽ được ranh giới cong mà không cần tự tạo đặc trưng phi tuyến. Hai núm chính: \(C\) (phạt vi phạm lề: lớn nghĩa là ít khoan nhượng) và \(\gamma\) (độ “địa phương” của kernel RBF).</p>
+<details class="derivation">
+  <summary>Xem công thức SVM, đối ngẫu và kernel</summary>
+  <div class="dv-body">
 <p>SVM (support vector machine) chọn siêu phẳng phân tách <strong>có lề lớn nhất</strong>. Khoảng cách từ điểm \(\mathbf{x}\) tới siêu phẳng \(\mathbf{w}^\top\mathbf{x}+b=0\) là \(|\mathbf{w}^\top\mathbf{x}+b|/\lVert\mathbf{w}\rVert\). Chuẩn hóa tỉ lệ \((\mathbf{w},b)\) sao cho điểm gần nhất thỏa \(y_i(\mathbf{w}^\top\mathbf{x}_i+b)=1\); khi đó mỗi phía có lề \(1/\lVert\mathbf{w}\rVert\) (tổng \(2/\lVert\mathbf{w}\rVert\)), và cực đại hóa lề tương đương</p>
 $$\min_{\mathbf{w},b}\ \tfrac12\lVert\mathbf{w}\rVert^2\quad\text{s.t.}\quad y_i(\mathbf{w}^\top\mathbf{x}_i+b)\ge1\ \ \forall i$$
 <p>Khi dữ liệu không tách hoàn toàn, thêm biến chùng \(\xi_i\ge0\) và hệ số phạt \(C\). Loại bỏ biến chùng cho dạng không ràng buộc, chính là <strong>hinge loss</strong> cộng điều chuẩn L2:</p>
 $$\min_{\mathbf{w},b}\ \tfrac12\lVert\mathbf{w}\rVert^2+C\sum_i\max\big(0,\;1-y_i(\mathbf{w}^\top\mathbf{x}_i+b)\big)$$
 <p>Dạng đối ngẫu (Lagrange) là \(\max_{\boldsymbol\alpha}\sum_i\alpha_i-\tfrac12\sum_{i,j}\alpha_i\alpha_jy_iy_j\,\mathbf{x}_i^\top\mathbf{x}_j\) với \(0\le\alpha_i\le C\), \(\sum_i\alpha_iy_i=0\), và \(\mathbf{w}=\sum_i\alpha_iy_i\mathbf{x}_i\). Hai hệ quả quan trọng: (1) chỉ các điểm có \(\alpha_i>0\) (<em>support vector</em>, nằm trên hoặc trong lề) ảnh hưởng đến nghiệm; (2) dữ liệu chỉ xuất hiện qua tích vô hướng \(\mathbf{x}_i^\top\mathbf{x}_j\), nên có thể thay bằng <strong>hàm kernel</strong> \(k(\mathbf{x}_i,\mathbf{x}_j)=\phi(\mathbf{x}_i)^\top\phi(\mathbf{x}_j)\) mà không cần tính \(\phi\) tường minh. Kernel RBF thường dùng:</p>
 $$k(\mathbf{x},\mathbf{x}')=\exp\!\big(-\gamma\lVert\mathbf{x}-\mathbf{x}'\rVert^2\big)$$
+  </div>
+</details>
 <table>
   <thead><tr><th>Siêu tham số</th><th>Tăng lên thì</th><th>Rủi ro</th></tr></thead>
   <tbody>
@@ -322,12 +424,27 @@ print(len(grid.best_estimator_["svc"].support_), "support vector trên", len(X_t
 <figcaption>Bagging làm trung bình các mô hình độc lập; boosting thêm từng mô hình nhỏ để sửa phần sai còn lại.</figcaption>
 </figure>
 <h3 id="bagging">Bagging và rừng ngẫu nhiên: vì sao trung bình giảm phương sai</h3>
+<p>Giống <strong>đa dạng hóa danh mục</strong>: trung bình nhiều tài sản làm rủi ro riêng giảm mạnh, nhưng phần rủi ro chung của thị trường thì không mất. Với mô hình cũng vậy: trung bình nhiều mô hình giảm “rủi ro riêng” (phương sai), còn phần giống nhau giữa các mô hình thì còn nguyên. Rừng ngẫu nhiên cố làm các cây khác nhau (mỗi cây một mẫu bootstrap, mỗi nút một tập đặc trưng ngẫu nhiên). Kéo thanh trượt dưới đây để thấy rõ.</p>
+<div class="viz" data-viz="bag1" data-title="Bagging là đa dạng hóa: trung bình nhiều mô hình">
+  <p class="viz-help">Đặt ρ = 0 rồi kéo B từ 1 lên 50: sai số co lại như 1/√B. Đặt ρ = 0,8: dù tăng B mãi, sai số cũng chỉ giảm tới ngưỡng √ρ.</p>
+</div>
+<details class="derivation">
+  <summary>Xem công thức phương sai của trung bình và bootstrap</summary>
+  <div class="dv-body">
 <p>Trung bình \(B\) biến ngẫu nhiên có cùng phương sai \(\sigma^2\) và tương quan từng cặp \(\rho\):</p>
 $$\mathrm{Var}\Big(\frac1B\sum_{b=1}^B X_b\Big)=\frac{1}{B^2}\Big(B\sigma^2+B(B-1)\rho\sigma^2\Big)=\rho\sigma^2+\frac{1-\rho}{B}\sigma^2$$
 <p>Tăng \(B\) chỉ làm biến mất số hạng thứ hai; <em>phần \(\rho\sigma^2\) còn lại</em> do các mô hình giống nhau. Rừng ngẫu nhiên giảm \(\rho\) bằng hai cách: mỗi cây học trên một mẫu <em>bootstrap</em> (lấy có hoàn lại \(n\) mẫu), và mỗi nút chỉ xét một tập con đặc trưng ngẫu nhiên. Một mẫu bootstrap chứa trung bình \(1-(1-\frac1n)^n\to1-\frac1e\approx63.2\%\) mẫu phân biệt, nên khoảng 36.8% mẫu “ngoài túi” (out-of-bag) dùng để ước lượng sai số mà không cần tập validation riêng.</p>
+  </div>
+</details>
 <h3 id="boosting">Gradient boosting: gradient descent trong không gian hàm</h3>
+<p>Boosting làm việc <strong>tuần tự</strong> như một nhóm chuyên gia: người thứ nhất dự báo, người thứ hai chỉ tập trung sửa phần <em>sai</em> còn lại, người thứ ba sửa phần sai còn lại sau hai người trước, và cứ thế. Mỗi mô hình mới chỉ là một cây nhỏ nên rất yếu, nhưng cộng dồn thì mạnh. “Hệ số co” nhỏ nghĩa là mỗi người chỉ được sửa một phần nhỏ: an toàn hơn nhưng cần nhiều bước hơn.</p>
+<details class="derivation">
+  <summary>Xem công thức gradient boosting</summary>
+  <div class="dv-body">
 <p>Thay vì tối ưu tham số, ta cộng dần các hàm: \(F_m=F_{m-1}+\nu\,h_m\). Tại mỗi bước, \(h_m\) được huấn luyện để khớp <em>gradient âm</em> của mất mát tại \(F_{m-1}\):</p>
 $$r_{im}=-\left.\frac{\partial L\big(y_i,F(\mathbf{x}_i)\big)}{\partial F(\mathbf{x}_i)}\right|_{F=F_{m-1}}$$
+  </div>
+</details>
 <p>Với bình phương \(L=\tfrac12(y-F)^2\) thì \(r_i=y_i-F_{m-1}(\mathbf{x}_i)\) đúng là <strong>phần dư</strong>; với mất mát logistic thì \(r_i=y_i-p_i\). Hệ số co \(\nu\) (learning rate) nhỏ cần nhiều cây hơn nhưng thường tổng quát hóa tốt hơn. XGBoost và các thư viện tương tự thêm xấp xỉ bậc hai của mất mát và điều chuẩn trên trọng số lá, cùng nhiều tối ưu hệ thống. Cài đặt từ đầu bằng cây nông của scikit-learn (cho kết quả khớp với <code>GradientBoostingRegressor</code> trong thử nghiệm của mình):</p>
 <pre><code class="language-python">import numpy as np
 from sklearn.tree import DecisionTreeRegressor
